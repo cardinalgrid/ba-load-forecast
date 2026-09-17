@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ba-load-forecast"
+version = "0.1.0"
+description = "Day-ahead load forecasting for US balancing authorities with public data: EIA-930 load, NOAA observations and archived HRRR forecasts, under a 9 a.m. information cut-off, scored against each BA's own day-ahead forecast."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Ricardo Guerra", email = "ricardo.guerra@cardinalgrid.com" }]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "pyarrow>=11",
+    "requests>=2.28",
+    "grid-data-sentinel[pandas] @ git+https://github.com/cardinalgrid/grid-data-sentinel",
+]
+
+[project.optional-dependencies]
+hrrr = ["zarr>=2.16,<3", "s3fs>=2024.2"]
+dev = ["pytest>=7", "ruff>=0.4", "matplotlib>=3.7"]
+
+[project.urls]
+Homepage = "https://cardinalgrid.com"
+Repository = "https://github.com/cardinalgrid/ba-load-forecast"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["network: needs internet access (public AWS and NOAA archives)"]
+addopts = "-m 'not network'"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF", "PL", "PT"]
+ignore = ["PLR0913", "PLR0917", "PLR2004", "PLR0912", "PLR0915", "E501", "PLC0415"]

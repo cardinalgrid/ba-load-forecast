@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "ba-load-forecast: day-ahead load forecasting for US balancing authorities with public data"
+type: software
+authors:
+  - family-names: Guerra
+    given-names: Ricardo
+    orcid: "https://orcid.org/0000-0001-6699-9951"
+    affiliation: "Cardinal Grid (independent open initiative)"
+version: 0.1.0
+date-released: 2026-09-17
+license: Apache-2.0
+repository-code: "https://github.com/cardinalgrid/ba-load-forecast"
+url: "https://cardinalgrid.com"
