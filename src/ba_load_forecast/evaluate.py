@@ -29,14 +29,16 @@ def score_day(info: InformationSet, forecasters: Sequence[Forecaster]) -> list[d
     common = {"ba": info.ba, "day": info.day, "day_type": info.day_type, "special_day": info.special_day,
               "run_init": None if info.run is None else f"{info.run[0]}T{info.run[1]:02d}"}
     rows = []
+    actual = info.actual if info.actual_plausible else np.full(24, np.nan)   # a gross fault in the outcome: no one is scored
+    note = None if info.actual_plausible else "implausible actual"
     for fc in forecasters:
-        error = None
+        error = note
         try:
             forecast = np.asarray(fc.predict(blind), dtype=float)
         except ForecastError as e:
             forecast, error = np.full(24, np.nan), str(e)
-        rows.append({**common, "model": fc.name, **day_metrics(forecast, info.actual), "error": error})
-    rows.append({**common, "model": BA_MODEL, **day_metrics(info.ba_forecast, info.actual), "error": None})
+        rows.append({**common, "model": fc.name, **day_metrics(forecast, actual), "error": error})
+    rows.append({**common, "model": BA_MODEL, **day_metrics(info.ba_forecast, actual), "error": note})
     return rows
 
 

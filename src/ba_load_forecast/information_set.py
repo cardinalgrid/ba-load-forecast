@@ -51,22 +51,51 @@ class InformationSet:
     actual: np.ndarray
     day_type: int
     special_day: int | None
+    actual_plausible: bool = True
 
     @property
     def cutoff(self) -> datetime:
         return last_load_hour(self.day)
 
 
+GROSS_LOW, GROSS_HIGH, GROSS_WINDOW_H = 0.2, 5.0, 24 * 28
+
+
+def gross_guard(load: pd.Series) -> pd.Series:
+    """The series with gross faults set to NaN: readings below ``GROSS_LOW`` or above ``GROSS_HIGH`` times
+    the median of the previous four weeks (the hard gross-ratio rule of grid-data-sentinel).
+
+    This is the control cleaning of the study: it removes only what no load could be (an overflow, a
+    dropped digit), and leaves every other fault in the history.
+    """
+    if load.empty:
+        return load
+    ref = load.rolling(GROSS_WINDOW_H, min_periods=24 * 7).median().shift(1)
+    ratio = load / ref
+    bad = ratio.notna() & ((ratio < GROSS_LOW) | (ratio > GROSS_HIGH))
+    return load.mask(bad)
+
+
+def plausible(actual: np.ndarray, reference: float) -> bool:
+    """False when any hour of the day that occurred is a gross fault against the recent median."""
+    a = np.asarray(actual, dtype=float)
+    if np.isnan(reference) or reference <= 0:
+        return True
+    ok = a[~np.isnan(a)]
+    return bool(np.all((ok >= GROSS_LOW * reference) & (ok <= GROSS_HIGH * reference)))
+
+
 class Loader:
     """Reads and caches the public data of every BA-year touched, then builds information sets."""
 
     def __init__(self, tidy_dir: Path, isd_dir: Path, hrrr_dir: Path, history_days: int = 730,
-                 init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS):
+                 init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True):
         self.tidy_dir = Path(tidy_dir)
         self.isd_dir = Path(isd_dir)
         self.hrrr_dir = Path(hrrr_dir)
         self.history_days = history_days
         self.init_hours = init_hours
+        self.gross_guard = gross_guard
         self._series: dict[tuple, pd.Series] = {}
         self._hrrr: dict[str, pd.DataFrame] = {}
 
@@ -122,7 +151,10 @@ class Loader:
 
         history_index = load.loc[pd.Timestamp(start):pd.Timestamp(cutoff)].index
         load_history = load.reindex(history_index)
+        if self.gross_guard:
+            load_history = gross_guard(load_history)
         temp_history = temp.reindex(history_index)
+        reference = float(load_history.iloc[-GROSS_WINDOW_H:].median()) if len(load_history) else np.nan
 
         off_day = off.reindex(hours).to_numpy(dtype=float)
         fallback = float(off.median()) if len(off) else np.nan
@@ -158,4 +190,5 @@ class Loader:
             ba_forecast=fcst.reindex(hours).to_numpy(dtype=float),
             actual=load.reindex(hours).to_numpy(dtype=float),
             day_type=int(day_types(d64)[0]), special_day=kinds.get(day),
+            actual_plausible=plausible(load.reindex(hours).to_numpy(dtype=float), reference),
         )

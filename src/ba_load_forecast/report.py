@@ -40,6 +40,7 @@ def by_model_ba(rows: pd.DataFrame) -> pd.DataFrame:
     p["win_peak_under"] = p["peak_under_pct"] > p["peak_under_pct_ba"]
     g = p.groupby(["model", "ba"])
     out = g[["mape", "peak_err_pct", "peak_under_pct", "abs_peak_hour_err"]].mean()
+    out.insert(1, "mape_median", g["mape"].median())
     out["worst_peak_under_pct"] = g["peak_under_pct"].min()
     out["win_mape"] = g["win_mape"].mean()
     out["win_peak_under"] = g["win_peak_under"].mean()
@@ -55,8 +56,8 @@ def overall(table: pd.DataFrame) -> pd.DataFrame:
     out = {}
     for model, g in t.groupby("model"):
         w = g["demand_mw"] / g["demand_mw"].sum()
-        row = {c: float((g[c] * w).sum()) for c in ["mape", "peak_err_pct", "peak_under_pct", "abs_peak_hour_err",
-                                                     "win_mape", "win_peak_under"]}
+        row = {c: float((g[c] * w).sum()) for c in ["mape", "mape_median", "peak_err_pct", "peak_under_pct",
+                                                     "abs_peak_hour_err", "win_mape", "win_peak_under"]}
         row["worst_peak_under_pct"] = float(g["worst_peak_under_pct"].min())
         row["n_days"] = int(g["n_days"].sum())
         row["n_bas"] = len(g)
@@ -148,7 +149,7 @@ def write_report(tables: dict[str, pd.DataFrame], path, title: str, intro: str) 
     ov = tables["overall"]
     lines = [f"# {title}", "", intro, "",
              "## All BAs, weighted by mean demand", "",
-             "Mean over BA-days of: hourly MAPE (%), error at the hour of the actual peak (% of the peak), the "
+             "Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the actual peak (% of the peak), the "
              "negative part of that error (under-forecast), the absolute error in the hour of the peak (h); the worst "
              "under-forecast on any day; the fraction of days with a lower MAPE, and with a smaller under-forecast at "
              "the peak, than the BA's own forecast (`DF`).", "",
