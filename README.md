@@ -32,24 +32,29 @@ persistence (the last observed temperature at the same hour, a floor). It never 
 
 **Comparison.** Every forecast is scored against `DF` for the same BA and day, under the same cut-off.
 
-## How good is the weather input? (2024)
+## How good is the weather input? (December 2020 to 2025)
 
 `docs/hrrr_verification.md` compares the HRRR 2 m temperature at each station's grid cell with the
-ISD-Lite observation for the same hour, over the leads a 9 a.m. forecast uses (17 to 45 h), for 2024:
-738 101 pairs at 35 stations.
+ISD-Lite observation for the same hour, over the leads a 9 a.m. forecast uses (17 to 45 h), from
+2 December 2020 to the end of 2025: 3.5 million pairs at 35 stations.
 
-- Overall the forecast runs slightly cool: bias −1.4 °F, MAE 3.1 °F, RMSE 4.0 °F. The MAE grows from
-  about 2.7 °F at the shortest leads to about 3.7 °F at 45 h.
-- The sign flips with temperature. Below 20 °F the forecast is warm on average (+0.7 °F), between 20 and
-  32 °F +0.5 °F, and above 32 °F cool by 1.2 to 1.7 °F.
-- On the 30 coldest mornings of each station (hours 04:00 to 09:00 local), bias is −0.4 °F and MAE 3.0 °F
-  overall, but the sign depends on the place: the forecast is warm at the northern and inland stations
-  (Columbia SC +3.3 °F, Spokane +2.8 °F, Boise +2.6 °F) and cold at the southern ones (Phoenix −5.2 °F,
-  Miami −4.5 °F, Tampa −4.1 °F), whose "coldest mornings" are mild in absolute terms.
+- Overall the forecast runs slightly cool: bias −1.2 °F, MAE 3.1 °F, RMSE 4.0 °F. The MAE grows from
+  about 3.0 °F at the shortest leads to about 3.5 °F at 45 h.
+- The sign flips with temperature. Below 20 °F the forecast is warm on average (+1.4 °F, MAE 3.8 °F),
+  between 20 and 32 °F +0.5 °F, and above 32 °F cool by 1.0 to 1.5 °F.
+- On the 30 coldest mornings of each station (hours 04:00 to 09:00 local), the sign depends on the place:
+  warm at Columbia SC (+5.7 °F), Moses Lake (+3.6 °F), Portland (+3.0 °F) and Spokane (+2.8 °F); cold at
+  Miami (−5.1 °F), Phoenix (−5.0 °F) and Tampa (−4.0 °F), whose "coldest mornings" are mild in absolute
+  terms.
+- In the four winter storms (all hours of the event days), the pooled bias is between −0.5 °F (Uri) and
+  −1.6 °F (January 2025), with MAE 3.3 to 3.7 °F. The largest warm errors are in the Pacific Northwest
+  during Elliott (Portland +7.5 °F, Spokane +4.9 °F) and at Denver during Uri (+4.0 °F); during Elliott the
+  forecast was cold in the Southeast (Louisville −4.9 °F, Nashville −4.5 °F, Atlanta −3.2 °F).
 
 A forecast that runs warm on a cold morning pushes a temperature-driven load forecast down, which is the
 direction of the errors the storm reviews describe. Whether that is what happened at any BA is a question
-for the forecasting phases, not for this table.
+for the forecasting phases, not for this table: at the Southeast stations, where the largest Elliott
+under-forecast was reported, the public weather forecast erred cold, not warm.
 
 ## Layout
 

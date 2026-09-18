@@ -16,6 +16,7 @@ from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
+from grid_sentinel.events import EVENTS
 from grid_sentinel.stations import station_table
 from grid_sentinel.weather import fetch_isd_lite, read_isd_lite
 
@@ -131,8 +132,25 @@ def main(argv=None) -> int:
     cold_by_station["min_observed_f"] = coldest.groupby("icao")["observed_f"].min().round(1)
     cold_all = summarize(cold).round(2)
 
+    # the four winter events: every hour of the local calendar days of each event, all leads
+    ev_parts = []
+    for ev in EVENTS:
+        w = d[(d["local_day"] >= pd.Timestamp(ev["start"])) & (d["local_day"] <= pd.Timestamp(ev["end"]))]
+        if w.empty:
+            continue
+        s = w.groupby("icao").apply(summarize).round(2)
+        s.insert(0, "event", ev["name"])
+        s["min_observed_f"] = w.groupby("icao")["observed_f"].min().round(1)
+        total = summarize(w).round(2)
+        total["event"] = ev["name"]
+        total["min_observed_f"] = round(float(w["observed_f"].min()), 1)
+        s.loc["ALL"] = total
+        ev_parts.append(s)
+    events_by_station = pd.concat(ev_parts) if ev_parts else pd.DataFrame()
+
     for name, t in [("by_station", by_station), ("by_lead", by_lead), ("by_month", by_month), ("by_bin", by_bin),
-                    ("by_local_hour", by_hour), ("cold_mornings_by_station", cold_by_station)]:
+                    ("by_local_hour", by_hour), ("cold_mornings_by_station", cold_by_station),
+                    ("events_by_station", events_by_station)]:
         t.to_csv(a.out / f"{name}.csv")
 
     # figures
@@ -195,6 +213,13 @@ def main(argv=None) -> int:
         "## Cold mornings by station",
         "",
         markdown_table(cold_by_station),
+        "",
+        "## The four winter events",
+        "",
+        "All hours of the local calendar days of each event (the dates of `grid_sentinel.events`), every lead "
+        "from 17 to 45 h; the last row of each event pools every station.",
+        "",
+        markdown_table(events_by_station) if len(events_by_station) else "(no event inside the years verified)",
         "",
         "Tables as CSV, including the error by lead and by local hour, are in `results/hrrr_verification/`.",
         "",
