@@ -95,6 +95,7 @@ class RecencyRegression:
         observed = info.temp_history_f.asfreq("h") if len(info.temp_history_f) else info.temp_history_f
         path = pd.Series(info.temp_forecast_path_f, index=info.path_timestamps)
         temp = pd.concat([observed.loc[: path.index[0] - pd.Timedelta(hours=1)], path])
+        temp = temp.interpolate(limit=6, limit_area="inside")     # short gaps in the observations before the cut-off
         ts = pd.DatetimeIndex(info.timestamps)
         x = design(ts, temp, np.full(24, info.day_type), self.lags, self.moving_avgs, self.degree)
         return x @ self.coef
