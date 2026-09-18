@@ -65,21 +65,22 @@ BA. Mean over BA-days, weighted by each BA's demand:
 
 | Model | MAPE (%) | Median MAPE (%) | Under-forecast at the peak (%) | Days with lower MAPE than `DF` |
 |---|---|---|---|---|
-| The BA's own forecast (`DF`) | 3.03 | 2.71 | −1.12 | |
-| Recency-effect regression (Hong) | 4.31 | 3.64 | −2.49 | 33 % |
-| Profile (Note 2) | 6.88 | 5.30 | −4.35 | 22 % |
-| Last known day | 6.97 | 5.82 | −4.25 | 19 % |
-| Mean of the same day type, 2 weeks | 7.13 | 5.43 | −4.42 | 20 % |
-| Same weekday last week | 8.67 | 6.74 | −5.27 | 15 % |
+| The BA's own forecast (`DF`) | 3.00 | 2.70 | −1.12 | |
+| Recency-effect regression (Hong) | 4.28 | 3.64 | −2.49 | 33 % |
+| Profile (Note 2) | 6.87 | 5.29 | −4.34 | 21 % |
+| Last known day | 6.95 | 5.82 | −4.24 | 19 % |
+| Mean of the same day type, 2 weeks | 7.12 | 5.43 | −4.40 | 20 % |
+| Same weekday last week | 8.66 | 6.73 | −5.26 | 15 % |
 
 The vanilla regression does not beat the operators: the difference is significant at every BA except
 SPP, where the two tie (3.88 % against 3.86 %, Diebold-Mariano p = 0.91, the model ahead on 49 % of
 days). It also under-forecasts the daily peak more than the BAs do, and does worse than they do inside
 Winter Storms Uri and Elliott at most BAs. CAISO is the clearest case of what one station costs: the
 regression (5.7 %) is behind the two-week floor there (5.3 %). Two caveats: the training history was
-cleaned only of gross faults (readings outside 0.2 to 5 times the four-week median), and during Uri
-the ERCOT "load that occurred" is the load served under shedding, so every forecast, the BA's included,
-scores badly there for a reason that is not forecasting.
+cleaned only of gross faults (readings outside 0.2 to 5 times the four-week median); and on the days
+when a BA shed firm load (ERCOT, SPP and MISO South in Uri; TVA and Duke in Elliott, among others) the
+"load that occurred" is the load served, not the demand, so those BA-days are listed in
+`docs/load_shed_days.csv` with their source and left out of every table (10 of 7473 BA-days here).
 
 The next phases add the semi-parametric additive model, gradient boosting, several stations per BA,
 the three treatments of special days and the ensembles, on the same harness.

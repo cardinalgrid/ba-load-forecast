@@ -1113,3 +1113,20 @@ k = 6, silhouette 0.326, 1821 days, classifier accuracy 0.606.
 | 1011 | 2020-10-11 | 1 | 0.28 | 2 | 0 | 5250 |
 | 1167 | 2021-03-17 | 0 | 0.28 | 0 | 0 | 6594 |
 | 1036 | 2020-11-05 | 1 | 0.28 | 0 | 0 | 5672 |
+
+## Documented load-shed days against the atypicality score
+
+Distance to the nearest centroid of the day's regime, and the share of the BA's days with a smaller distance (`docs/load_shed_days.csv` lists the sources). A day whose shape was truncated by firm load shed should sit near the top; a day that does not is a warning that shape alone cannot tell a shed day from an ordinary extreme one.
+
+| ba | day | cluster | distance | percentile | regime |
+| --- | --- | --- | --- | --- | --- |
+| MISO | 2021-02-16 | 1 | 0.13 | 72.50 | heating |
+| ERCO | 2021-02-15 | 1 | 0.64 | 99.90 | heating |
+| ERCO | 2021-02-16 | 1 | 0.29 | 96.20 | heating |
+| ERCO | 2021-02-17 | 0 | 0.27 | 95.10 | heating |
+| ERCO | 2021-02-18 | 0 | 0.21 | 84.90 | heating |
+| SWPP | 2021-02-15 | 1 | 0.07 | 13.00 | heating |
+| SWPP | 2021-02-16 | 1 | 0.20 | 93.60 | heating |
+| TVA | 2022-12-23 | 1 | 0.17 | 66.30 | heating |
+| TVA | 2022-12-24 | 0 | 0.33 | 97.40 | heating |
+| DUK | 2022-12-24 | 0 | 0.31 | 94.80 | heating |

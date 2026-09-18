@@ -44,6 +44,17 @@ def test_complete_cases_and_tables():
     assert t["coverage"].loc["B", "scored_fraction"] == pytest.approx(10 / 12)
 
 
+def test_documented_shed_days_are_left_out_and_reported_apart():
+    rows = rows_fixture()
+    shed = pd.DataFrame({"ba": ["PJM"], "date": [date(2021, 2, 15)]})
+    t = summarise(rows, shed=shed)
+    assert t["by_model_ba"].loc[("A", "PJM"), "n_days"] == 4
+    assert t["by_model_ba"].loc[("A", "TVA"), "n_days"] == 5
+    assert set(t["shed_days"]["day"]) == {date(2021, 2, 15)}
+    assert len(t["shed_days"]) == 3
+    assert "shed_days" not in summarise(rows, shed=pd.DataFrame(columns=["ba", "date"]))
+
+
 def test_dm_test():
     rng = np.random.default_rng(0)
     e = rng.normal(0, 1, 500)

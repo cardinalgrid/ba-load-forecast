@@ -8,6 +8,7 @@ smaller under-forecast at the peak (a less negative ``peak_under_pct``).
 from __future__ import annotations
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -117,10 +118,36 @@ def dm_against_ba(rows: pd.DataFrame, metric: str = "mape") -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
-def summarise(rows: pd.DataFrame, events=EVENTS) -> dict[str, pd.DataFrame]:
+def load_shed_days(path=None) -> pd.DataFrame:
+    """The documented firm-load-shed days (``docs/load_shed_days.csv``: ba, date, ...), or an empty frame."""
+    p = Path(path) if path else Path(__file__).resolve().parents[2] / "docs" / "load_shed_days.csv"
+    if not p.exists():
+        return pd.DataFrame(columns=["ba", "date"])
+    d = pd.read_csv(p)
+    d["date"] = pd.to_datetime(d["date"]).dt.date
+    return d
+
+
+def split_shed(rows: pd.DataFrame, shed: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """The rows outside and inside the documented load-shed BA-days."""
+    if shed.empty:
+        return rows, rows.iloc[0:0]
+    key = set(zip(shed["ba"], shed["date"], strict=True))
+    mask = np.array([(b, d) in key for b, d in zip(rows["ba"], rows["day"], strict=True)])
+    return rows[~mask], rows[mask]
+
+
+def summarise(rows: pd.DataFrame, events=EVENTS, shed: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
+    """Tables on the complete cases; documented load-shed BA-days are left out of every metric and reported apart.
+
+    On a load-shed day the load that occurred is the load served, not the demand, so no forecast can be
+    scored against it. ``shed`` defaults to the list in ``docs/load_shed_days.csv``.
+    """
     cc = complete_cases(rows)
+    shed = load_shed_days() if shed is None else shed
+    cc, shed_rows = split_shed(cc, shed)
     table = by_model_ba(cc)
-    return {
+    out = {
         "by_model_ba": table,
         "overall": overall(table),
         "events": events_table(cc, events),
@@ -128,6 +155,9 @@ def summarise(rows: pd.DataFrame, events=EVENTS) -> dict[str, pd.DataFrame]:
         "dm_peak": dm_against_ba(cc, "peak_err_pct"),
         "coverage": rows.groupby("model")["skipped"].apply(lambda s: 1.0 - s.astype(bool).mean()).to_frame("scored_fraction"),
     }
+    if len(shed_rows):
+        out["shed_days"] = shed_rows[["ba", "day", "model", "mape", "peak_err_pct", "peak_under_pct"]].sort_values(["ba", "day", "model"])
+    return out
 
 
 def markdown_table(t: pd.DataFrame, digits: int = 2) -> str:
@@ -157,6 +187,12 @@ def write_report(tables: dict[str, pd.DataFrame], path, title: str, intro: str) 
              "## By BA", "", markdown_table(tables["by_model_ba"]), ""]
     if len(tables["events"]):
         lines += ["## The winter events (calendar days of each event)", "", markdown_table(tables["events"]), ""]
+    if "shed_days" in tables:
+        lines += ["## Documented load-shed days (left out of every table above)", "",
+                  "On these BA-days the load that occurred is the load served under firm load shed, not the demand "
+                  "(`docs/load_shed_days.csv` gives the source of each). No forecast can be scored against it; the "
+                  "metrics are shown for the record.", "",
+                  markdown_table(tables["shed_days"]), ""]
     lines += ["## Diebold-Mariano against the BA's forecast (daily MAPE)", "",
               "Negative statistics favour the model; p-values from the normal approximation.", "",
               markdown_table(tables["dm_mape"], 3), "",

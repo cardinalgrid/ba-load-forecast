@@ -21,7 +21,7 @@ from grid_sentinel.calendar_us import SATURDAY, SUNDAY, WORKDAY, day_types, spec
 from ba_load_forecast.clusters import LabelClassifier, crosstab, daily_shapes, fit_clusters
 from ba_load_forecast.forecasters.profile import COOLING, HEATING, MILD, regime
 from ba_load_forecast.information_set import Loader, gross_guard
-from ba_load_forecast.report import markdown_table
+from ba_load_forecast.report import load_shed_days, markdown_table
 
 ROOT = Path(__file__).resolve().parents[1]
 DEV_BAS = ("PJM", "MISO", "ERCO", "CISO", "SWPP", "NYIS", "ISNE", "TVA", "DUK", "BPAT")
@@ -138,10 +138,22 @@ def main(argv=None) -> int:
              "regime) cell; its accuracy is the share of days whose cluster it names correctly. Distances are to the "
              "nearest centroid of the day's regime; the largest ones are the most atypical days.", ""]
     summary = []
+    shed = load_shed_days()
+    shed_rows = []
     for ba in a.bas:
         t0 = time.time()
         table, info = analyse_ba(loader, ba, a.start, a.end)
         table.to_csv(a.out / f"{ba}_days.csv", index=False)
+        for d in shed.loc[shed["ba"] == ba, "date"]:
+            row = table[table["day"] == d]
+            if len(row):
+                dist = float(row["distance"].iloc[0])
+                shed_rows.append({"ba": ba, "day": d, "cluster": int(row["cluster"].iloc[0]), "distance": round(dist, 3),
+                                  "percentile": round(float((table["distance"] < dist).mean() * 100), 1),
+                                  "regime": REGIME_NAMES.get(int(row["regime"].iloc[0]), "no temp")})
+            else:
+                shed_rows.append({"ba": ba, "day": d, "cluster": None, "distance": None, "percentile": None,
+                                  "regime": "day not complete or removed by the gross-fault guard"})
         sp = special_table(table, info)
         sp.to_csv(a.out / f"{ba}_special_days.csv", index=False)
         ct = info["crosstab"].copy()
@@ -164,6 +176,14 @@ def main(argv=None) -> int:
                   "### The 20 most atypical days", "", markdown_table(top), ""]
         log(f"{ba}: k={info['k']} silhouette={info['silhouette']:.3f} accuracy={info['classifier_accuracy']:.3f} in {time.time() - t0:.0f} s")
     lines.insert(3, markdown_table(pd.DataFrame(summary)) + "\n")
+    if shed_rows:
+        lines += ["## Documented load-shed days against the atypicality score", "",
+                  "Distance to the nearest centroid of the day's regime, and the share of the BA's days with a smaller "
+                  "distance (`docs/load_shed_days.csv` lists the sources). A day whose shape was truncated by firm "
+                  "load shed should sit near the top; a day that does not is a warning that shape alone cannot tell "
+                  "a shed day from an ordinary extreme one.", "",
+                  markdown_table(pd.DataFrame(shed_rows)), ""]
+        pd.DataFrame(shed_rows).to_csv(a.out / "load_shed_days_distance.csv", index=False)
     a.doc.write_text("\n".join(lines), encoding="utf-8")
     pd.DataFrame(summary).to_csv(a.out / "summary.csv", index=False)
     log(f"written {a.doc}")

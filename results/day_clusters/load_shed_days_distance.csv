@@ -1,0 +1,11 @@
+ba,day,cluster,distance,percentile,regime
+MISO,2021-02-16,1,0.131,72.5,heating
+ERCO,2021-02-15,1,0.64,99.9,heating
+ERCO,2021-02-16,1,0.287,96.2,heating
+ERCO,2021-02-17,0,0.271,95.1,heating
+ERCO,2021-02-18,0,0.207,84.9,heating
+SWPP,2021-02-15,1,0.074,13.0,heating
+SWPP,2021-02-16,1,0.201,93.6,heating
+TVA,2022-12-23,1,0.174,66.3,heating
+TVA,2022-12-24,0,0.327,97.4,heating
+DUK,2022-12-24,0,0.31,94.8,heating
