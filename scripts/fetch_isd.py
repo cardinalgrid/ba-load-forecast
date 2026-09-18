@@ -43,7 +43,7 @@ def main(argv=None) -> int:
         for icao, usaf, wban, y in missing:
             try:
                 p = fetch_isd_lite(usaf, wban, y, a.isd_dir)
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 log(f"{icao} {y}: {type(e).__name__}: {str(e)[:100]}")
                 continue
             if p is None:
