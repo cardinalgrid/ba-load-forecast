@@ -18,7 +18,7 @@ offsets in hours behind UTC).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -27,10 +27,24 @@ import pandas as pd
 from grid_sentinel.calendar_us import day_types, special_days
 from grid_sentinel.data import load_series_local, tidy_frame, utc_offset
 from grid_sentinel.stations import BA_STATION
-from grid_sentinel.weather import hourly_temperature_f
+from grid_sentinel.weather import fetch_isd_lite, hourly_temperature_f, read_isd_lite
 
 from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hour, path_timestamps, run_for_day
 from .hrrr import load_station
+from .stations_multi import BA_STATIONS_MULTI, station_table_for
+
+
+def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Path, isd_dir: Path) -> pd.Series:
+    """Temperature in Fahrenheit at one ISD station, indexed like the BA's load (local hour beginning)."""
+    p = fetch_isd_lite(usaf, wban, year, isd_dir)
+    s = load_series_local(tidy_dir, ba, year)
+    if p is None or s.empty:
+        return pd.Series(dtype=float)
+    obs = read_isd_lite(p).drop_duplicates("utc").set_index("utc")["temp_c"].sort_index()
+    off = utc_offset(tidy_dir, ba, year).reindex(s.index)
+    off = off.fillna(off.median())
+    utc = pd.DatetimeIndex(s.index + pd.to_timedelta(off.to_numpy(), unit="h")).tz_localize("UTC")
+    return pd.Series(obs.reindex(utc).to_numpy(dtype=float) * 9.0 / 5.0 + 32.0, index=s.index)
 
 
 @dataclass
@@ -52,6 +66,9 @@ class InformationSet:
     day_type: int
     special_day: int | None
     actual_plausible: bool = True
+    stations: list[str] = field(default_factory=list)
+    temp_history_stations_f: pd.DataFrame | None = None       # one column per station, aligned with load_history
+    temp_forecast_path_stations_f: pd.DataFrame | None = None  # one column per station, indexed by path_timestamps
 
     @property
     def cutoff(self) -> datetime:
@@ -89,15 +106,37 @@ class Loader:
     """Reads and caches the public data of every BA-year touched, then builds information sets."""
 
     def __init__(self, tidy_dir: Path, isd_dir: Path, hrrr_dir: Path, history_days: int = 730,
-                 init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True):
+                 init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
+                 stations: str = "single", hrrr_dirs: list[Path] | None = None):
+        """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
+        become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
+        looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``)."""
         self.tidy_dir = Path(tidy_dir)
         self.isd_dir = Path(isd_dir)
         self.hrrr_dir = Path(hrrr_dir)
+        self.hrrr_dirs = [Path(d) for d in hrrr_dirs] if hrrr_dirs else [self.hrrr_dir, self.hrrr_dir.parent / "hrrr_multi"]
         self.history_days = history_days
         self.init_hours = init_hours
         self.gross_guard = gross_guard
+        self.stations = stations
         self._series: dict[tuple, pd.Series] = {}
         self._hrrr: dict[str, pd.DataFrame] = {}
+        self._station_table: pd.DataFrame | None = None
+
+    def stations_of(self, ba: str) -> list[str]:
+        if self.stations == "multi" and ba in BA_STATIONS_MULTI:
+            return list(BA_STATIONS_MULTI[ba])
+        return [BA_STATION[ba]]
+
+    def station_temperature(self, icao: str, ba: str, year: int) -> pd.Series:
+        def read():
+            if self._station_table is None:
+                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v}),
+                                                        self.isd_dir).set_index("icao")
+            st = self._station_table.loc[icao]
+            return station_temperature_f(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir)
+
+        return self._cached(("stemp", icao, ba, year), read)
 
     # ---- cached readers -------------------------------------------------------------------------------
     def load(self, ba: str, year: int) -> pd.Series:
@@ -122,7 +161,12 @@ class Loader:
 
     def hrrr(self, icao: str) -> pd.DataFrame:
         if icao not in self._hrrr:
-            self._hrrr[icao] = load_station(self.hrrr_dir, icao)
+            rows = load_station(self.hrrr_dir, icao)
+            for d in self.hrrr_dirs:
+                if len(rows):
+                    break
+                rows = load_station(d, icao)
+            self._hrrr[icao] = rows
         return self._hrrr[icao]
 
     def _cached(self, key, read):
@@ -162,17 +206,27 @@ class Loader:
         off_cutoff = off.get(pd.Timestamp(cutoff), fallback)
 
         run = None
-        temp_fc = np.full(24, np.nan)
         path_ts = path_timestamps(day)
-        temp_path = np.full(PATH_HOURS, np.nan)
-        rows = self.hrrr(BA_STATION[ba])
+        stations = self.stations_of(ba)
+        off_path = off.reindex(path_ts).to_numpy(dtype=float)
+        off_path = np.where(np.isnan(off_path), fallback, off_path)
         if not np.isnan(off_cutoff):
             run = run_for_day(day, float(off_cutoff), self.init_hours)
-            if len(rows):
-                off_path = off.reindex(path_ts).to_numpy(dtype=float)
-                off_path = np.where(np.isnan(off_path), fallback, off_path)
-                temp_path = forecast_path(rows, day, off_path, run)
-                temp_fc = temp_path[-24:]
+        paths = {}
+        for icao in stations:
+            rows = self.hrrr(icao)
+            paths[icao] = forecast_path(rows, day, off_path, run) if run is not None and len(rows) else np.full(PATH_HOURS, np.nan)
+        path_frame = pd.DataFrame(paths, index=path_ts)
+        temp_path = path_frame.mean(axis=1, skipna=False).to_numpy() if len(stations) > 1 else path_frame.iloc[:, 0].to_numpy()
+        temp_fc = temp_path[-24:]
+        stations_hist = None
+        if len(stations) > 1:
+            cols = {icao: self._years(ba, start, day, lambda b, y, i=icao: self.station_temperature(i, b, y)).reindex(history_index)
+                    for icao in stations}
+            stations_hist = pd.DataFrame(cols, index=history_index)
+            temp_history = stations_hist.mean(axis=1)
+            temp = pd.concat([self._years(ba, start, day, lambda b, y, i=icao: self.station_temperature(i, b, y)) for icao in stations],
+                             axis=1).mean(axis=1)
 
         persist = np.full(24, np.nan)
         for h in range(24):
@@ -191,4 +245,6 @@ class Loader:
             actual=load.reindex(hours).to_numpy(dtype=float),
             day_type=int(day_types(d64)[0]), special_day=kinds.get(day),
             actual_plausible=plausible(load.reindex(hours).to_numpy(dtype=float), reference),
+            stations=stations, temp_history_stations_f=stations_hist,
+            temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None,
         )
