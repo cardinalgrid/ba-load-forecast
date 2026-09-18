@@ -15,6 +15,7 @@ per station.
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -26,6 +27,28 @@ from .hrrr_grid import BUCKET, CHUNK, GridPoint
 
 VARIABLE = "2m_above_ground/TMP"
 COLUMNS = ["icao", "init_utc", "lead_h", "valid_utc", "temp_f"]
+RETRY_WAITS_S = (5, 15, 45, 120, 300, 600)
+
+
+def with_retries(call: Callable[[], object], what: str, log: Callable[[str], None] = print,
+                 waits: tuple[float, ...] | None = None):
+    """Run ``call``; on any error other than a missing object, wait and try again, then give up.
+
+    Network errors (DNS, connection resets, throttling) are transient on a job that runs for hours;
+    ``FileNotFoundError`` is how the archive reports an object that does not exist and is not retried.
+    """
+    waits = RETRY_WAITS_S if waits is None else waits
+    for i, wait in enumerate((*waits, None)):
+        try:
+            return call()
+        except FileNotFoundError:
+            raise
+        except Exception as e:
+            if wait is None:
+                raise
+            log(f"{what}: {type(e).__name__}: {str(e)[:120]}; retry {i + 1}/{len(waits)} in {wait} s")
+            time.sleep(wait)
+    return None  # pragma: no cover
 
 
 def kelvin_to_f(k):
@@ -37,10 +60,10 @@ def run_root(day: date, init_hour: int, bucket: str = BUCKET) -> str:
     return f"{bucket}/sfc/{d}/{d}_{init_hour:02d}z_fcst.zarr/{VARIABLE}/{VARIABLE}"
 
 
-def run_meta(fs, root: str) -> dict | None:
+def run_meta(fs, root: str, log: Callable[[str], None] = print) -> dict | None:
     """The Zarr array metadata of a run (shape, chunks, dtype, compressor), or None when the run is absent."""
     try:
-        return json.loads(fs.cat(f"{root}/.zarray"))
+        return json.loads(with_retries(lambda: fs.cat(f"{root}/.zarray"), f"{root}/.zarray", log))
     except FileNotFoundError:
         return None
 
@@ -62,20 +85,31 @@ def decode_chunk(raw: bytes, meta: dict) -> np.ndarray:
     return out
 
 
-def read_run(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket: str = BUCKET) -> dict[str, np.ndarray] | None:
+def read_run(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket: str = BUCKET,
+             log: Callable[[str], None] = print) -> dict[str, np.ndarray] | None:
     """Temperature in Fahrenheit per lead (index 0 = lead 1 h) for every station, or None if the run is absent.
 
-    Every chunk needed is fetched in one concurrent request; a missing chunk gives NaN for its stations.
+    Every chunk needed is fetched in one concurrent request; a chunk the archive lacks gives NaN for its
+    stations, a chunk that fails for any other reason is fetched again (``with_retries``).
     """
     root = run_root(day, init_hour, bucket)
-    meta = run_meta(fs, root)
+    meta = run_meta(fs, root, log)
     if meta is None:
         return None
     if tuple(meta["chunks"][1:]) != (CHUNK, CHUNK):
         raise ValueError(f"unexpected chunking {meta['chunks']} in {root}")
     n_lead = meta["shape"][0]
     keys = sorted({p.chunk_key for p in points.values()})
-    raw = fs.cat([f"{root}/0.{k}" for k in keys], on_error="return")
+    paths = [f"{root}/0.{k}" for k in keys]
+
+    def fetch():
+        got = fs.cat(paths, on_error="return")
+        bad = [q for q, r in got.items() if isinstance(r, Exception) and not isinstance(r, FileNotFoundError)]
+        if bad:
+            raise OSError(f"{len(bad)} chunk reads failed, e.g. {bad[0]}: {got[bad[0]]}")
+        return got
+
+    raw = with_retries(fetch, f"{root} chunks", log)
     blocks: dict[str, np.ndarray | None] = {}
     for k in keys:
         r = raw.get(f"{root}/0.{k}")
@@ -87,9 +121,10 @@ def read_run(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket
     return out
 
 
-def run_frame(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket: str = BUCKET):
+def run_frame(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket: str = BUCKET,
+              log: Callable[[str], None] = print):
     """The tidy rows of one run (``COLUMNS``), or None when the run is absent."""
-    temps = read_run(fs, day, init_hour, points, bucket)
+    temps = read_run(fs, day, init_hour, points, bucket, log)
     if temps is None:
         return None
     init = datetime(day.year, day.month, day.day, init_hour)
@@ -130,7 +165,7 @@ def extract(points: dict[str, GridPoint], start: date, end: date, out_dir: Path,
             f = run_file(out_dir, day, h)
             if resume and f.exists():
                 continue
-            frame = run_frame(fs, day, h, points, bucket)
+            frame = run_frame(fs, day, h, points, bucket, log)
             if frame is None:
                 frame = pd.DataFrame({c: pd.Series(dtype=t) for c, t in
                                       zip(COLUMNS, ["object", "datetime64[ns]", "int16", "datetime64[ns]", "float32"], strict=True)})

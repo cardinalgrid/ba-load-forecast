@@ -14,7 +14,8 @@ def f_of(utc: str) -> float:
 
 def test_information_set_ends_at_the_cutoff_and_carries_the_day(public_data):
     tidy, isd, hrrr = public_data
-    info = Loader(tidy, isd, hrrr).information_set("PJM", date(2024, 1, 16))
+    # history_days stays inside the fixture's years so that no ISD-Lite file is ever fetched from NOAA
+    info = Loader(tidy, isd, hrrr, history_days=60).information_set("PJM", date(2024, 1, 16))
 
     assert info.load_history.index[0] == pd.Timestamp("2023-12-01 00:00")
     assert info.load_history.index[-1] == pd.Timestamp("2024-01-15 08:00")

@@ -6,7 +6,16 @@ import pytest
 import zarr
 from numcodecs import Blosc
 
-from ba_load_forecast.hrrr import consolidate, extract, kelvin_to_f, load_station, read_run, run_file, run_root
+from ba_load_forecast.hrrr import (
+    consolidate,
+    extract,
+    kelvin_to_f,
+    load_station,
+    read_run,
+    run_file,
+    run_root,
+    with_retries,
+)
 from ba_load_forecast.hrrr_grid import GridPoint
 
 N_LEAD = 48
@@ -81,3 +90,44 @@ def test_extract_is_resumable_and_consolidates(bucket, tmp_path):
     assert first["valid_utc"] == datetime(2024, 1, 16, 7)
     assert first["temp_f"] == pytest.approx(kelvin_to_f(cell_value(0, 10, 20)), abs=1e-3)
     assert load_station(out, "KZZZ").empty
+
+
+class FlakyFS:
+    """A filesystem whose first ``failures`` calls raise a connection error."""
+
+    def __init__(self, inner, failures):
+        self.inner, self.failures, self.calls = inner, failures, 0
+
+    def cat(self, *args, **kwargs):
+        self.calls += 1
+        if self.calls <= self.failures:
+            raise ConnectionError("getaddrinfo failed")
+        return self.inner.cat(*args, **kwargs)
+
+
+def test_read_run_retries_transient_network_errors(bucket, monkeypatch):
+    monkeypatch.setattr("ba_load_forecast.hrrr.RETRY_WAITS_S", (0, 0, 0))
+    logs = []
+    fs = FlakyFS(fsspec.filesystem("file"), failures=2)
+    out = read_run(fs, date(2024, 1, 16), 12, POINTS, bucket, log=logs.append)
+    assert not np.isnan(out["KAAA"]).any()
+    assert len(logs) == 2
+    assert "retry 1/" in logs[0]
+
+
+def raise_(exc):
+    raise exc
+
+
+def test_with_retries_gives_up_and_never_retries_missing_objects():
+    calls = []
+
+    def boom():
+        calls.append(1)
+        raise ConnectionError("down")
+
+    with pytest.raises(ConnectionError):
+        with_retries(boom, "x", log=lambda m: None, waits=(0, 0))
+    assert len(calls) == 3
+    with pytest.raises(FileNotFoundError):
+        with_retries(lambda: raise_(FileNotFoundError("gone")), "x", log=lambda m: None, waits=(0,))
