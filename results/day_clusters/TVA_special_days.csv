@@ -1,0 +1,53 @@
+day,name,cluster,as_calendar_type,cluster_of_that_type,weekday_type,cluster_of_weekday_type,distance
+2018-01-01,New Year's Day,0,sunday,5,workday,1,0.2633
+2018-02-04,Super Bowl Sunday,1,saturday,1,sunday,5,0.1726
+2018-05-28,Memorial Day,6,sunday,5,workday,1,0.1401
+2018-09-03,Labor Day,5,sunday,5,workday,1,0.1022
+2018-11-22,Thanksgiving,0,saturday,1,workday,1,0.3102
+2018-11-23,Day after Thanksgiving,0,saturday,1,workday,1,0.2432
+2018-12-24,Christmas Eve,0,saturday,1,workday,1,0.1408
+2018-12-25,Christmas Day,0,saturday,1,workday,1,0.1648
+2018-12-31,New Year's Eve,2,saturday,1,workday,1,0.1359
+2019-01-01,New Year's Day,1,sunday,5,workday,1,0.2486
+2019-02-03,Super Bowl Sunday,0,saturday,1,sunday,5,0.1499
+2019-05-27,Memorial Day,5,sunday,5,workday,1,0.1348
+2019-07-04,Independence Day,5,sunday,5,workday,1,0.2197
+2019-09-02,Labor Day,5,sunday,5,workday,1,0.1817
+2019-11-28,Thanksgiving,0,saturday,1,workday,1,0.1786
+2019-11-29,Day after Thanksgiving,1,saturday,1,workday,1,0.171
+2019-12-24,Christmas Eve,0,saturday,1,workday,1,0.1716
+2019-12-25,Christmas Day,0,saturday,1,workday,1,0.1198
+2019-12-31,New Year's Eve,1,saturday,1,workday,1,0.1699
+2020-01-01,New Year's Day,0,sunday,5,workday,1,0.1221
+2020-02-02,Super Bowl Sunday,0,saturday,1,sunday,5,0.1668
+2020-05-25,Memorial Day,5,sunday,5,workday,1,0.1355
+2020-07-03,observed holiday,5,sunday,5,workday,1,0.1198
+2020-07-04,Independence Day,5,sunday,5,saturday,1,0.1778
+2020-09-07,Labor Day,5,sunday,5,workday,1,0.248
+2020-11-26,Thanksgiving,1,saturday,1,workday,1,0.2185
+2020-11-27,Day after Thanksgiving,0,saturday,1,workday,1,0.2207
+2020-12-24,Christmas Eve,1,saturday,1,workday,1,0.4252
+2020-12-25,Christmas Day,1,saturday,1,workday,1,0.2251
+2020-12-31,New Year's Eve,1,saturday,1,workday,1,0.1586
+2021-01-01,New Year's Day,1,sunday,5,workday,1,0.2662
+2021-02-07,Super Bowl Sunday,1,saturday,1,sunday,5,0.1389
+2021-05-31,Memorial Day,4,sunday,5,workday,1,0.2121
+2021-07-04,Independence Day,5,sunday,5,sunday,5,0.1871
+2021-07-05,observed holiday,5,sunday,5,workday,1,0.2576
+2021-09-06,Labor Day,5,sunday,5,workday,1,0.1333
+2021-11-25,Thanksgiving,0,saturday,1,workday,1,0.2326
+2021-11-26,Day after Thanksgiving,1,saturday,1,workday,1,0.277
+2021-12-24,Christmas Eve,2,saturday,1,workday,1,0.4727
+2021-12-25,Christmas Day,2,saturday,1,saturday,1,0.1489
+2021-12-31,New Year's Eve,2,sunday,5,workday,1,0.1386
+2022-01-01,New Year's Day,2,sunday,5,saturday,1,0.2269
+2022-02-13,Super Bowl Sunday,0,saturday,1,sunday,5,0.1472
+2022-05-30,Memorial Day,5,sunday,5,workday,1,0.1616
+2022-07-04,Independence Day,5,sunday,5,workday,1,0.1516
+2022-09-05,Labor Day,6,sunday,5,workday,1,0.1641
+2022-11-24,Thanksgiving,0,saturday,1,workday,1,0.259
+2022-11-25,Day after Thanksgiving,1,saturday,1,workday,1,0.1062
+2022-12-24,Christmas Eve,0,saturday,1,saturday,1,0.327
+2022-12-25,Christmas Day,0,saturday,1,sunday,5,0.3072
+2022-12-26,observed holiday,0,saturday,1,workday,1,0.2149
+2022-12-31,New Year's Eve,2,saturday,1,saturday,1,0.1701
