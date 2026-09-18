@@ -32,6 +32,25 @@ persistence (the last observed temperature at the same hour, a floor). It never 
 
 **Comparison.** Every forecast is scored against `DF` for the same BA and day, under the same cut-off.
 
+## How good is the weather input? (2024)
+
+`docs/hrrr_verification.md` compares the HRRR 2 m temperature at each station's grid cell with the
+ISD-Lite observation for the same hour, over the leads a 9 a.m. forecast uses (17 to 45 h), for 2024:
+738 101 pairs at 35 stations.
+
+- Overall the forecast runs slightly cool: bias −1.4 °F, MAE 3.1 °F, RMSE 4.0 °F. The MAE grows from
+  about 2.7 °F at the shortest leads to about 3.7 °F at 45 h.
+- The sign flips with temperature. Below 20 °F the forecast is warm on average (+0.7 °F), between 20 and
+  32 °F +0.5 °F, and above 32 °F cool by 1.2 to 1.7 °F.
+- On the 30 coldest mornings of each station (hours 04:00 to 09:00 local), bias is −0.4 °F and MAE 3.0 °F
+  overall, but the sign depends on the place: the forecast is warm at the northern and inland stations
+  (Columbia SC +3.3 °F, Spokane +2.8 °F, Boise +2.6 °F) and cold at the southern ones (Phoenix −5.2 °F,
+  Miami −4.5 °F, Tampa −4.1 °F), whose "coldest mornings" are mild in absolute terms.
+
+A forecast that runs warm on a cold morning pushes a temperature-driven load forecast down, which is the
+direction of the errors the storm reviews describe. Whether that is what happened at any BA is a question
+for the forecasting phases, not for this table.
+
 ## Layout
 
 | Module | Responsibility |
