@@ -29,7 +29,7 @@ from grid_sentinel.data import load_series_local, tidy_frame, utc_offset
 from grid_sentinel.stations import BA_STATION
 from grid_sentinel.weather import hourly_temperature_f
 
-from .cutoff import DEFAULT_INIT_HOURS, forecast_temperature, last_load_hour, run_for_day
+from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hour, path_timestamps, run_for_day
 from .hrrr import load_station
 
 
@@ -43,6 +43,8 @@ class InformationSet:
     load_history: pd.Series
     temp_history_f: pd.Series
     temp_forecast_f: np.ndarray
+    temp_forecast_path_f: np.ndarray
+    path_timestamps: pd.DatetimeIndex
     temp_persistence_f: np.ndarray
     temp_observed_f: np.ndarray
     ba_forecast: np.ndarray
@@ -129,11 +131,16 @@ class Loader:
 
         run = None
         temp_fc = np.full(24, np.nan)
+        path_ts = path_timestamps(day)
+        temp_path = np.full(PATH_HOURS, np.nan)
         rows = self.hrrr(BA_STATION[ba])
         if not np.isnan(off_cutoff):
             run = run_for_day(day, float(off_cutoff), self.init_hours)
             if len(rows):
-                temp_fc = forecast_temperature(rows, day, off_day, run)
+                off_path = off.reindex(path_ts).to_numpy(dtype=float)
+                off_path = np.where(np.isnan(off_path), fallback, off_path)
+                temp_path = forecast_path(rows, day, off_path, run)
+                temp_fc = temp_path[-24:]
 
         persist = np.full(24, np.nan)
         for h in range(24):
@@ -145,7 +152,8 @@ class Loader:
         return InformationSet(
             ba=ba, day=day, timestamps=hours, offset_h=off_day, run=run,
             load_history=load_history, temp_history_f=temp_history,
-            temp_forecast_f=temp_fc, temp_persistence_f=persist,
+            temp_forecast_f=temp_fc, temp_forecast_path_f=temp_path, path_timestamps=path_ts,
+            temp_persistence_f=persist,
             temp_observed_f=temp.reindex(hours).to_numpy(dtype=float),
             ba_forecast=fcst.reindex(hours).to_numpy(dtype=float),
             actual=load.reindex(hours).to_numpy(dtype=float),

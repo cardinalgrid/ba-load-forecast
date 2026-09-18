@@ -69,6 +69,33 @@ def lead_hours(day: date, offset_h, init: tuple[date, int]) -> np.ndarray:
     return ((valid_utc_for_day(day, offset_h) - init_utc) / np.timedelta64(1, "h")).astype(int)
 
 
+PATH_HOURS = 24 - CUTOFF_LOCAL_HOUR + 24   # from 09:00 of D-1 to 23:00 of D: 39 hours
+
+
+def path_timestamps(day: date) -> pd.DatetimeIndex:
+    """Local hours (hour beginning) from the cut-off hour of D-1 to 23:00 of ``day``."""
+    start = datetime(day.year, day.month, day.day, CUTOFF_LOCAL_HOUR) - timedelta(days=1)
+    return pd.date_range(start, periods=PATH_HOURS, freq="h")
+
+
+def forecast_path(rows: pd.DataFrame, day: date, offset_h, init: tuple[date, int]) -> np.ndarray:
+    """Temperature in Fahrenheit from the run ``init`` for every local hour from 09:00 of D-1 to 23:00 of D.
+
+    The hours before the target day are what the same run said about the rest of D-1, which a forecaster
+    running at 9 a.m. also had; ``offset_h`` is a scalar or one value per hour of the path. Hours the run
+    does not cover are NaN.
+    """
+    off = np.broadcast_to(np.asarray(offset_h, dtype=float), (PATH_HOURS,))
+    local = path_timestamps(day)
+    valid = pd.DatetimeIndex(local.to_numpy() + (off * 3600.0 * 1e9).astype("timedelta64[ns]"))
+    d, h = init
+    init_ts = pd.Timestamp(datetime(d.year, d.month, d.day, h))
+    run = rows[rows["init_utc"] == init_ts]
+    s = pd.Series(run["temp_f"].to_numpy(dtype=float), index=pd.DatetimeIndex(run["valid_utc"]))
+    s = s[~s.index.duplicated()]
+    return s.reindex(valid).to_numpy(dtype=float)
+
+
 def forecast_temperature(rows: pd.DataFrame, day: date, offset_h, init: tuple[date, int] | None = None,
                          init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS) -> np.ndarray:
     """Temperature in Fahrenheit forecast for the 24 local hours of ``day`` from the run available at the cut-off.

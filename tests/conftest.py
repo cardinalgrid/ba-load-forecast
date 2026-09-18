@@ -60,6 +60,39 @@ def write_hrrr(hrrr_dir, icao, init, n_lead=48):
                   "temp_f": (100.0 + lead).astype("float32")}).to_parquet(hrrr_dir / f"{icao}.parquet", index=False)
 
 
+def make_info(day, load: pd.Series, temp: pd.Series, temp_forecast, ba="PJM", ba_forecast=None, actual=None):
+    """An InformationSet built directly from series (local hour beginning), for forecaster tests.
+
+    ``load`` and ``temp`` are truncated at the cut-off; ``temp_forecast`` is 24 values for the day (or a
+    39-value path from 09:00 of D-1); the outcome is NaN unless given.
+    """
+    from datetime import date as _date
+
+    from grid_sentinel.calendar_us import day_types, special_days
+
+    from ba_load_forecast.cutoff import PATH_HOURS, last_load_hour, path_timestamps
+
+    day = day if isinstance(day, _date) else pd.Timestamp(day).date()
+    cutoff = pd.Timestamp(last_load_hour(day))
+    hist = load.loc[:cutoff]
+    hours = pd.date_range(pd.Timestamp(day), periods=24, freq="h")
+    tf = np.asarray(temp_forecast, dtype=float)
+    path = np.full(PATH_HOURS, np.nan)
+    path[-len(tf):] = tf
+    nan24 = np.full(24, np.nan)
+    from ba_load_forecast.information_set import InformationSet
+
+    return InformationSet(
+        ba=ba, day=day, timestamps=hours, offset_h=np.full(24, 5.0), run=(day - pd.Timedelta(days=1), 12),
+        load_history=hist, temp_history_f=temp.reindex(hist.index),
+        temp_forecast_f=path[-24:], temp_forecast_path_f=path, path_timestamps=path_timestamps(day),
+        temp_persistence_f=nan24.copy(), temp_observed_f=nan24.copy(),
+        ba_forecast=nan24.copy() if ba_forecast is None else np.asarray(ba_forecast, dtype=float),
+        actual=nan24.copy() if actual is None else np.asarray(actual, dtype=float),
+        day_type=int(day_types(np.array([np.datetime64(day)]))[0]), special_day=special_days(day.year).get(day),
+    )
+
+
 @pytest.fixture
 def public_data(tmp_path):
     """PJM/KPHL from 2023-12-01 to 2024-01-20 (Eastern standard time), 05:00 of 2024-01-16 missing,

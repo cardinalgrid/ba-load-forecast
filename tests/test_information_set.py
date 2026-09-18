@@ -25,6 +25,9 @@ def test_information_set_ends_at_the_cutoff_and_carries_the_day(public_data):
 
     assert info.run == (date(2024, 1, 15), 12)
     np.testing.assert_array_equal(info.temp_forecast_f, 100.0 + np.arange(17, 41))
+    np.testing.assert_array_equal(info.temp_forecast_path_f, 100.0 + np.arange(2, 41))   # 09:00 EST of D-1 = lead 2
+    assert info.path_timestamps[0] == pd.Timestamp("2024-01-15 09:00")
+    assert info.path_timestamps[-1] == pd.Timestamp("2024-01-16 23:00")
     assert info.temp_observed_f[0] == pytest.approx(f_of("2024-01-16 05:00"))
     assert info.temp_observed_f[23] == pytest.approx(f_of("2024-01-17 04:00"))
     # persistence: same hour of D-1 up to the cut-off hour, of D-2 after it
