@@ -29,6 +29,7 @@ from grid_sentinel.data import load_series_local, tidy_frame, utc_offset
 from grid_sentinel.stations import BA_STATION
 from grid_sentinel.weather import fetch_isd_lite, hourly_temperature_f, read_isd_lite
 
+from .cleaning import sentinel_clean
 from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hour, path_timestamps, run_for_day
 from .hrrr import load_station
 from .stations_multi import BA_STATIONS_MULTI, station_table_for
@@ -107,10 +108,13 @@ class Loader:
 
     def __init__(self, tidy_dir: Path, isd_dir: Path, hrrr_dir: Path, history_days: int = 730,
                  init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
-                 stations: str = "single", hrrr_dirs: list[Path] | None = None):
+                 stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross"):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
-        looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``)."""
+        looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
+        repairs the load history with grid-data-sentinel (``cleaning.sentinel_clean``, one year at a time, warmed
+        up on the year before) before the gross-fault guard; the outcome is never cleaned."""
+        self.cleaning = cleaning
         self.tidy_dir = Path(tidy_dir)
         self.isd_dir = Path(isd_dir)
         self.hrrr_dir = Path(hrrr_dir)
@@ -139,8 +143,26 @@ class Loader:
         return self._cached(("stemp", icao, ba, year), read)
 
     # ---- cached readers -------------------------------------------------------------------------------
+    def raw_load(self, ba: str, year: int) -> pd.Series:
+        return self._cached(("raw", ba, year), lambda: load_series_local(self.tidy_dir, ba, year))
+
     def load(self, ba: str, year: int) -> pd.Series:
-        return self._cached(("load", ba, year), lambda: load_series_local(self.tidy_dir, ba, year))
+        """The load series used as history: raw, or repaired by the Sentinel when ``cleaning="sentinel"``."""
+        if self.cleaning != "sentinel":
+            return self.raw_load(ba, year)
+
+        def clean():
+            raw = self.raw_load(ba, year)
+            if raw.empty:
+                return raw
+            prev = self.raw_load(ba, year - 1)
+            temp = self.temperature(ba, year)
+            temp_prev = self.temperature(ba, year - 1) if not prev.empty else None
+            cleaned, _ = sentinel_clean(raw, temp if not temp.empty else None, warm=prev if not prev.empty else None,
+                                        warm_temp=temp_prev if temp_prev is not None and not temp_prev.empty else None)
+            return cleaned
+
+        return self._cached(("load", ba, year), clean)
 
     def forecast(self, ba: str, year: int) -> pd.Series:
         def read():
@@ -189,6 +211,7 @@ class Loader:
         hours = pd.date_range(datetime(day.year, day.month, day.day), periods=24, freq="h")
 
         load = self._years(ba, start, day, self.load)
+        outcome = load if self.cleaning != "sentinel" else self._years(ba, start, day, self.raw_load)
         fcst = self._years(ba, start, day, self.forecast)
         off = self._years(ba, start, day, self.offset)
         temp = self._years(ba, start, day, self.temperature)
@@ -242,9 +265,9 @@ class Loader:
             temp_persistence_f=persist,
             temp_observed_f=temp.reindex(hours).to_numpy(dtype=float),
             ba_forecast=fcst.reindex(hours).to_numpy(dtype=float),
-            actual=load.reindex(hours).to_numpy(dtype=float),
+            actual=outcome.reindex(hours).to_numpy(dtype=float),
             day_type=int(day_types(d64)[0]), special_day=kinds.get(day),
-            actual_plausible=plausible(load.reindex(hours).to_numpy(dtype=float), reference),
+            actual_plausible=plausible(outcome.reindex(hours).to_numpy(dtype=float), reference),
             stations=stations, temp_history_stations_f=stations_hist,
             temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None,
         )

@@ -41,7 +41,8 @@ class SplineBasis:
 class AdditiveModel:
     def __init__(self, train_days: int = 730, refit_days: int = 7, n_knots: int = 6,
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
-                 min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type"):
+                 min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
+                 labels=None, name: str | None = None):
         self.train_days = train_days
         self.refit_days = refit_days
         self.n_knots = n_knots
@@ -50,11 +51,12 @@ class AdditiveModel:
         self.min_train_days = min_train_days
         self.special_days = special_days
         self.label_column = label_column
-        self.name = "additive" + ("_special" if special_days else "")
+        self.labels = labels                    # a ShapeLabels, when label_column == "cluster"
+        self.name = name or ("additive" + ("_special" if special_days else "") + ("_cluster" if label_column == "cluster" else ""))
         self.fitted_on: date | None = None
         self.fitted_ba: str | None = None
         self.bases: dict[str, SplineBasis] = {}
-        self.labels: list[int] = []
+        self.label_values: list[int] = []
         self.coef: dict[int, np.ndarray] = {}
         self.mean: np.ndarray | None = None
         self.std: np.ndarray | None = None
@@ -63,7 +65,7 @@ class AdditiveModel:
     # ---- design --------------------------------------------------------------------------------------
     def design(self, rows: pd.DataFrame) -> np.ndarray:
         cols = [np.ones(len(rows))]
-        for lab in self.labels:
+        for lab in self.label_values:
             cols.append((rows[self.label_column].to_numpy() == lab).astype(float))
         if self.special_days:
             for kind in (1, 2):
@@ -94,14 +96,24 @@ class AdditiveModel:
     def needs_fit(self, info: InformationSet) -> bool:
         return (self.fitted_on is None or self.fitted_ba != info.ba or (info.day - self.fitted_on).days >= self.refit_days)
 
+    def day_labels(self, info: InformationSet, target: bool = False):
+        if self.labels is None:
+            return None
+        labels = dict(self.labels.labels(info.ba))
+        if target:
+            labels[info.day] = self.labels.predict(info)
+        return labels
+
     def fit(self, info: InformationSet) -> None:
         days = training_days(info.day - timedelta(days=2), self.train_days)
-        rows = rows_for_days(info.load_history, info.temp_history_f, days)
+        rows = rows_for_days(info.load_history, info.temp_history_f, days, labels=self.day_labels(info))
         rows = rows.dropna()
+        if self.label_column == "cluster":
+            rows = rows[rows["cluster"] >= 0]
         if rows["y"].gt(0).sum() < 24 * self.min_train_days:
             raise ForecastError(f"only {len(rows) // 24} complete days of history to fit on")
         rows = rows[rows["y"] > 0]
-        self.labels = sorted(rows[self.label_column].unique().tolist())[1:]      # first label is the reference
+        self.label_values = sorted(rows[self.label_column].unique().tolist())[1:]      # first label is the reference
         self.bases = {c: SplineBasis(rows[c].to_numpy(), self.n_knots) for c in SMOOTH}
         x_all = self._standardise(self.design(rows), fit=True)
         y_all = rows["y"].to_numpy(dtype=float)
@@ -129,7 +141,7 @@ class AdditiveModel:
             raise ForecastError("no weather forecast for the day")
         if self.needs_fit(info):
             self.fit(info)
-        rows = rows_for_days(info.load_history, target_temperature(info), [info.day])
+        rows = rows_for_days(info.load_history, target_temperature(info), [info.day], labels=self.day_labels(info, target=True))
         feats = rows.drop(columns=["y"])
         if feats.isna().any().any():
             raise ForecastError("missing input for the target day: " + ", ".join(feats.columns[feats.isna().any()]))

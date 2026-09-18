@@ -15,6 +15,7 @@ For a day ``d`` and hour ``h`` the row holds what a forecaster had at 9 a.m. of 
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, timedelta
 
 import numpy as np
@@ -83,11 +84,13 @@ def calendar_features(ts: pd.DatetimeIndex) -> pd.DataFrame:
     return out
 
 
-def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: pd.DataFrame | None = None) -> pd.DataFrame:
+def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: pd.DataFrame | None = None,
+                  labels: Mapping[date, int] | None = None) -> pd.DataFrame:
     """Feature rows for every hour of ``days`` with the target ``y`` (NaN where the load is unknown).
 
     ``stations``, when given, is an hourly frame with one temperature column per station; each becomes a
-    column ``t_<name>`` (the target-day values must already be the forecast path).
+    column ``t_<name>`` (the target-day values must already be the forecast path). ``labels`` maps days to
+    a data-driven day label (the shape cluster) and adds the column ``cluster`` (-1 where unknown).
     """
     ts = hourly_index(days)
     out = pd.concat([calendar_features(ts), temperature_features(temp, ts), load_features(load, ts)], axis=1)
@@ -95,6 +98,8 @@ def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: 
         st = stations.asfreq("h") if not stations.empty else stations
         for c in st.columns:
             out[f"t_{c}"] = st[c].reindex(ts).to_numpy()
+    if labels is not None:
+        out["cluster"] = [labels.get(d, -1) for d in ts.date]
     out["y"] = load.reindex(ts).to_numpy() if not load.empty else np.nan
     return out
 

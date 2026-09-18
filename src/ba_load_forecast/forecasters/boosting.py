@@ -23,7 +23,7 @@ from .base import ForecastError
 class Boosting:
     def __init__(self, train_days: int = 730, refit_days: int = 7, max_iter: int = 400, learning_rate: float = 0.05,
                  max_leaf_nodes: int = 31, min_train_days: int = 120, seed: int = 0, stations: bool = True,
-                 special_days: bool = True, label_column: str = "day_type"):
+                 special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None):
         self.train_days = train_days
         self.refit_days = refit_days
         self.max_iter = max_iter
@@ -34,7 +34,8 @@ class Boosting:
         self.stations = stations
         self.special_days = special_days
         self.label_column = label_column
-        self.name = "boosting"
+        self.labels = labels                    # a ShapeLabels, when label_column == "cluster"
+        self.name = name or ("boosting" + ("" if special_days else "_nospecial") + ("_cluster" if label_column == "cluster" else ""))
         self.model: HistGradientBoostingRegressor | None = None
         self.columns: list[str] = []
         self.fitted_on: date | None = None
@@ -62,10 +63,21 @@ class Boosting:
         return (self.model is None or self.fitted_ba != info.ba or self.fitted_on is None
                 or (info.day - self.fitted_on).days >= self.refit_days)
 
+    def day_labels(self, info: InformationSet, target: bool = False):
+        if self.labels is None:
+            return None
+        labels = dict(self.labels.labels(info.ba))
+        if target:
+            labels[info.day] = self.labels.predict(info)
+        return labels
+
     def fit(self, info: InformationSet) -> None:
         days = training_days(info.day - timedelta(days=2), self.train_days)
-        rows = rows_for_days(info.load_history, info.temp_history_f, days, self._station_frames(info, target=False))
+        rows = rows_for_days(info.load_history, info.temp_history_f, days, self._station_frames(info, target=False),
+                             labels=self.day_labels(info))
         rows = rows[rows["y"] > 0].dropna(subset=["y"])
+        if self.label_column == "cluster":
+            rows = rows[rows["cluster"] >= 0]
         if len(rows) < 24 * self.min_train_days:
             raise ForecastError(f"only {len(rows) // 24} days of history to fit on")
         self.columns = self._columns(rows)
@@ -81,6 +93,7 @@ class Boosting:
             raise ForecastError("no weather forecast for the day")
         if self.needs_fit(info):
             self.fit(info)
-        rows = rows_for_days(info.load_history, target_temperature(info), [info.day], self._station_frames(info, target=True))
+        rows = rows_for_days(info.load_history, target_temperature(info), [info.day], self._station_frames(info, target=True),
+                             labels=self.day_labels(info, target=True))
         x = rows[self.columns].to_numpy(dtype=float)
         return self.model.predict(x)
