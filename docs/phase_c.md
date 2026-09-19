@@ -9,7 +9,10 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | index | mape | mape_median | peak_err_pct | peak_under_pct | abs_peak_hour_err | win_mape | win_peak_under | worst_peak_under_pct | n_days | n_bas |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DF | 3.00 | 2.70 | 0.27 | -1.12 | 1.07 | 0.00 | 0.00 | -19.98 | 7457 | 10.00 |
+| boosting_multi | 3.06 | 2.65 | -0.82 | -2.03 | 1.54 | 0.50 | 0.27 | -31.26 | 7457 | 10.00 |
+| additive_multi | 3.12 | 2.70 | -0.53 | -1.96 | 1.45 | 0.50 | 0.29 | -22.77 | 7457 | 10.00 |
 | additive_long | 3.55 | 3.00 | -0.89 | -2.46 | 1.62 | 0.43 | 0.26 | -26.57 | 7457 | 10.00 |
+| recency_regression_multi | 3.63 | 3.16 | -0.70 | -2.25 | 1.58 | 0.41 | 0.27 | -30.94 | 7457 | 10.00 |
 | boosting_long | 3.70 | 3.08 | -0.89 | -2.45 | 1.70 | 0.41 | 0.27 | -27.80 | 7457 | 10.00 |
 | additive_sentinel | 3.73 | 3.12 | -0.38 | -2.26 | 1.69 | 0.41 | 0.28 | -26.29 | 7457 | 10.00 |
 | additive_special | 3.74 | 3.14 | -0.42 | -2.29 | 1.68 | 0.41 | 0.28 | -26.30 | 7457 | 10.00 |
@@ -69,6 +72,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_long | PJM | 3.72 | 3.20 | -0.36 | -2.27 | 2.18 | -16.84 | 0.56 | 0.50 | 744 | 91927.69 |
 | additive_long | SWPP | 3.37 | 2.66 | -0.18 | -2.00 | 1.52 | -20.79 | 0.57 | 0.08 | 741 | 31300.49 |
 | additive_long | TVA | 3.81 | 3.37 | -1.81 | -3.03 | 1.70 | -16.92 | 0.21 | 0.20 | 739 | 18562.62 |
+| additive_multi | BPAT | 2.87 | 2.45 | -0.89 | -1.86 | 2.00 | -18.56 | 0.30 | 0.21 | 750 | 6533.15 |
+| additive_multi | CISO | 3.93 | 3.52 | -2.09 | -3.43 | 0.39 | -18.55 | 0.31 | 0.19 | 737 | 25196.91 |
+| additive_multi | DUK | 3.74 | 3.29 | -0.22 | -2.14 | 1.46 | -14.72 | 0.35 | 0.29 | 750 | 12129.97 |
+| additive_multi | ERCO | 3.48 | 2.87 | -1.49 | -2.65 | 1.05 | -17.26 | 0.35 | 0.18 | 746 | 46782.53 |
+| additive_multi | ISNE | 4.33 | 3.74 | -0.32 | -2.27 | 0.60 | -22.77 | 0.19 | 0.18 | 752 | 13392.81 |
+| additive_multi | MISO | 2.69 | 2.43 | -0.59 | -1.69 | 1.90 | -9.36 | 0.48 | 0.06 | 746 | 73788.38 |
+| additive_multi | NYIS | 2.93 | 2.39 | -0.29 | -1.89 | 0.67 | -16.20 | 0.49 | 0.63 | 752 | 17400.75 |
+| additive_multi | PJM | 2.89 | 2.50 | 0.07 | -1.55 | 1.77 | -11.89 | 0.74 | 0.56 | 744 | 91927.69 |
+| additive_multi | SWPP | 2.68 | 2.25 | -0.27 | -1.63 | 1.55 | -20.05 | 0.68 | 0.09 | 741 | 31300.49 |
+| additive_multi | TVA | 3.69 | 3.19 | 0.36 | -1.71 | 1.44 | -11.78 | 0.21 | 0.32 | 739 | 18562.62 |
 | additive_sentinel | BPAT | 3.21 | 2.77 | -0.41 | -1.84 | 2.01 | -17.93 | 0.26 | 0.24 | 750 | 6533.15 |
 | additive_sentinel | CISO | 4.59 | 3.99 | -0.09 | -2.76 | 0.65 | -26.29 | 0.26 | 0.26 | 737 | 25196.91 |
 | additive_sentinel | DUK | 4.06 | 3.53 | -0.34 | -2.32 | 1.48 | -17.12 | 0.28 | 0.30 | 750 | 12129.97 |
@@ -129,6 +142,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_long | PJM | 4.02 | 3.37 | -0.36 | -2.32 | 2.20 | -18.28 | 0.52 | 0.50 | 744 | 91927.69 |
 | boosting_long | SWPP | 3.46 | 2.65 | -1.14 | -2.48 | 1.73 | -23.76 | 0.58 | 0.06 | 741 | 31300.49 |
 | boosting_long | TVA | 3.83 | 3.29 | -0.73 | -2.33 | 1.76 | -18.42 | 0.19 | 0.26 | 739 | 18562.62 |
+| boosting_multi | BPAT | 2.85 | 2.56 | -0.58 | -1.72 | 1.91 | -19.81 | 0.28 | 0.24 | 750 | 6533.15 |
+| boosting_multi | CISO | 3.25 | 2.88 | -2.53 | -3.06 | 0.49 | -19.56 | 0.38 | 0.15 | 737 | 25196.91 |
+| boosting_multi | DUK | 3.80 | 3.28 | -0.41 | -2.36 | 1.56 | -15.26 | 0.30 | 0.28 | 750 | 12129.97 |
+| boosting_multi | ERCO | 3.18 | 2.67 | -2.10 | -2.87 | 1.30 | -17.98 | 0.36 | 0.20 | 746 | 46782.53 |
+| boosting_multi | ISNE | 4.08 | 3.60 | -1.12 | -2.32 | 0.65 | -19.55 | 0.20 | 0.16 | 752 | 13392.81 |
+| boosting_multi | MISO | 2.62 | 2.24 | -0.74 | -1.69 | 1.86 | -12.42 | 0.51 | 0.05 | 746 | 73788.38 |
+| boosting_multi | NYIS | 2.85 | 2.50 | -0.42 | -1.70 | 0.68 | -15.69 | 0.48 | 0.66 | 752 | 17400.75 |
+| boosting_multi | PJM | 3.08 | 2.76 | -0.03 | -1.65 | 1.92 | -12.72 | 0.69 | 0.53 | 744 | 91927.69 |
+| boosting_multi | SWPP | 2.86 | 2.29 | -0.76 | -1.99 | 1.72 | -31.26 | 0.66 | 0.08 | 741 | 31300.49 |
+| boosting_multi | TVA | 3.50 | 2.96 | -0.14 | -1.88 | 1.47 | -15.85 | 0.22 | 0.29 | 739 | 18562.62 |
 | boosting_nospecial | BPAT | 3.27 | 2.92 | -0.69 | -2.07 | 2.08 | -18.81 | 0.24 | 0.24 | 750 | 6533.15 |
 | boosting_nospecial | CISO | 4.17 | 3.28 | -0.60 | -2.50 | 0.59 | -26.37 | 0.32 | 0.28 | 737 | 25196.91 |
 | boosting_nospecial | DUK | 4.30 | 3.79 | -0.35 | -2.50 | 1.80 | -17.07 | 0.25 | 0.28 | 750 | 12129.97 |
@@ -179,6 +202,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | recency_regression | PJM | 4.36 | 3.75 | 0.15 | -2.21 | 2.19 | -22.47 | 0.46 | 0.50 | 744 | 91927.69 |
 | recency_regression | SWPP | 3.81 | 3.00 | -0.36 | -2.25 | 1.65 | -18.84 | 0.49 | 0.08 | 741 | 31300.49 |
 | recency_regression | TVA | 4.65 | 4.17 | -0.53 | -2.69 | 1.79 | -19.34 | 0.14 | 0.26 | 739 | 18562.62 |
+| recency_regression_multi | BPAT | 3.36 | 2.88 | -1.10 | -2.14 | 1.95 | -18.92 | 0.23 | 0.22 | 750 | 6533.15 |
+| recency_regression_multi | CISO | 4.66 | 4.33 | -2.13 | -3.63 | 0.64 | -17.83 | 0.19 | 0.18 | 737 | 25196.91 |
+| recency_regression_multi | DUK | 4.27 | 3.78 | -0.10 | -2.45 | 1.53 | -18.13 | 0.26 | 0.26 | 750 | 12129.97 |
+| recency_regression_multi | ERCO | 3.67 | 2.99 | -1.76 | -2.95 | 1.17 | -17.32 | 0.32 | 0.20 | 746 | 46782.53 |
+| recency_regression_multi | ISNE | 4.75 | 4.31 | -0.45 | -2.17 | 0.61 | -18.65 | 0.13 | 0.18 | 752 | 13392.81 |
+| recency_regression_multi | MISO | 3.39 | 2.94 | -0.99 | -2.14 | 2.13 | -16.19 | 0.37 | 0.05 | 746 | 73788.38 |
+| recency_regression_multi | NYIS | 3.60 | 3.17 | -0.27 | -1.92 | 0.72 | -16.83 | 0.34 | 0.62 | 752 | 17400.75 |
+| recency_regression_multi | PJM | 3.38 | 2.93 | 0.01 | -1.78 | 1.85 | -30.94 | 0.64 | 0.51 | 744 | 91927.69 |
+| recency_regression_multi | SWPP | 3.11 | 2.62 | -0.61 | -2.05 | 1.69 | -17.64 | 0.58 | 0.09 | 741 | 31300.49 |
+| recency_regression_multi | TVA | 4.20 | 3.78 | 0.55 | -1.97 | 1.53 | -15.46 | 0.16 | 0.30 | 739 | 18562.62 |
 | recency_regression_sentinel | BPAT | 3.80 | 3.28 | -0.71 | -2.23 | 2.05 | -18.73 | 0.20 | 0.25 | 750 | 6533.15 |
 | recency_regression_sentinel | CISO | 5.71 | 4.89 | -1.54 | -3.20 | 0.84 | -24.70 | 0.14 | 0.24 | 737 | 25196.91 |
 | recency_regression_sentinel | DUK | 4.58 | 4.16 | -0.04 | -2.42 | 1.72 | -20.27 | 0.21 | 0.29 | 750 | 12129.97 |
@@ -234,6 +267,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_long | PJM | uri | 2.30 | -0.71 | -0.89 | -2.83 | 6 |
 | additive_long | SWPP | uri | 7.99 | 4.17 | -1.10 | -4.40 | 4 |
 | additive_long | TVA | uri | 5.12 | 1.67 | -1.24 | -3.99 | 6 |
+| additive_multi | BPAT | uri | 2.78 | 0.35 | -0.45 | -1.97 | 6 |
+| additive_multi | CISO | uri | 2.73 | 2.54 | -0.04 | -0.25 | 6 |
+| additive_multi | DUK | uri | 3.42 | -1.61 | -1.70 | -7.45 | 6 |
+| additive_multi | ERCO | uri | 5.16 | -6.62 | -6.62 | -7.27 | 2 |
+| additive_multi | ISNE | uri | 3.79 | 3.65 | -0.11 | -0.67 | 6 |
+| additive_multi | MISO | uri | 5.04 | -3.68 | -4.12 | -7.03 | 5 |
+| additive_multi | NYIS | uri | 2.15 | 2.84 | -0.03 | -0.19 | 6 |
+| additive_multi | PJM | uri | 2.34 | 1.19 | -0.41 | -2.45 | 6 |
+| additive_multi | SWPP | uri | 6.87 | 1.42 | -2.10 | -4.69 | 4 |
+| additive_multi | TVA | uri | 3.29 | 0.17 | -0.98 | -2.71 | 6 |
 | additive_sentinel | BPAT | uri | 3.11 | -0.50 | -1.60 | -4.36 | 6 |
 | additive_sentinel | CISO | uri | 2.61 | 1.11 | -0.40 | -1.92 | 6 |
 | additive_sentinel | DUK | uri | 3.80 | -0.99 | -1.71 | -7.28 | 6 |
@@ -294,6 +337,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_long | PJM | uri | 2.87 | -3.63 | -3.63 | -4.52 | 6 |
 | boosting_long | SWPP | uri | 6.48 | -0.84 | -3.39 | -9.72 | 4 |
 | boosting_long | TVA | uri | 4.75 | -1.29 | -2.47 | -6.68 | 6 |
+| boosting_multi | BPAT | uri | 3.19 | -0.44 | -1.39 | -3.52 | 6 |
+| boosting_multi | CISO | uri | 1.86 | 0.14 | -0.65 | -2.17 | 6 |
+| boosting_multi | DUK | uri | 4.08 | -3.14 | -3.14 | -5.91 | 6 |
+| boosting_multi | ERCO | uri | 10.29 | -15.83 | -15.83 | -17.59 | 2 |
+| boosting_multi | ISNE | uri | 3.74 | 0.94 | -0.56 | -3.12 | 6 |
+| boosting_multi | MISO | uri | 6.70 | -7.12 | -7.12 | -12.42 | 5 |
+| boosting_multi | NYIS | uri | 2.12 | 1.02 | -0.39 | -0.90 | 6 |
+| boosting_multi | PJM | uri | 2.99 | -1.75 | -2.43 | -4.42 | 6 |
+| boosting_multi | SWPP | uri | 6.73 | -3.47 | -4.61 | -11.41 | 4 |
+| boosting_multi | TVA | uri | 4.22 | -5.52 | -5.75 | -8.77 | 6 |
 | boosting_nospecial | BPAT | uri | 3.38 | -1.46 | -2.63 | -6.20 | 6 |
 | boosting_nospecial | CISO | uri | 2.27 | 0.21 | -0.52 | -1.58 | 6 |
 | boosting_nospecial | DUK | uri | 4.27 | -3.16 | -3.16 | -6.28 | 6 |
@@ -344,6 +397,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | recency_regression | PJM | uri | 5.32 | -3.87 | -3.87 | -4.74 | 6 |
 | recency_regression | SWPP | uri | 8.37 | -5.92 | -7.38 | -18.84 | 4 |
 | recency_regression | TVA | uri | 5.36 | -1.90 | -3.22 | -6.55 | 6 |
+| recency_regression_multi | BPAT | uri | 2.83 | -1.46 | -1.97 | -5.41 | 6 |
+| recency_regression_multi | CISO | uri | 1.79 | 0.11 | -0.29 | -0.73 | 6 |
+| recency_regression_multi | DUK | uri | 4.12 | -4.38 | -4.38 | -7.13 | 6 |
+| recency_regression_multi | ERCO | uri | 6.30 | -3.70 | -5.44 | -10.88 | 2 |
+| recency_regression_multi | ISNE | uri | 2.86 | -0.65 | -0.87 | -2.78 | 6 |
+| recency_regression_multi | MISO | uri | 8.12 | -7.89 | -7.89 | -11.39 | 5 |
+| recency_regression_multi | NYIS | uri | 3.15 | -0.74 | -1.01 | -3.82 | 6 |
+| recency_regression_multi | PJM | uri | 3.13 | -2.70 | -2.70 | -6.56 | 6 |
+| recency_regression_multi | SWPP | uri | 6.56 | -5.37 | -5.84 | -12.85 | 4 |
+| recency_regression_multi | TVA | uri | 3.93 | -2.05 | -2.92 | -5.50 | 6 |
 | recency_regression_sentinel | BPAT | uri | 3.30 | -0.43 | -1.96 | -8.40 | 6 |
 | recency_regression_sentinel | CISO | uri | 3.89 | -1.41 | -1.59 | -3.03 | 6 |
 | recency_regression_sentinel | DUK | uri | 3.90 | -2.84 | -2.84 | -6.00 | 6 |
@@ -394,6 +457,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_long | PJM | elliott | 4.47 | -1.42 | -2.19 | -7.20 | 5 |
 | additive_long | SWPP | elliott | 4.52 | -4.75 | -4.75 | -9.71 | 5 |
 | additive_long | TVA | elliott | 8.31 | 5.63 | 0.00 | 0.00 | 3 |
+| additive_multi | BPAT | elliott | 4.80 | -2.32 | -3.79 | -7.97 | 5 |
+| additive_multi | CISO | elliott | 4.22 | 4.21 | -0.02 | -0.11 | 5 |
+| additive_multi | DUK | elliott | 6.39 | -5.00 | -5.17 | -9.17 | 4 |
+| additive_multi | ERCO | elliott | 9.68 | -7.85 | -9.04 | -17.26 | 5 |
+| additive_multi | ISNE | elliott | 4.80 | 4.05 | -0.46 | -1.28 | 5 |
+| additive_multi | MISO | elliott | 5.16 | 6.10 | -0.34 | -1.69 | 5 |
+| additive_multi | NYIS | elliott | 2.59 | -0.97 | -1.67 | -2.56 | 5 |
+| additive_multi | PJM | elliott | 5.62 | -0.11 | -2.30 | -7.15 | 5 |
+| additive_multi | SWPP | elliott | 4.61 | -2.06 | -3.18 | -8.59 | 5 |
+| additive_multi | TVA | elliott | 6.15 | 1.51 | -0.46 | -1.37 | 3 |
 | additive_sentinel | BPAT | elliott | 5.63 | -0.71 | -2.51 | -6.85 | 5 |
 | additive_sentinel | CISO | elliott | 4.41 | 2.33 | -1.03 | -5.15 | 5 |
 | additive_sentinel | DUK | elliott | 7.47 | -2.76 | -3.87 | -7.41 | 4 |
@@ -454,6 +527,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_long | PJM | elliott | 6.02 | -4.79 | -5.24 | -10.58 | 5 |
 | boosting_long | SWPP | elliott | 5.22 | -5.38 | -5.64 | -14.19 | 5 |
 | boosting_long | TVA | elliott | 6.31 | 1.58 | -0.24 | -0.72 | 3 |
+| boosting_multi | BPAT | elliott | 4.18 | -5.04 | -5.47 | -10.51 | 5 |
+| boosting_multi | CISO | elliott | 3.44 | 0.56 | -1.07 | -4.18 | 5 |
+| boosting_multi | DUK | elliott | 5.60 | -8.96 | -8.96 | -13.16 | 4 |
+| boosting_multi | ERCO | elliott | 7.00 | -3.83 | -5.63 | -12.32 | 5 |
+| boosting_multi | ISNE | elliott | 4.07 | 3.71 | -0.09 | -0.45 | 5 |
+| boosting_multi | MISO | elliott | 5.19 | -0.71 | -2.80 | -5.40 | 5 |
+| boosting_multi | NYIS | elliott | 3.30 | -0.21 | -1.50 | -2.86 | 5 |
+| boosting_multi | PJM | elliott | 4.77 | -6.53 | -6.53 | -12.72 | 5 |
+| boosting_multi | SWPP | elliott | 4.79 | -1.38 | -3.35 | -10.76 | 5 |
+| boosting_multi | TVA | elliott | 5.39 | -1.74 | -1.94 | -5.52 | 3 |
 | boosting_nospecial | BPAT | elliott | 5.95 | -1.81 | -4.01 | -8.74 | 5 |
 | boosting_nospecial | CISO | elliott | 3.83 | 1.37 | -0.69 | -2.11 | 5 |
 | boosting_nospecial | DUK | elliott | 6.74 | -7.01 | -7.64 | -13.56 | 4 |
@@ -504,6 +587,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | recency_regression | PJM | elliott | 7.05 | -8.07 | -8.11 | -16.86 | 5 |
 | recency_regression | SWPP | elliott | 4.46 | -4.82 | -4.82 | -7.33 | 5 |
 | recency_regression | TVA | elliott | 4.73 | 4.04 | -1.49 | -3.36 | 3 |
+| recency_regression_multi | BPAT | elliott | 4.02 | 1.73 | -1.56 | -7.79 | 5 |
+| recency_regression_multi | CISO | elliott | 5.97 | 9.03 | 0.00 | 0.00 | 5 |
+| recency_regression_multi | DUK | elliott | 3.33 | -2.21 | -3.00 | -5.50 | 4 |
+| recency_regression_multi | ERCO | elliott | 6.39 | -2.22 | -4.70 | -9.53 | 5 |
+| recency_regression_multi | ISNE | elliott | 4.18 | 5.70 | -0.36 | -1.79 | 5 |
+| recency_regression_multi | MISO | elliott | 5.61 | -2.12 | -4.13 | -16.19 | 5 |
+| recency_regression_multi | NYIS | elliott | 3.00 | -0.33 | -1.68 | -4.37 | 5 |
+| recency_regression_multi | PJM | elliott | 11.18 | -15.67 | -15.67 | -30.94 | 5 |
+| recency_regression_multi | SWPP | elliott | 2.86 | -0.38 | -1.53 | -5.61 | 5 |
+| recency_regression_multi | TVA | elliott | 4.75 | 1.03 | -2.26 | -3.53 | 3 |
 | recency_regression_sentinel | BPAT | elliott | 4.54 | -0.44 | -2.10 | -6.58 | 5 |
 | recency_regression_sentinel | CISO | elliott | 7.40 | 5.63 | 0.00 | 0.00 | 5 |
 | recency_regression_sentinel | DUK | elliott | 4.28 | -2.72 | -3.08 | -6.52 | 4 |
@@ -521,166 +614,196 @@ On these BA-days the load that occurred is the load served under firm load shed,
 
 | index | ba | day | model | mape | peak_err_pct | peak_under_pct |
 | --- | --- | --- | --- | --- | --- | --- |
-| 35682 | DUK | 2022-12-24 | DF | 7.96 | -10.53 | -10.53 |
-| 35687 | DUK | 2022-12-24 | additive | 10.06 | -18.74 | -18.74 |
-| 35689 | DUK | 2022-12-24 | additive_cluster | 13.15 | -24.17 | -24.17 |
-| 35680 | DUK | 2022-12-24 | additive_long | 6.42 | -10.46 | -10.46 |
-| 35684 | DUK | 2022-12-24 | additive_sentinel | 10.06 | -18.76 | -18.76 |
-| 35690 | DUK | 2022-12-24 | additive_separate | 10.06 | -18.74 | -18.74 |
-| 35688 | DUK | 2022-12-24 | additive_special | 11.31 | -22.03 | -22.03 |
-| 35691 | DUK | 2022-12-24 | boosting | 10.84 | -20.01 | -20.01 |
-| 35693 | DUK | 2022-12-24 | boosting_cluster | 14.52 | -23.13 | -23.13 |
-| 35681 | DUK | 2022-12-24 | boosting_long | 9.83 | -16.18 | -16.18 |
-| 35692 | DUK | 2022-12-24 | boosting_nospecial | 10.79 | -20.26 | -20.26 |
-| 35685 | DUK | 2022-12-24 | boosting_sentinel | 10.76 | -20.02 | -20.02 |
-| 35694 | DUK | 2022-12-24 | last_known_day | 29.05 | -39.03 | -39.03 |
-| 35695 | DUK | 2022-12-24 | profile | 42.59 | -45.59 | -45.59 |
-| 35686 | DUK | 2022-12-24 | recency_regression | 10.06 | -9.81 | -9.81 |
-| 35683 | DUK | 2022-12-24 | recency_regression_sentinel | 10.06 | -9.78 | -9.78 |
-| 36994 | ERCO | 2021-02-15 | DF | 44.43 | -1.04 | -1.04 |
-| 36999 | ERCO | 2021-02-15 | additive | 23.31 | -16.98 | -16.98 |
-| 37001 | ERCO | 2021-02-15 | additive_cluster | 21.98 | -18.89 | -18.89 |
-| 36992 | ERCO | 2021-02-15 | additive_long | 41.10 | -1.69 | -1.69 |
-| 36996 | ERCO | 2021-02-15 | additive_sentinel | 23.31 | -16.98 | -16.98 |
-| 37002 | ERCO | 2021-02-15 | additive_separate | 23.31 | -16.98 | -16.98 |
-| 37000 | ERCO | 2021-02-15 | additive_special | 23.58 | -16.93 | -16.93 |
-| 37003 | ERCO | 2021-02-15 | boosting | 16.80 | -17.21 | -17.21 |
-| 37005 | ERCO | 2021-02-15 | boosting_cluster | 19.13 | -19.11 | -19.11 |
-| 36993 | ERCO | 2021-02-15 | boosting_long | 22.14 | -14.57 | -14.57 |
-| 37004 | ERCO | 2021-02-15 | boosting_nospecial | 16.54 | -17.64 | -17.64 |
-| 36997 | ERCO | 2021-02-15 | boosting_sentinel | 17.42 | -16.97 | -16.97 |
-| 37006 | ERCO | 2021-02-15 | last_known_day | 22.77 | -15.91 | -15.91 |
-| 37007 | ERCO | 2021-02-15 | profile | 12.39 | -34.83 | -34.83 |
-| 36998 | ERCO | 2021-02-15 | recency_regression | 59.63 | 3.38 | 0.00 |
-| 36995 | ERCO | 2021-02-15 | recency_regression_sentinel | 59.64 | 3.38 | 0.00 |
-| 37010 | ERCO | 2021-02-16 | DF | 47.94 | 60.09 | 0.00 |
-| 37015 | ERCO | 2021-02-16 | additive | 30.79 | 26.54 | 0.00 |
-| 37017 | ERCO | 2021-02-16 | additive_cluster | 29.57 | 26.54 | 0.00 |
-| 37008 | ERCO | 2021-02-16 | additive_long | 52.45 | 46.85 | 0.00 |
-| 37012 | ERCO | 2021-02-16 | additive_sentinel | 30.79 | 26.54 | 0.00 |
-| 37018 | ERCO | 2021-02-16 | additive_separate | 30.79 | 26.54 | 0.00 |
-| 37016 | ERCO | 2021-02-16 | additive_special | 31.04 | 26.41 | 0.00 |
-| 37019 | ERCO | 2021-02-16 | boosting | 22.33 | 19.90 | 0.00 |
-| 37021 | ERCO | 2021-02-16 | boosting_cluster | 23.20 | 16.91 | 0.00 |
-| 37009 | ERCO | 2021-02-16 | boosting_long | 28.06 | 26.11 | 0.00 |
-| 37020 | ERCO | 2021-02-16 | boosting_nospecial | 21.29 | 18.82 | 0.00 |
-| 37013 | ERCO | 2021-02-16 | boosting_sentinel | 22.04 | 18.43 | 0.00 |
-| 37022 | ERCO | 2021-02-16 | last_known_day | 37.95 | 9.73 | 0.00 |
-| 37023 | ERCO | 2021-02-16 | profile | 10.35 | 12.52 | 0.00 |
-| 37014 | ERCO | 2021-02-16 | recency_regression | 81.77 | 86.34 | 0.00 |
-| 37011 | ERCO | 2021-02-16 | recency_regression_sentinel | 81.78 | 86.35 | 0.00 |
-| 37026 | ERCO | 2021-02-17 | DF | 30.02 | 22.28 | 0.00 |
-| 37031 | ERCO | 2021-02-17 | additive | 25.55 | 21.54 | 0.00 |
-| 37033 | ERCO | 2021-02-17 | additive_cluster | 25.24 | 21.73 | 0.00 |
-| 37024 | ERCO | 2021-02-17 | additive_long | 35.15 | 33.44 | 0.00 |
-| 37028 | ERCO | 2021-02-17 | additive_sentinel | 25.55 | 21.54 | 0.00 |
-| 37034 | ERCO | 2021-02-17 | additive_separate | 25.55 | 21.54 | 0.00 |
-| 37032 | ERCO | 2021-02-17 | additive_special | 25.69 | 21.66 | 0.00 |
-| 37035 | ERCO | 2021-02-17 | boosting | 17.89 | 11.98 | 0.00 |
-| 37037 | ERCO | 2021-02-17 | boosting_cluster | 18.52 | 11.99 | 0.00 |
-| 37025 | ERCO | 2021-02-17 | boosting_long | 23.41 | 15.65 | 0.00 |
-| 37036 | ERCO | 2021-02-17 | boosting_nospecial | 17.15 | 11.61 | 0.00 |
-| 37029 | ERCO | 2021-02-17 | boosting_sentinel | 17.59 | 11.20 | 0.00 |
-| 37038 | ERCO | 2021-02-17 | last_known_day | 5.67 | -9.74 | -9.74 |
-| 37039 | ERCO | 2021-02-17 | profile | 8.92 | 6.34 | 0.00 |
-| 37030 | ERCO | 2021-02-17 | recency_regression | 47.01 | 36.53 | 0.00 |
-| 37027 | ERCO | 2021-02-17 | recency_regression_sentinel | 47.01 | 36.53 | 0.00 |
-| 37042 | ERCO | 2021-02-18 | DF | 18.74 | 16.29 | 0.00 |
-| 37047 | ERCO | 2021-02-18 | additive | 7.46 | 5.66 | 0.00 |
-| 37049 | ERCO | 2021-02-18 | additive_cluster | 7.64 | 6.52 | 0.00 |
-| 37040 | ERCO | 2021-02-18 | additive_long | 8.08 | 5.87 | 0.00 |
-| 37044 | ERCO | 2021-02-18 | additive_sentinel | 7.46 | 5.66 | 0.00 |
-| 37050 | ERCO | 2021-02-18 | additive_separate | 7.46 | 5.66 | 0.00 |
-| 37048 | ERCO | 2021-02-18 | additive_special | 7.45 | 5.64 | 0.00 |
-| 37051 | ERCO | 2021-02-18 | boosting | 7.56 | 1.88 | 0.00 |
-| 37053 | ERCO | 2021-02-18 | boosting_cluster | 6.06 | 1.36 | 0.00 |
-| 37041 | ERCO | 2021-02-18 | boosting_long | 3.87 | -1.15 | -1.15 |
-| 37052 | ERCO | 2021-02-18 | boosting_nospecial | 7.85 | 2.76 | 0.00 |
-| 37045 | ERCO | 2021-02-18 | boosting_sentinel | 8.70 | 3.13 | 0.00 |
-| 37054 | ERCO | 2021-02-18 | last_known_day | 14.79 | -20.49 | -20.49 |
-| 37055 | ERCO | 2021-02-18 | profile | 5.37 | -5.70 | -5.70 |
-| 37046 | ERCO | 2021-02-18 | recency_regression | 2.73 | -0.95 | -0.95 |
-| 37043 | ERCO | 2021-02-18 | recency_regression_sentinel | 2.73 | -0.95 | -0.95 |
-| 61042 | MISO | 2021-02-16 | DF | 7.05 | 10.44 | 0.00 |
-| 61047 | MISO | 2021-02-16 | additive | 2.63 | -1.97 | -1.97 |
-| 61049 | MISO | 2021-02-16 | additive_cluster | 2.51 | -1.90 | -1.90 |
-| 61040 | MISO | 2021-02-16 | additive_long | 2.23 | -1.57 | -1.57 |
-| 61044 | MISO | 2021-02-16 | additive_sentinel | 2.63 | -1.97 | -1.97 |
-| 61050 | MISO | 2021-02-16 | additive_separate | 2.63 | -1.97 | -1.97 |
-| 61048 | MISO | 2021-02-16 | additive_special | 2.52 | -1.46 | -1.46 |
-| 61051 | MISO | 2021-02-16 | boosting | 5.65 | -6.63 | -6.63 |
-| 61053 | MISO | 2021-02-16 | boosting_cluster | 6.52 | -7.16 | -7.16 |
-| 61041 | MISO | 2021-02-16 | boosting_long | 3.96 | -3.77 | -3.77 |
-| 61052 | MISO | 2021-02-16 | boosting_nospecial | 4.90 | -5.90 | -5.90 |
-| 61045 | MISO | 2021-02-16 | boosting_sentinel | 4.79 | -6.23 | -6.23 |
-| 61054 | MISO | 2021-02-16 | last_known_day | 1.83 | -5.59 | -5.59 |
-| 61055 | MISO | 2021-02-16 | profile | 8.70 | -7.19 | -7.19 |
-| 61046 | MISO | 2021-02-16 | recency_regression | 7.40 | -6.85 | -6.85 |
-| 61043 | MISO | 2021-02-16 | recency_regression_sentinel | 7.40 | -6.85 | -6.85 |
-| 96914 | SWPP | 2021-02-15 | DF | 4.31 | 3.41 | 0.00 |
-| 96919 | SWPP | 2021-02-15 | additive | 2.19 | -2.44 | -2.44 |
-| 96921 | SWPP | 2021-02-15 | additive_cluster | 3.06 | -0.86 | -0.86 |
-| 96912 | SWPP | 2021-02-15 | additive_long | 4.52 | 2.27 | 0.00 |
-| 96916 | SWPP | 2021-02-15 | additive_sentinel | 1.90 | -2.68 | -2.68 |
-| 96922 | SWPP | 2021-02-15 | additive_separate | 2.19 | -2.44 | -2.44 |
-| 96920 | SWPP | 2021-02-15 | additive_special | 2.15 | -2.43 | -2.43 |
-| 96923 | SWPP | 2021-02-15 | boosting | 5.52 | -7.82 | -7.82 |
-| 96925 | SWPP | 2021-02-15 | boosting_cluster | 6.27 | -9.94 | -9.94 |
-| 96913 | SWPP | 2021-02-15 | boosting_long | 5.21 | -7.70 | -7.70 |
-| 96924 | SWPP | 2021-02-15 | boosting_nospecial | 5.74 | -8.32 | -8.32 |
-| 96917 | SWPP | 2021-02-15 | boosting_sentinel | 5.79 | -8.58 | -8.58 |
-| 96926 | SWPP | 2021-02-15 | last_known_day | 5.65 | -6.47 | -6.47 |
-| 96927 | SWPP | 2021-02-15 | profile | 9.92 | -7.53 | -7.53 |
-| 96918 | SWPP | 2021-02-15 | recency_regression | 8.24 | -3.68 | -3.68 |
-| 96915 | SWPP | 2021-02-15 | recency_regression_sentinel | 9.43 | -4.96 | -4.96 |
-| 96930 | SWPP | 2021-02-16 | DF | 10.57 | 6.93 | 0.00 |
-| 96935 | SWPP | 2021-02-16 | additive | 6.90 | 1.66 | 0.00 |
-| 96937 | SWPP | 2021-02-16 | additive_cluster | 7.72 | 2.47 | 0.00 |
-| 96928 | SWPP | 2021-02-16 | additive_long | 9.32 | 6.48 | 0.00 |
-| 96932 | SWPP | 2021-02-16 | additive_sentinel | 6.45 | 1.74 | 0.00 |
-| 96938 | SWPP | 2021-02-16 | additive_separate | 6.90 | 1.66 | 0.00 |
-| 96936 | SWPP | 2021-02-16 | additive_special | 6.93 | 1.72 | 0.00 |
-| 96939 | SWPP | 2021-02-16 | boosting | 3.45 | -6.93 | -6.93 |
-| 96941 | SWPP | 2021-02-16 | boosting_cluster | 3.31 | -7.95 | -7.95 |
-| 96929 | SWPP | 2021-02-16 | boosting_long | 3.41 | -6.94 | -6.94 |
-| 96940 | SWPP | 2021-02-16 | boosting_nospecial | 3.31 | -7.05 | -7.05 |
-| 96933 | SWPP | 2021-02-16 | boosting_sentinel | 3.44 | -7.30 | -7.30 |
-| 96942 | SWPP | 2021-02-16 | last_known_day | 6.45 | -0.45 | -0.45 |
-| 96943 | SWPP | 2021-02-16 | profile | 5.00 | -8.76 | -8.76 |
-| 96934 | SWPP | 2021-02-16 | recency_regression | 7.20 | 7.97 | 0.00 |
-| 96931 | SWPP | 2021-02-16 | recency_regression_sentinel | 8.80 | 6.65 | 0.00 |
-| 119330 | TVA | 2022-12-23 | DF | 3.74 | -6.27 | -6.27 |
-| 119335 | TVA | 2022-12-23 | additive | 14.64 | -15.51 | -15.51 |
-| 119337 | TVA | 2022-12-23 | additive_cluster | 16.39 | -17.79 | -17.79 |
-| 119328 | TVA | 2022-12-23 | additive_long | 7.93 | -6.77 | -6.77 |
-| 119332 | TVA | 2022-12-23 | additive_sentinel | 14.65 | -15.51 | -15.51 |
-| 119338 | TVA | 2022-12-23 | additive_separate | 14.64 | -15.51 | -15.51 |
-| 119336 | TVA | 2022-12-23 | additive_special | 13.99 | -13.76 | -13.76 |
-| 119339 | TVA | 2022-12-23 | boosting | 17.29 | -18.74 | -18.74 |
-| 119341 | TVA | 2022-12-23 | boosting_cluster | 17.43 | -18.08 | -18.08 |
-| 119329 | TVA | 2022-12-23 | boosting_long | 14.28 | -14.32 | -14.32 |
-| 119340 | TVA | 2022-12-23 | boosting_nospecial | 17.34 | -18.46 | -18.46 |
-| 119333 | TVA | 2022-12-23 | boosting_sentinel | 16.89 | -18.42 | -18.42 |
-| 119342 | TVA | 2022-12-23 | last_known_day | 38.49 | -39.75 | -39.75 |
-| 119343 | TVA | 2022-12-23 | profile | 33.41 | -35.97 | -35.97 |
-| 119334 | TVA | 2022-12-23 | recency_regression | 17.85 | -19.05 | -19.05 |
-| 119331 | TVA | 2022-12-23 | recency_regression_sentinel | 17.86 | -19.06 | -19.06 |
-| 119346 | TVA | 2022-12-24 | DF | 3.88 | -8.57 | -8.57 |
-| 119351 | TVA | 2022-12-24 | additive | 8.68 | -20.29 | -20.29 |
-| 119353 | TVA | 2022-12-24 | additive_cluster | 6.02 | -20.53 | -20.53 |
-| 119344 | TVA | 2022-12-24 | additive_long | 3.98 | -9.72 | -9.72 |
-| 119348 | TVA | 2022-12-24 | additive_sentinel | 8.68 | -20.29 | -20.29 |
-| 119354 | TVA | 2022-12-24 | additive_separate | 8.68 | -20.29 | -20.29 |
-| 119352 | TVA | 2022-12-24 | additive_special | 10.64 | -22.51 | -22.51 |
-| 119355 | TVA | 2022-12-24 | boosting | 7.61 | -16.53 | -16.53 |
-| 119357 | TVA | 2022-12-24 | boosting_cluster | 9.63 | -20.74 | -20.74 |
-| 119345 | TVA | 2022-12-24 | boosting_long | 5.76 | -12.55 | -12.55 |
-| 119356 | TVA | 2022-12-24 | boosting_nospecial | 7.07 | -15.92 | -15.92 |
-| 119349 | TVA | 2022-12-24 | boosting_sentinel | 8.18 | -18.64 | -18.64 |
-| 119358 | TVA | 2022-12-24 | last_known_day | 18.57 | -22.60 | -22.60 |
-| 119359 | TVA | 2022-12-24 | profile | 43.83 | -54.16 | -54.16 |
-| 119350 | TVA | 2022-12-24 | recency_regression | 6.63 | -13.17 | -13.17 |
-| 119347 | TVA | 2022-12-24 | recency_regression_sentinel | 6.63 | -13.17 | -13.17 |
+| 42372 | DUK | 2022-12-24 | DF | 7.96 | -10.53 | -10.53 |
+| 42380 | DUK | 2022-12-24 | additive | 10.06 | -18.74 | -18.74 |
+| 42382 | DUK | 2022-12-24 | additive_cluster | 13.15 | -24.17 | -24.17 |
+| 42370 | DUK | 2022-12-24 | additive_long | 6.42 | -10.46 | -10.46 |
+| 42374 | DUK | 2022-12-24 | additive_multi | 10.74 | -19.81 | -19.81 |
+| 42377 | DUK | 2022-12-24 | additive_sentinel | 10.06 | -18.76 | -18.76 |
+| 42383 | DUK | 2022-12-24 | additive_separate | 10.06 | -18.74 | -18.74 |
+| 42381 | DUK | 2022-12-24 | additive_special | 11.31 | -22.03 | -22.03 |
+| 42384 | DUK | 2022-12-24 | boosting | 10.84 | -20.01 | -20.01 |
+| 42386 | DUK | 2022-12-24 | boosting_cluster | 14.52 | -23.13 | -23.13 |
+| 42371 | DUK | 2022-12-24 | boosting_long | 9.83 | -16.18 | -16.18 |
+| 42375 | DUK | 2022-12-24 | boosting_multi | 11.99 | -20.52 | -20.52 |
+| 42385 | DUK | 2022-12-24 | boosting_nospecial | 10.79 | -20.26 | -20.26 |
+| 42378 | DUK | 2022-12-24 | boosting_sentinel | 10.76 | -20.02 | -20.02 |
+| 42387 | DUK | 2022-12-24 | last_known_day | 29.05 | -39.03 | -39.03 |
+| 42388 | DUK | 2022-12-24 | profile | 42.59 | -45.59 | -45.59 |
+| 42379 | DUK | 2022-12-24 | recency_regression | 10.06 | -9.81 | -9.81 |
+| 42373 | DUK | 2022-12-24 | recency_regression_multi | 6.41 | -2.92 | -2.92 |
+| 42376 | DUK | 2022-12-24 | recency_regression_sentinel | 10.06 | -9.78 | -9.78 |
+| 43930 | ERCO | 2021-02-15 | DF | 44.43 | -1.04 | -1.04 |
+| 43938 | ERCO | 2021-02-15 | additive | 23.31 | -16.98 | -16.98 |
+| 43940 | ERCO | 2021-02-15 | additive_cluster | 21.98 | -18.89 | -18.89 |
+| 43928 | ERCO | 2021-02-15 | additive_long | 41.10 | -1.69 | -1.69 |
+| 43932 | ERCO | 2021-02-15 | additive_multi | 26.51 | -13.89 | -13.89 |
+| 43935 | ERCO | 2021-02-15 | additive_sentinel | 23.31 | -16.98 | -16.98 |
+| 43941 | ERCO | 2021-02-15 | additive_separate | 23.31 | -16.98 | -16.98 |
+| 43939 | ERCO | 2021-02-15 | additive_special | 23.58 | -16.93 | -16.93 |
+| 43942 | ERCO | 2021-02-15 | boosting | 16.80 | -17.21 | -17.21 |
+| 43944 | ERCO | 2021-02-15 | boosting_cluster | 19.13 | -19.11 | -19.11 |
+| 43929 | ERCO | 2021-02-15 | boosting_long | 22.14 | -14.57 | -14.57 |
+| 43933 | ERCO | 2021-02-15 | boosting_multi | 21.27 | -17.98 | -17.98 |
+| 43943 | ERCO | 2021-02-15 | boosting_nospecial | 16.54 | -17.64 | -17.64 |
+| 43936 | ERCO | 2021-02-15 | boosting_sentinel | 17.42 | -16.97 | -16.97 |
+| 43945 | ERCO | 2021-02-15 | last_known_day | 22.77 | -15.91 | -15.91 |
+| 43946 | ERCO | 2021-02-15 | profile | 12.39 | -34.83 | -34.83 |
+| 43937 | ERCO | 2021-02-15 | recency_regression | 59.63 | 3.38 | 0.00 |
+| 43931 | ERCO | 2021-02-15 | recency_regression_multi | 76.77 | 19.26 | 0.00 |
+| 43934 | ERCO | 2021-02-15 | recency_regression_sentinel | 59.64 | 3.38 | 0.00 |
+| 43949 | ERCO | 2021-02-16 | DF | 47.94 | 60.09 | 0.00 |
+| 43957 | ERCO | 2021-02-16 | additive | 30.79 | 26.54 | 0.00 |
+| 43959 | ERCO | 2021-02-16 | additive_cluster | 29.57 | 26.54 | 0.00 |
+| 43947 | ERCO | 2021-02-16 | additive_long | 52.45 | 46.85 | 0.00 |
+| 43951 | ERCO | 2021-02-16 | additive_multi | 34.99 | 36.46 | 0.00 |
+| 43954 | ERCO | 2021-02-16 | additive_sentinel | 30.79 | 26.54 | 0.00 |
+| 43960 | ERCO | 2021-02-16 | additive_separate | 30.79 | 26.54 | 0.00 |
+| 43958 | ERCO | 2021-02-16 | additive_special | 31.04 | 26.41 | 0.00 |
+| 43961 | ERCO | 2021-02-16 | boosting | 22.33 | 19.90 | 0.00 |
+| 43963 | ERCO | 2021-02-16 | boosting_cluster | 23.20 | 16.91 | 0.00 |
+| 43948 | ERCO | 2021-02-16 | boosting_long | 28.06 | 26.11 | 0.00 |
+| 43952 | ERCO | 2021-02-16 | boosting_multi | 26.88 | 23.64 | 0.00 |
+| 43962 | ERCO | 2021-02-16 | boosting_nospecial | 21.29 | 18.82 | 0.00 |
+| 43955 | ERCO | 2021-02-16 | boosting_sentinel | 22.04 | 18.43 | 0.00 |
+| 43964 | ERCO | 2021-02-16 | last_known_day | 37.95 | 9.73 | 0.00 |
+| 43965 | ERCO | 2021-02-16 | profile | 10.35 | 12.52 | 0.00 |
+| 43956 | ERCO | 2021-02-16 | recency_regression | 81.77 | 86.34 | 0.00 |
+| 43950 | ERCO | 2021-02-16 | recency_regression_multi | 83.08 | 100.02 | 0.00 |
+| 43953 | ERCO | 2021-02-16 | recency_regression_sentinel | 81.78 | 86.35 | 0.00 |
+| 43968 | ERCO | 2021-02-17 | DF | 30.02 | 22.28 | 0.00 |
+| 43976 | ERCO | 2021-02-17 | additive | 25.55 | 21.54 | 0.00 |
+| 43978 | ERCO | 2021-02-17 | additive_cluster | 25.24 | 21.73 | 0.00 |
+| 43966 | ERCO | 2021-02-17 | additive_long | 35.15 | 33.44 | 0.00 |
+| 43970 | ERCO | 2021-02-17 | additive_multi | 31.70 | 32.07 | 0.00 |
+| 43973 | ERCO | 2021-02-17 | additive_sentinel | 25.55 | 21.54 | 0.00 |
+| 43979 | ERCO | 2021-02-17 | additive_separate | 25.55 | 21.54 | 0.00 |
+| 43977 | ERCO | 2021-02-17 | additive_special | 25.69 | 21.66 | 0.00 |
+| 43980 | ERCO | 2021-02-17 | boosting | 17.89 | 11.98 | 0.00 |
+| 43982 | ERCO | 2021-02-17 | boosting_cluster | 18.52 | 11.99 | 0.00 |
+| 43967 | ERCO | 2021-02-17 | boosting_long | 23.41 | 15.65 | 0.00 |
+| 43971 | ERCO | 2021-02-17 | boosting_multi | 24.61 | 18.29 | 0.00 |
+| 43981 | ERCO | 2021-02-17 | boosting_nospecial | 17.15 | 11.61 | 0.00 |
+| 43974 | ERCO | 2021-02-17 | boosting_sentinel | 17.59 | 11.20 | 0.00 |
+| 43983 | ERCO | 2021-02-17 | last_known_day | 5.67 | -9.74 | -9.74 |
+| 43984 | ERCO | 2021-02-17 | profile | 8.92 | 6.34 | 0.00 |
+| 43975 | ERCO | 2021-02-17 | recency_regression | 47.01 | 36.53 | 0.00 |
+| 43969 | ERCO | 2021-02-17 | recency_regression_multi | 41.67 | 39.12 | 0.00 |
+| 43972 | ERCO | 2021-02-17 | recency_regression_sentinel | 47.01 | 36.53 | 0.00 |
+| 43987 | ERCO | 2021-02-18 | DF | 18.74 | 16.29 | 0.00 |
+| 43995 | ERCO | 2021-02-18 | additive | 7.46 | 5.66 | 0.00 |
+| 43997 | ERCO | 2021-02-18 | additive_cluster | 7.64 | 6.52 | 0.00 |
+| 43985 | ERCO | 2021-02-18 | additive_long | 8.08 | 5.87 | 0.00 |
+| 43989 | ERCO | 2021-02-18 | additive_multi | 12.43 | 10.18 | 0.00 |
+| 43992 | ERCO | 2021-02-18 | additive_sentinel | 7.46 | 5.66 | 0.00 |
+| 43998 | ERCO | 2021-02-18 | additive_separate | 7.46 | 5.66 | 0.00 |
+| 43996 | ERCO | 2021-02-18 | additive_special | 7.45 | 5.64 | 0.00 |
+| 43999 | ERCO | 2021-02-18 | boosting | 7.56 | 1.88 | 0.00 |
+| 44001 | ERCO | 2021-02-18 | boosting_cluster | 6.06 | 1.36 | 0.00 |
+| 43986 | ERCO | 2021-02-18 | boosting_long | 3.87 | -1.15 | -1.15 |
+| 43990 | ERCO | 2021-02-18 | boosting_multi | 4.42 | -3.21 | -3.21 |
+| 44000 | ERCO | 2021-02-18 | boosting_nospecial | 7.85 | 2.76 | 0.00 |
+| 43993 | ERCO | 2021-02-18 | boosting_sentinel | 8.70 | 3.13 | 0.00 |
+| 44002 | ERCO | 2021-02-18 | last_known_day | 14.79 | -20.49 | -20.49 |
+| 44003 | ERCO | 2021-02-18 | profile | 5.37 | -5.70 | -5.70 |
+| 43994 | ERCO | 2021-02-18 | recency_regression | 2.73 | -0.95 | -0.95 |
+| 43988 | ERCO | 2021-02-18 | recency_regression_multi | 6.71 | 4.27 | 0.00 |
+| 43991 | ERCO | 2021-02-18 | recency_regression_sentinel | 2.73 | -0.95 | -0.95 |
+| 72487 | MISO | 2021-02-16 | DF | 7.05 | 10.44 | 0.00 |
+| 72495 | MISO | 2021-02-16 | additive | 2.63 | -1.97 | -1.97 |
+| 72497 | MISO | 2021-02-16 | additive_cluster | 2.51 | -1.90 | -1.90 |
+| 72485 | MISO | 2021-02-16 | additive_long | 2.23 | -1.57 | -1.57 |
+| 72489 | MISO | 2021-02-16 | additive_multi | 2.85 | -2.38 | -2.38 |
+| 72492 | MISO | 2021-02-16 | additive_sentinel | 2.63 | -1.97 | -1.97 |
+| 72498 | MISO | 2021-02-16 | additive_separate | 2.63 | -1.97 | -1.97 |
+| 72496 | MISO | 2021-02-16 | additive_special | 2.52 | -1.46 | -1.46 |
+| 72499 | MISO | 2021-02-16 | boosting | 5.65 | -6.63 | -6.63 |
+| 72501 | MISO | 2021-02-16 | boosting_cluster | 6.52 | -7.16 | -7.16 |
+| 72486 | MISO | 2021-02-16 | boosting_long | 3.96 | -3.77 | -3.77 |
+| 72490 | MISO | 2021-02-16 | boosting_multi | 4.02 | -4.78 | -4.78 |
+| 72500 | MISO | 2021-02-16 | boosting_nospecial | 4.90 | -5.90 | -5.90 |
+| 72493 | MISO | 2021-02-16 | boosting_sentinel | 4.79 | -6.23 | -6.23 |
+| 72502 | MISO | 2021-02-16 | last_known_day | 1.83 | -5.59 | -5.59 |
+| 72503 | MISO | 2021-02-16 | profile | 8.70 | -7.19 | -7.19 |
+| 72494 | MISO | 2021-02-16 | recency_regression | 7.40 | -6.85 | -6.85 |
+| 72488 | MISO | 2021-02-16 | recency_regression_multi | 6.15 | -5.04 | -5.04 |
+| 72491 | MISO | 2021-02-16 | recency_regression_sentinel | 7.40 | -6.85 | -6.85 |
+| 115085 | SWPP | 2021-02-15 | DF | 4.31 | 3.41 | 0.00 |
+| 115093 | SWPP | 2021-02-15 | additive | 2.19 | -2.44 | -2.44 |
+| 115095 | SWPP | 2021-02-15 | additive_cluster | 3.06 | -0.86 | -0.86 |
+| 115083 | SWPP | 2021-02-15 | additive_long | 4.52 | 2.27 | 0.00 |
+| 115087 | SWPP | 2021-02-15 | additive_multi | 2.27 | -3.16 | -3.16 |
+| 115090 | SWPP | 2021-02-15 | additive_sentinel | 1.90 | -2.68 | -2.68 |
+| 115096 | SWPP | 2021-02-15 | additive_separate | 2.19 | -2.44 | -2.44 |
+| 115094 | SWPP | 2021-02-15 | additive_special | 2.15 | -2.43 | -2.43 |
+| 115097 | SWPP | 2021-02-15 | boosting | 5.52 | -7.82 | -7.82 |
+| 115099 | SWPP | 2021-02-15 | boosting_cluster | 6.27 | -9.94 | -9.94 |
+| 115084 | SWPP | 2021-02-15 | boosting_long | 5.21 | -7.70 | -7.70 |
+| 115088 | SWPP | 2021-02-15 | boosting_multi | 6.63 | -9.64 | -9.64 |
+| 115098 | SWPP | 2021-02-15 | boosting_nospecial | 5.74 | -8.32 | -8.32 |
+| 115091 | SWPP | 2021-02-15 | boosting_sentinel | 5.79 | -8.58 | -8.58 |
+| 115100 | SWPP | 2021-02-15 | last_known_day | 5.65 | -6.47 | -6.47 |
+| 115101 | SWPP | 2021-02-15 | profile | 9.92 | -7.53 | -7.53 |
+| 115092 | SWPP | 2021-02-15 | recency_regression | 8.24 | -3.68 | -3.68 |
+| 115086 | SWPP | 2021-02-15 | recency_regression_multi | 7.32 | -6.84 | -6.84 |
+| 115089 | SWPP | 2021-02-15 | recency_regression_sentinel | 9.43 | -4.96 | -4.96 |
+| 115104 | SWPP | 2021-02-16 | DF | 10.57 | 6.93 | 0.00 |
+| 115112 | SWPP | 2021-02-16 | additive | 6.90 | 1.66 | 0.00 |
+| 115114 | SWPP | 2021-02-16 | additive_cluster | 7.72 | 2.47 | 0.00 |
+| 115102 | SWPP | 2021-02-16 | additive_long | 9.32 | 6.48 | 0.00 |
+| 115106 | SWPP | 2021-02-16 | additive_multi | 6.69 | 0.04 | 0.00 |
+| 115109 | SWPP | 2021-02-16 | additive_sentinel | 6.45 | 1.74 | 0.00 |
+| 115115 | SWPP | 2021-02-16 | additive_separate | 6.90 | 1.66 | 0.00 |
+| 115113 | SWPP | 2021-02-16 | additive_special | 6.93 | 1.72 | 0.00 |
+| 115116 | SWPP | 2021-02-16 | boosting | 3.45 | -6.93 | -6.93 |
+| 115118 | SWPP | 2021-02-16 | boosting_cluster | 3.31 | -7.95 | -7.95 |
+| 115103 | SWPP | 2021-02-16 | boosting_long | 3.41 | -6.94 | -6.94 |
+| 115107 | SWPP | 2021-02-16 | boosting_multi | 3.60 | -8.83 | -8.83 |
+| 115117 | SWPP | 2021-02-16 | boosting_nospecial | 3.31 | -7.05 | -7.05 |
+| 115110 | SWPP | 2021-02-16 | boosting_sentinel | 3.44 | -7.30 | -7.30 |
+| 115119 | SWPP | 2021-02-16 | last_known_day | 6.45 | -0.45 | -0.45 |
+| 115120 | SWPP | 2021-02-16 | profile | 5.00 | -8.76 | -8.76 |
+| 115111 | SWPP | 2021-02-16 | recency_regression | 7.20 | 7.97 | 0.00 |
+| 115105 | SWPP | 2021-02-16 | recency_regression_multi | 4.08 | -0.60 | -0.60 |
+| 115108 | SWPP | 2021-02-16 | recency_regression_sentinel | 8.80 | 6.65 | 0.00 |
+| 141704 | TVA | 2022-12-23 | DF | 3.74 | -6.27 | -6.27 |
+| 141712 | TVA | 2022-12-23 | additive | 14.64 | -15.51 | -15.51 |
+| 141714 | TVA | 2022-12-23 | additive_cluster | 16.39 | -17.79 | -17.79 |
+| 141702 | TVA | 2022-12-23 | additive_long | 7.93 | -6.77 | -6.77 |
+| 141706 | TVA | 2022-12-23 | additive_multi | 14.19 | -15.37 | -15.37 |
+| 141709 | TVA | 2022-12-23 | additive_sentinel | 14.65 | -15.51 | -15.51 |
+| 141715 | TVA | 2022-12-23 | additive_separate | 14.64 | -15.51 | -15.51 |
+| 141713 | TVA | 2022-12-23 | additive_special | 13.99 | -13.76 | -13.76 |
+| 141716 | TVA | 2022-12-23 | boosting | 17.29 | -18.74 | -18.74 |
+| 141718 | TVA | 2022-12-23 | boosting_cluster | 17.43 | -18.08 | -18.08 |
+| 141703 | TVA | 2022-12-23 | boosting_long | 14.28 | -14.32 | -14.32 |
+| 141707 | TVA | 2022-12-23 | boosting_multi | 16.93 | -18.92 | -18.92 |
+| 141717 | TVA | 2022-12-23 | boosting_nospecial | 17.34 | -18.46 | -18.46 |
+| 141710 | TVA | 2022-12-23 | boosting_sentinel | 16.89 | -18.42 | -18.42 |
+| 141719 | TVA | 2022-12-23 | last_known_day | 38.49 | -39.75 | -39.75 |
+| 141720 | TVA | 2022-12-23 | profile | 33.41 | -35.97 | -35.97 |
+| 141711 | TVA | 2022-12-23 | recency_regression | 17.85 | -19.05 | -19.05 |
+| 141705 | TVA | 2022-12-23 | recency_regression_multi | 15.95 | -20.21 | -20.21 |
+| 141708 | TVA | 2022-12-23 | recency_regression_sentinel | 17.86 | -19.06 | -19.06 |
+| 141723 | TVA | 2022-12-24 | DF | 3.88 | -8.57 | -8.57 |
+| 141731 | TVA | 2022-12-24 | additive | 8.68 | -20.29 | -20.29 |
+| 141733 | TVA | 2022-12-24 | additive_cluster | 6.02 | -20.53 | -20.53 |
+| 141721 | TVA | 2022-12-24 | additive_long | 3.98 | -9.72 | -9.72 |
+| 141725 | TVA | 2022-12-24 | additive_multi | 7.38 | -16.89 | -16.89 |
+| 141728 | TVA | 2022-12-24 | additive_sentinel | 8.68 | -20.29 | -20.29 |
+| 141734 | TVA | 2022-12-24 | additive_separate | 8.68 | -20.29 | -20.29 |
+| 141732 | TVA | 2022-12-24 | additive_special | 10.64 | -22.51 | -22.51 |
+| 141735 | TVA | 2022-12-24 | boosting | 7.61 | -16.53 | -16.53 |
+| 141737 | TVA | 2022-12-24 | boosting_cluster | 9.63 | -20.74 | -20.74 |
+| 141722 | TVA | 2022-12-24 | boosting_long | 5.76 | -12.55 | -12.55 |
+| 141726 | TVA | 2022-12-24 | boosting_multi | 8.24 | -17.45 | -17.45 |
+| 141736 | TVA | 2022-12-24 | boosting_nospecial | 7.07 | -15.92 | -15.92 |
+| 141729 | TVA | 2022-12-24 | boosting_sentinel | 8.18 | -18.64 | -18.64 |
+| 141738 | TVA | 2022-12-24 | last_known_day | 18.57 | -22.60 | -22.60 |
+| 141739 | TVA | 2022-12-24 | profile | 43.83 | -54.16 | -54.16 |
+| 141730 | TVA | 2022-12-24 | recency_regression | 6.63 | -13.17 | -13.17 |
+| 141724 | TVA | 2022-12-24 | recency_regression_multi | 8.62 | -12.48 | -12.48 |
+| 141727 | TVA | 2022-12-24 | recency_regression_sentinel | 6.63 | -13.17 | -13.17 |
 
 ## Diebold-Mariano against the BA's forecast (daily MAPE)
 
@@ -718,6 +841,16 @@ Negative statistics favour the model; p-values from the normal approximation.
 | additive_long | PJM | mape | 0.853 | 0.394 | 744 |
 | additive_long | SWPP | mape | -3.961 | 0.000 | 741 |
 | additive_long | TVA | mape | 19.568 | 0.000 | 739 |
+| additive_multi | BPAT | mape | 13.102 | 0.000 | 750 |
+| additive_multi | CISO | mape | 13.248 | 0.000 | 737 |
+| additive_multi | DUK | mape | 11.332 | 0.000 | 750 |
+| additive_multi | ERCO | mape | 10.521 | 0.000 | 746 |
+| additive_multi | ISNE | mape | 23.695 | 0.000 | 752 |
+| additive_multi | MISO | mape | 0.592 | 0.554 | 746 |
+| additive_multi | NYIS | mape | 3.391 | 0.001 | 752 |
+| additive_multi | PJM | mape | -11.855 | 0.000 | 744 |
+| additive_multi | SWPP | mape | -12.657 | 0.000 | 741 |
+| additive_multi | TVA | mape | 19.756 | 0.000 | 739 |
 | additive_sentinel | BPAT | mape | 16.378 | 0.000 | 750 |
 | additive_sentinel | CISO | mape | 17.295 | 0.000 | 737 |
 | additive_sentinel | DUK | mape | 14.555 | 0.000 | 750 |
@@ -778,6 +911,16 @@ Negative statistics favour the model; p-values from the normal approximation.
 | boosting_long | PJM | mape | 4.135 | 0.000 | 744 |
 | boosting_long | SWPP | mape | -2.992 | 0.003 | 741 |
 | boosting_long | TVA | mape | 20.301 | 0.000 | 739 |
+| boosting_multi | BPAT | mape | 14.349 | 0.000 | 750 |
+| boosting_multi | CISO | mape | 6.056 | 0.000 | 737 |
+| boosting_multi | DUK | mape | 12.452 | 0.000 | 750 |
+| boosting_multi | ERCO | mape | 7.466 | 0.000 | 746 |
+| boosting_multi | ISNE | mape | 22.238 | 0.000 | 752 |
+| boosting_multi | MISO | mape | -0.326 | 0.744 | 746 |
+| boosting_multi | NYIS | mape | 2.665 | 0.008 | 752 |
+| boosting_multi | PJM | mape | -9.484 | 0.000 | 744 |
+| boosting_multi | SWPP | mape | -9.789 | 0.000 | 741 |
+| boosting_multi | TVA | mape | 18.769 | 0.000 | 739 |
 | boosting_nospecial | BPAT | mape | 18.566 | 0.000 | 750 |
 | boosting_nospecial | CISO | mape | 12.075 | 0.000 | 737 |
 | boosting_nospecial | DUK | mape | 16.905 | 0.000 | 750 |
@@ -828,6 +971,16 @@ Negative statistics favour the model; p-values from the normal approximation.
 | recency_regression | PJM | mape | 7.753 | 0.000 | 744 |
 | recency_regression | SWPP | mape | 0.193 | 0.847 | 741 |
 | recency_regression | TVA | mape | 27.354 | 0.000 | 739 |
+| recency_regression_multi | BPAT | mape | 18.468 | 0.000 | 750 |
+| recency_regression_multi | CISO | mape | 22.659 | 0.000 | 737 |
+| recency_regression_multi | DUK | mape | 16.322 | 0.000 | 750 |
+| recency_regression_multi | ERCO | mape | 12.492 | 0.000 | 746 |
+| recency_regression_multi | ISNE | mape | 28.280 | 0.000 | 752 |
+| recency_regression_multi | MISO | mape | 8.344 | 0.000 | 746 |
+| recency_regression_multi | NYIS | mape | 11.629 | 0.000 | 752 |
+| recency_regression_multi | PJM | mape | -3.563 | 0.000 | 744 |
+| recency_regression_multi | SWPP | mape | -6.999 | 0.000 | 741 |
+| recency_regression_multi | TVA | mape | 25.112 | 0.000 | 739 |
 | recency_regression_sentinel | BPAT | mape | 21.515 | 0.000 | 750 |
 | recency_regression_sentinel | CISO | mape | 25.883 | 0.000 | 737 |
 | recency_regression_sentinel | DUK | mape | 19.559 | 0.000 | 750 |
@@ -849,15 +1002,18 @@ Fraction of BA-days each model produced a scorable forecast for.
 | additive | 0.986 |
 | additive_cluster | 0.986 |
 | additive_long | 0.986 |
+| additive_multi | 0.986 |
 | additive_sentinel | 0.986 |
 | additive_separate | 0.986 |
 | additive_special | 0.986 |
 | boosting | 0.995 |
 | boosting_cluster | 0.995 |
 | boosting_long | 0.995 |
+| boosting_multi | 0.995 |
 | boosting_nospecial | 0.995 |
 | boosting_sentinel | 0.995 |
 | last_known_day | 0.995 |
 | profile | 0.999 |
 | recency_regression | 0.995 |
+| recency_regression_multi | 0.995 |
 | recency_regression_sentinel | 0.995 |
