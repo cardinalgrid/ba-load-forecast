@@ -77,6 +77,7 @@ class InformationSet:
 
 
 GROSS_LOW, GROSS_HIGH, GROSS_WINDOW_H = 0.2, 5.0, 24 * 28
+FIRST_DAY = date(2015, 7, 1)
 
 
 def gross_guard(load: pd.Series) -> pd.Series:
@@ -206,7 +207,7 @@ class Loader:
 
     # ---- the information set --------------------------------------------------------------------------
     def information_set(self, ba: str, day: date) -> InformationSet:
-        start = day - timedelta(days=self.history_days)
+        start = max(day - timedelta(days=self.history_days), FIRST_DAY)   # EIA-930 starts in July 2015
         cutoff = last_load_hour(day)
         hours = pd.date_range(datetime(day.year, day.month, day.day), periods=24, freq="h")
 
