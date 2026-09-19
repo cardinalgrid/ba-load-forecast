@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-from ..features import FEATURE_COLUMNS, rows_for_days, target_temperature, training_days
+from ..features import EXTREME_COLUMNS, FEATURE_COLUMNS, rows_for_days, target_temperature, training_days
 from ..information_set import InformationSet
 from .base import ForecastError
 
@@ -23,7 +23,9 @@ from .base import ForecastError
 class Boosting:
     def __init__(self, train_days: int = 730, refit_days: int = 7, max_iter: int = 400, learning_rate: float = 0.05,
                  max_leaf_nodes: int = 31, min_train_days: int = 120, seed: int = 0, stations: bool = True,
-                 special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None):
+                 special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None,
+                 extremes: bool = False):
+        self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS)
         self.train_days = train_days
         self.refit_days = refit_days
         self.max_iter = max_iter
@@ -57,6 +59,8 @@ class Boosting:
         if not self.special_days:
             cols = [c for c in cols if c != "special_kind"]
         cols += [c for c in rows.columns if c.startswith("t_K")]
+        if self.extremes:
+            cols += EXTREME_COLUMNS
         return cols
 
     def needs_fit(self, info: InformationSet) -> bool:

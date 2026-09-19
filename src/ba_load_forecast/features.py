@@ -31,6 +31,26 @@ TEMP_COLUMNS = ["t", *[f"t_lag{k}" for k in LAGS], *[f"t_ma{m}" for m in MOVING_
 LOAD_COLUMNS = ["l_last_known", "l_d7", "l_mean24"]
 CALENDAR_COLUMNS = ["hour", "day_type", "special_kind", "doy_sin", "doy_cos", "trend"]
 FEATURE_COLUMNS = [*CALENDAR_COLUMNS, *TEMP_COLUMNS, *LOAD_COLUMNS]
+COLD_F, HEAT_F = 32.0, 85.0
+EXTREME_COLUMNS = ["cold_h", "cold_ma24", "cold_hours", "heat_h", "heat_ma24"]
+
+
+def extreme_features(temp: pd.Series, ts: pd.DatetimeIndex) -> pd.DataFrame:
+    """Explicit extreme terms: degrees below ``COLD_F`` (hour and 24 h mean), consecutive hours below it up to
+    and including the hour, and degrees above ``HEAT_F`` (hour and 24 h mean). What a smooth response does
+    not extrapolate on its own into a cold wave."""
+    t = temp.asfreq("h") if not temp.empty else temp
+    out = pd.DataFrame(index=ts)
+    th = t.reindex(ts).to_numpy(dtype=float)
+    ma = t.rolling(24, min_periods=24).mean().shift(1, freq="h").reindex(ts).to_numpy(dtype=float)
+    out["cold_h"] = np.maximum(0.0, COLD_F - th)
+    out["cold_ma24"] = np.maximum(0.0, COLD_F - ma)
+    below = (t < COLD_F).astype(int)                                  # NaN counts as not cold
+    run = below.groupby((below == 0).cumsum()).cumsum()
+    out["cold_hours"] = run.reindex(ts).to_numpy(dtype=float)
+    out["heat_h"] = np.maximum(0.0, th - HEAT_F)
+    out["heat_ma24"] = np.maximum(0.0, ma - HEAT_F)
+    return out
 
 
 def hourly_index(days: list[date]) -> pd.DatetimeIndex:
@@ -93,7 +113,8 @@ def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: 
     a data-driven day label (the shape cluster) and adds the column ``cluster`` (-1 where unknown).
     """
     ts = hourly_index(days)
-    out = pd.concat([calendar_features(ts), temperature_features(temp, ts), load_features(load, ts)], axis=1)
+    out = pd.concat([calendar_features(ts), temperature_features(temp, ts), load_features(load, ts),
+                     extreme_features(temp, ts)], axis=1)
     if stations is not None and len(stations.columns):
         st = stations.asfreq("h") if not stations.empty else stations
         for c in st.columns:

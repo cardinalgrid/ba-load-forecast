@@ -11,6 +11,32 @@ import numpy as np
 MAX_MISSING_HOURS = 2
 
 FIELDS = ("mape", "peak_err_pct", "peak_under_pct", "peak_hour_err", "actual_peak", "actual_mean", "n_missing", "skipped")
+QUANTILE_FIELDS = ("pinball_05", "pinball_50", "pinball_95", "coverage_90", "width_90", "peak_in_band")
+
+
+def quantile_metrics(quantiles, actual, taus=(0.05, 0.5, 0.95)) -> dict:
+    """Pinball losses (in percent of the actual), coverage and mean relative width of the 5-95 band, and
+    whether the actual peak fell inside the band at the hour of the peak. NaN when the day cannot be scored."""
+    q = np.asarray(quantiles, dtype=float)
+    a = np.asarray(actual, dtype=float)
+    out = {k: np.nan for k in QUANTILE_FIELDS}
+    if q.shape != (len(taus), 24) or a.shape != (24,) or np.isnan(q).any():
+        return out
+    ok = ~np.isnan(a) & (a > 0)
+    if ok.sum() < 24 - MAX_MISSING_HOURS:
+        return out
+    for tau, key in zip(taus, ("pinball_05", "pinball_50", "pinball_95"), strict=True):
+        qi = q[list(taus).index(tau)]
+        diff = a[ok] - qi[ok]
+        loss = np.maximum(tau * diff, (tau - 1.0) * diff)
+        out[key] = float(np.mean(loss / a[ok]) * 100.0)
+    lo, hi = q[0], q[-1]
+    inside = (a[ok] >= lo[ok]) & (a[ok] <= hi[ok])
+    out["coverage_90"] = float(inside.mean())
+    out["width_90"] = float(np.mean((hi[ok] - lo[ok]) / a[ok]) * 100.0)
+    ph = int(np.nanargmax(a))
+    out["peak_in_band"] = float(lo[ph] <= a[ph] <= hi[ph])
+    return out
 
 
 def day_metrics(forecast, actual) -> dict:

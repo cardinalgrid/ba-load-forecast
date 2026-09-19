@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import BSpline
 
-from ..features import rows_for_days, target_temperature, training_days
+from ..features import EXTREME_COLUMNS, rows_for_days, target_temperature, training_days
 from ..information_set import InformationSet
 from .base import ForecastError
 
@@ -42,7 +42,8 @@ class AdditiveModel:
     def __init__(self, train_days: int = 730, refit_days: int = 7, n_knots: int = 6,
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
-                 labels=None, name: str | None = None):
+                 labels=None, name: str | None = None, extremes: bool = False):
+        self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS) as linear regressors
         self.train_days = train_days
         self.refit_days = refit_days
         self.n_knots = n_knots
@@ -75,6 +76,9 @@ class AdditiveModel:
             cols.append(rows[c].to_numpy(dtype=float))
         for c in LINEAR:
             cols.append(rows[c].to_numpy(dtype=float))
+        if self.extremes:
+            for c in EXTREME_COLUMNS:
+                cols.append(rows[c].to_numpy(dtype=float))
         return np.column_stack([c if c.ndim == 2 else c[:, None] for c in cols])
 
     def _standardise(self, x: np.ndarray, fit: bool) -> np.ndarray:

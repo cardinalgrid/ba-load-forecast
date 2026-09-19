@@ -17,28 +17,36 @@ import pandas as pd
 from .forecasters.base import Forecaster, ForecastError, blind_copy
 from .hrrr import days_between
 from .information_set import InformationSet, Loader
-from .metrics import FIELDS, day_metrics
+from .metrics import FIELDS, QUANTILE_FIELDS, day_metrics, quantile_metrics
 
 BA_MODEL = "DF"
-COLUMNS = ["ba", "day", "model", *FIELDS, "day_type", "special_day", "run_init", "error"]
+COLUMNS = ["ba", "day", "model", *FIELDS, *QUANTILE_FIELDS, "temp_min_f", "day_type", "special_day", "run_init", "error"]
 
 
 def score_day(info: InformationSet, forecasters: Sequence[Forecaster]) -> list[dict]:
     """The rows of one BA-day: one per forecaster plus the BA's own forecast."""
     blind = blind_copy(info)
+    temp_min = float(np.nanmin(info.temp_observed_f)) if np.isfinite(info.temp_observed_f).any() else np.nan
     common = {"ba": info.ba, "day": info.day, "day_type": info.day_type, "special_day": info.special_day,
-              "run_init": None if info.run is None else f"{info.run[0]}T{info.run[1]:02d}"}
+              "run_init": None if info.run is None else f"{info.run[0]}T{info.run[1]:02d}", "temp_min_f": temp_min}
+    empty_q = {k: np.nan for k in QUANTILE_FIELDS}
     rows = []
     actual = info.actual if info.actual_plausible else np.full(24, np.nan)   # a gross fault in the outcome: no one is scored
     note = None if info.actual_plausible else "implausible actual"
     for fc in forecasters:
         error = note
+        qm = empty_q
         try:
-            forecast = np.asarray(fc.predict(blind), dtype=float)
+            if hasattr(fc, "predict_quantiles"):
+                q = np.asarray(fc.predict_quantiles(blind), dtype=float)
+                forecast = q[q.shape[0] // 2]
+                qm = quantile_metrics(q, actual)
+            else:
+                forecast = np.asarray(fc.predict(blind), dtype=float)
         except ForecastError as e:
             forecast, error = np.full(24, np.nan), str(e)
-        rows.append({**common, "model": fc.name, **day_metrics(forecast, actual), "error": error})
-    rows.append({**common, "model": BA_MODEL, **day_metrics(info.ba_forecast, actual), "error": note})
+        rows.append({**common, "model": fc.name, **day_metrics(forecast, actual), **qm, "error": error})
+    rows.append({**common, "model": BA_MODEL, **day_metrics(info.ba_forecast, actual), **empty_q, "error": note})
     return rows
 
 

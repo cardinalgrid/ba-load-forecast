@@ -21,7 +21,8 @@ HRRR grid cell.
 ## Environment
 
 Python 3.11 on Windows 11; `pip install -e ".[hrrr,dev]"` plus `grid-data-sentinel[pandas]` 0.4.0
-installed from its repository. Versions used for the results in this repository: numpy 1.26, pandas 2.2,
+installed from its repository (the 0.4 API: `Sentinel`, `Repairer`, `Context`; the 0.3 release does not have
+the classes that `cleaning.py` uses). Versions used for the results in this repository: numpy 1.26, pandas 2.2,
 scipy 1.17, scikit-learn 1.3, zarr 2.18, s3fs 2026.7, pyarrow 11. k-means and the silhouette are implemented
 in numpy (`clusters.py`), so scikit-learn is used only by the boosting.
 

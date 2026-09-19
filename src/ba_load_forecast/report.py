@@ -137,6 +137,55 @@ def split_shed(rows: pd.DataFrame, shed: pd.DataFrame) -> tuple[pd.DataFrame, pd
     return rows[~mask], rows[mask]
 
 
+def special_days_table(rows: pd.DataFrame) -> pd.DataFrame:
+    """Metrics on the special days and on their eves only, per model: the days the treatments are about."""
+    r = rows.copy()
+    special = {(b, d) for b, d, s in zip(r["ba"], r["day"], r["special_day"], strict=True) if pd.notna(s)}
+    r["is_special"] = [(b, d) in special for b, d in zip(r["ba"], r["day"], strict=True)]
+    r["is_eve"] = [(b, d + pd.Timedelta(days=1).to_pytimedelta()) in special for b, d in zip(r["ba"], r["day"], strict=True)]
+    parts = []
+    for label, mask in (("special", r["is_special"]), ("eve", r["is_eve"])):
+        sub = paired_with_ba(r[mask])
+        if sub.empty:
+            continue
+        sub["win_mape"] = sub["mape"] < sub["mape_ba"]
+        g = sub.groupby("model")
+        t = g[["mape", "peak_err_pct", "peak_under_pct"]].mean()
+        t["win_mape"] = g["win_mape"].mean()
+        t["n_days"] = g.size()
+        t.loc[t.index == BA_MODEL, "win_mape"] = np.nan
+        t.insert(0, "days", label)
+        parts.append(t.reset_index())
+    return pd.concat(parts, ignore_index=True).sort_values(["days", "mape"]) if parts else pd.DataFrame()
+
+
+def quantile_table(rows: pd.DataFrame, cold_mornings: int = 30) -> pd.DataFrame:
+    """Pinball losses, coverage and width of the 90% band per model, on all days, on the winter-event days and
+    on the ``cold_mornings`` coldest days of each BA (by the observed minimum temperature)."""
+    q = rows[rows["pinball_50"].notna()].copy()
+    if q.empty:
+        return pd.DataFrame()
+    day = pd.to_datetime(q["day"])
+    in_event = np.zeros(len(q), dtype=bool)
+    for ev in EVENTS:
+        in_event |= ((day >= pd.Timestamp(ev["start"])) & (day <= pd.Timestamp(ev["end"]))).to_numpy()
+    cold = np.zeros(len(q), dtype=bool)
+    for ba, g in q.groupby("ba"):
+        coldest = g.drop_duplicates("day").nsmallest(cold_mornings, "temp_min_f")["day"]
+        cold |= ((q["ba"] == ba) & q["day"].isin(coldest)).to_numpy()
+    parts = []
+    for label, mask in (("all", np.ones(len(q), dtype=bool)), ("events", in_event), ("cold_mornings", cold)):
+        sub = q[mask]
+        if sub.empty:
+            continue
+        g = sub.groupby("model")
+        t = g[["pinball_05", "pinball_50", "pinball_95", "coverage_90", "width_90", "peak_in_band"]].mean()
+        t["n_days"] = g.size()
+        t.insert(0, "days", label)
+        parts.append(t.reset_index())
+    return pd.concat(parts, ignore_index=True)
+
+
 def summarise(rows: pd.DataFrame, events=EVENTS, shed: pd.DataFrame | None = None) -> dict[str, pd.DataFrame]:
     """Tables on the complete cases; documented load-shed BA-days are left out of every metric and reported apart.
 
@@ -157,6 +206,13 @@ def summarise(rows: pd.DataFrame, events=EVENTS, shed: pd.DataFrame | None = Non
     }
     if len(shed_rows):
         out["shed_days"] = shed_rows[["ba", "day", "model", "mape", "peak_err_pct", "peak_under_pct"]].sort_values(["ba", "day", "model"])
+    sp = special_days_table(cc)
+    if len(sp):
+        out["special_days"] = sp
+    if "pinball_50" in cc.columns:
+        qt = quantile_table(cc)
+        if len(qt):
+            out["quantiles"] = qt
     return out
 
 
@@ -187,6 +243,17 @@ def write_report(tables: dict[str, pd.DataFrame], path, title: str, intro: str) 
              "## By BA", "", markdown_table(tables["by_model_ba"]), ""]
     if len(tables["events"]):
         lines += ["## The winter events (calendar days of each event)", "", markdown_table(tables["events"]), ""]
+    if "special_days" in tables:
+        lines += ["## Special days and their eves", "",
+                  "The same metrics on the special days of `calendar_us` (holidays, Super Bowl Sunday) and on the day "
+                  "before each: the days the special-day treatments are about.", "",
+                  markdown_table(tables["special_days"]), ""]
+    if "quantiles" in tables:
+        lines += ["## Quantile forecasts", "",
+                  "Pinball loss of the 5th, 50th and 95th percentiles (in percent of the actual), coverage and mean "
+                  "relative width of the 90% band, and the share of days whose actual peak fell inside the band at the "
+                  "hour of the peak; on all days, on the winter-event days and on the 30 coldest days of each BA.", "",
+                  markdown_table(tables["quantiles"], 3), ""]
     if "shed_days" in tables:
         lines += ["## Documented load-shed days (left out of every table above)", "",
                   "On these BA-days the load that occurred is the load served under firm load shed, not the demand "
