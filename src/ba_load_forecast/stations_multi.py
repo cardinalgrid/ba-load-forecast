@@ -3,8 +3,8 @@
 One airport per BA (``grid_sentinel.stations.BA_STATION``) is what Note 2 and phase B used; a system the
 size of CAISO or PJM is not one city. This table adds, for the development BAs, the main airports of
 the largest load centres in each footprint. Station identifiers and coordinates come from the public
-ISD history file, like the single-station table. Weights are equal; a population weighting is noted
-as an alternative in the study notes.
+ISD history file, like the single-station table. Weights are equal; a population weighting is an
+alternative that was not tested (see ``docs/methods.md``).
 """
 
 from __future__ import annotations

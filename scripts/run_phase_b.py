@@ -1,6 +1,6 @@
 """Phase B: the floors, the profile and the recency regression against each BA's own forecast.
 
-    python scripts/run_phase_b.py --out "~/ba-load-forecast-runs/phase_b"
+    python scripts/run_phase_b.py --out <a local folder for the rows>
     python scripts/run_phase_b.py --report-only
 
 One parquet per BA in ``--out`` (skipped when it exists, so the run is resumable); the report goes to
