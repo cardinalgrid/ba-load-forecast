@@ -3,8 +3,8 @@
 Hong's benchmark model explains hourly load with a trend, the month, the day type by hour, and a cubic
 polynomial of temperature interacted with the hour and with the month; the recency effect adds the
 temperature of the previous hours (lags) and its moving averages, so that the load responds to how long
-it has been cold, not only to how cold it is now. (References marked for verification in the study
-notes: Hong, Pinson and Fan 2014; Wang, Liu and Hong 2016.)
+it has been cold, not only to how cold it is now (Hong, Pinson and Fan 2014,
+doi:10.1016/j.ijforecast.2013.07.001; Wang, Liu and Hong 2016, doi:10.1016/j.ijforecast.2015.09.006).
 
 Training uses the observed temperature; forecasting uses the HRRR path, which also supplies the hours
 of D-1 after the cut-off that the lags and moving averages need. The model is refitted every

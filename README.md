@@ -7,6 +7,10 @@ initiative.
 > Status: **0.1.0, data layer.** The information cut-off, the archived weather forecasts and the
 > loaders exist and are tested; no forecasting model yet.
 
+Documentation: `docs/methods.md` (every rule, model and parameter, with the reason), `docs/reproduce.md`
+(inputs and commands in order), and one report per phase (`docs/phase_b.md`, `docs/phase_c.md`,
+`docs/phase_d.md`, `docs/hrrr_verification.md`, `docs/day_clusters.md`).
+
 ## The question
 
 Every BA reports to the EIA, every hour, the demand that occurred (`D`) and the forecast it made the day

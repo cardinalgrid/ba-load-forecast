@@ -87,8 +87,8 @@ def dm_test(errors_a, errors_b, power: int = 1) -> tuple[float, float]:
     """Diebold-Mariano statistic and two-sided p-value for one-step-ahead forecasts.
 
     Loss is ``|e|**power``; the differential is loss_a minus loss_b, so a negative statistic favours
-    ``a``. Uses the Harvey, Leybourne and Newbold small-sample correction and the normal
-    approximation for the p-value (reference marked for verification in the study notes).
+    ``a``. Uses the Harvey, Leybourne and Newbold (1997) small-sample correction and the normal
+    approximation for the p-value (Diebold and Mariano 1995, doi:10.1080/07350015.1995.10524599).
     """
     a = np.asarray(errors_a, dtype=float)
     b = np.asarray(errors_b, dtype=float)
