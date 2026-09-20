@@ -95,6 +95,8 @@ to +1.3 % between 2020 and 2022, the signature of behind-the-meter solar, which 
 describes yet. Adaptive conformal intervals reach the nominal 90 % coverage over the year (89.7 %) and
 still cover only 78 to 81 % of the hours inside the storms and on the coldest mornings.
 
+Two later steps qualify those numbers. **Sky features** (`docs/phase_e_sky.md`): the short-wave flux is empty in the public HRRR Zarr archive until 2025, so the boosting received the sun's elevation and the HRRR total cloud cover as seen at each day's cut-off instead; the corrected ensemble improves from 3.74 % to 3.57 % at ISO-NE and from 2.76 % to 2.70 % at CAISO (now below CAISO's 2.80 %), not at FPL, and the midday gap at ISO-NE remains. **The benchmark itself** (`docs/df_hourly_bias.md`): the published `DF` of PJM is stamped one hour earlier than the demand from 2019 on (moved by one hour its MAPE is 2.3 to 2.5 %, not 3.4 to 3.9 %), NYISO's is 2.4 % low at every hour, MISO's and SPP's are 1 to 4 % high, ISO-NE's is 3 to 6 % low before dawn and FPL's 4 to 7 % low in the evening. With its own trailing hourly bias removed, `DF` reaches 2.17 % over the eleven BAs, ahead of the corrected ensemble (2.59 %) everywhere except SPP. The models beat the forecasts as published; they do not yet beat the forecasters.
+
 What the tables say, so far:
 
 - **Several weather stations per BA and six years of training are the two levers that matter.** With one
@@ -172,7 +174,7 @@ Cardinal Grid Note 2 and of [grid-data-sentinel](https://github.com/cardinalgrid
 
 ## Limitations
 
-One station per BA. The 9 a.m. cut-off is an assumption about when BAs run their forecasts. The HRRR is a
+One to six stations per BA. The 9 a.m. cut-off is an assumption about when BAs run their forecasts. The HRRR is a
 weather model with its own error, not the forecast any BA used, and the 2 h availability lag is a
 convention. Nothing here describes the internal process of any operator.
 

@@ -65,6 +65,16 @@ outcome at the 5th, 50th and 95th percentiles, the coverage and relative width o
 whether the actual peak fell inside it, over all days, the event days and the 30 coldest days of each
 BA by observed minimum temperature.
 
+## 4a. The benchmark by hour of the day
+
+`scripts/df_profile.py` (`docs/df_hourly_bias.md`) profiles the BAs' own forecast (`DF`) against demand (`D`) by local hour, from the EIA-930 files alone. Three things follow for any comparison against `DF`.
+
+1. **At PJM the published `DF` is stamped one hour earlier than `D` from 2019 on.** Compared with the `D` of the following hour, its MAPE falls from 3.4 to 3.9 % to 2.3 to 2.5 % in every year from 2019 to 2025; in 2016 to 2018 the published alignment is the better one (2.3 to 2.4 %). The daily peaks of the two series sit one hour apart. The signed error of `DF` as published has the shape a time shift gives: negative while the load falls (−6 to −7 % from 22:00 to 01:00), positive while it rises (+3 % at 05:00 and 06:00). The same test points to a shift at CAISO in 2016 and from 2023 on, outside or at the edge of the development period, where the CAISO `DF` degrades for other reasons as well (5.5 to 8 %).
+2. **Constant or hour-dependent offsets.** NYISO's `DF` is 2.2 to 2.6 % below `D` at every hour and in every year; MISO's is 1 to 3 % above, SPP's 2 to 4 % above; ISO-NE's is 3 to 6 % below between 01:00 and 05:00 and within 1 % for the rest of the day; FPL's is 4 to 7 % below from 18:00 to 01:00. TVA, BPA and Duke show no offset (within 1 % at every hour). The EIA-930 instructions ask for "the day-ahead demand forecast generated in the normal course of business" and fix neither the hour of issue nor what the forecast quantity includes, so `DF` and `D` need not measure the same quantity.
+3. **What it is worth.** Dividing `DF` by one plus its own median relative error at the same hour over the previous 60 days (known before the day) takes the demand-weighted MAPE of the eleven BAs from 3.04 % to 2.17 %, below the 2.59 % of the corrected ensemble on the same days. By BA the ensemble stays ahead of that corrected `DF` only at SPP (2.35 % against 2.53 %) and is close at PJM (2.35 % against 2.24 %).
+
+`DF` as published stays the headline benchmark, because it is what a user of the public data receives. The corrected `DF` is reported next to it as the harder benchmark: it is closer to what the operators' forecasters achieve. It is not a forecast available at the 9 a.m. cut-off unless the BA publishes `DF` for the next day before that hour, which EIA-930 does not record.
+
 ## 5. Models
 
 All models are fitted per BA, on a rolling origin: the last training day is two days before the target
@@ -96,6 +106,7 @@ stations (Miami, West Palm Beach, Melbourne, Fort Myers, Sarasota, Pensacola).
 | Bias correction on the ensemble | the median relative error of the ensemble per hour of the day, from the known days **of the same temperature regime** as the target day over the last 365 days (all known days when fewer than 20 share the regime); before 20 known days exist the uncorrected forecast is used | the regime-conditional correction beats the 60-day one (2.58 % against 2.66 %); it is also what absorbs a structural step within weeks |
 | Adaptive intervals (`quantiles.AdaptiveIntervals`) | adaptive conformal inference [8]: the miscoverage level used to read the error quantiles is updated once per newly known day, `alpha <- alpha + 0.02 (0.10 - miss)`, clipped to 0.005 to 0.5, errors from a 120-day window | reaches the nominal 90 % over the year without assuming exchangeable errors |
 | Shared fitted members (`base.Cached`) | a wrapper that keeps the forecast of the last BA-day | the same fitted model is scored alone and inside ensembles at the cost of one fit |
+| Sky features, boosting only (`sky.py`, `Boosting(sky=True)`) | the cosine of the solar zenith angle at the BA's main station (declination 23.44° sin(2π(284 + n)/365), equation of time, evaluated at the middle of the hour, zero at night); the HRRR total cloud cover (`entire_atmosphere/TCDC`, %) averaged over the BA's stations, kept **as seen at each day's cut-off** (for every past day, the value forecast for it by the run available at that day's 9 a.m. rule), so the model trains on the kind of input it receives; and their product `sun × (1 − cloud/100)`. Cloud cover exists from 2 December 2020; before that it is missing, which the boosting accepts | the downward short-wave flux (`surface/DSWRF`, `VBDSF`) is present only as metadata in the public HRRR Zarr archive until 2025, so it cannot be used; tested at ISO-NE, CAISO and FPL (`docs/phase_e_sky.md`): the corrected ensemble goes from 3.74 % to 3.57 % at ISO-NE and from 2.76 % to 2.70 % at CAISO and does not move at FPL; the gain grows with the length of the cloud history (boosting at ISO-NE: −0.08 point in December 2020, −0.23 in 2021, −0.33 in 2022) and closes little of the midday gap to ISO-NE's forecast |
 | Hourly forecasts (`evaluate(hourly=True)`) | the 24 values of every model, of `DF`, of the outcome and of the 5th and 95th percentiles are stored per BA and day | diagnostics by hour and month (`scripts/diagnose.py`, `docs/diagnostics.md`) and any later analysis without rerunning the models |
 
 ## 6. Special days and daily shapes
@@ -138,7 +149,7 @@ One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are
 description of any operator's process. The HRRR is a weather model with its own error and not the
 forecast any BA used; the BAs' forecasters have vendor weather and internal information this study
 does not have. Special days, events and the ten BAs are choices of the study. Prediction intervals
-are too narrow on the coldest mornings. Results are for the development period and BAs; no
+are too narrow on the coldest mornings. A large part of the margin over the BAs' published forecasts comes from offsets and, at PJM, a one-hour misalignment in the published `DF` (section 4a); against `DF` with its own hourly bias removed the models are behind at ten of the eleven BAs. Results are for the development period and BAs; no
 out-of-sample evaluation on other BAs or years has been run yet.
 
 ## References

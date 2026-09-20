@@ -49,6 +49,10 @@ long outputs to a local disk, not to a synced folder.
 | 13. FPL stations | `scripts\run_fpl.cmd` (ISD-Lite, HRRR extraction for the FPL stations, consolidation) | `data/hrrr_fpl/` | 2 h |
 | 14. Phase E | `scripts\run_phase_e.cmd recipe` and `scripts\run_phase_e.cmd intervals` (one job and one log per group; eleven BAs) | `%USERPROFILE%\ba-load-forecast-runs\phase_e\<group>_<BA>.parquet` and `<group>_<BA>_hourly.parquet`; `results/phase_e/*.csv`, `docs/phase_e.md` | 2.5 h each |
 | 15. Diagnostics | `python scripts/diagnose.py --group intervals --model ens_bc_regime` | `results/diagnostics/*.csv`, `docs/diagnostics.md`, `docs/figures/diagnostics_mape_by_hour_month.*` | 1 min |
+| 16. Cloud cover, 15 stations | `scripts\run_cloud.cmd` (`extract_hrrr.py --field cloud_pct` per year for the stations of ISO-NE, CAISO and FPL, then consolidation) | `data/cloud/` | about 3 h |
+| 17. Phase E, sky group | `scripts\run_phase_e.cmd sky` | `%USERPROFILE%\ba-load-forecast-runs\phase_e\sky_<BA>*.parquet`; `results/phase_e_sky/*.csv`, `docs/phase_e_sky.md` | 1.5 h |
+| 18. Diagnostics of the sky group | `python scripts/diagnose.py --group sky --model ens_sky_bc_regime --out results/diagnostics_sky --doc docs/diagnostics_sky.md` | `results/diagnostics_sky/*.csv`, `docs/diagnostics_sky.md`, `docs/figures/diagnostics_sky_mape_by_hour_month.*` | 1 min |
+| 19. The BAs' forecast by hour, offsets and time alignment | `python scripts/df_profile.py` (EIA-930 files only; the comparison column reads the stored hourly forecasts of step 14) | `results/df_profile/*.csv`, `docs/df_hourly_bias.md` | 2 min |
 
 Tests: `pytest -q` (57 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 

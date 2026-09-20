@@ -118,9 +118,9 @@ def main(argv=None) -> int:
     axes[0, 0].legend(fontsize=7, frameon=False)
     fig.tight_layout()
     for ext in ("pdf", "png"):
-        fig.savefig(figures / f"diagnostics_mape_by_hour_month.{ext}", dpi=200)
+        fig.savefig(figures / f"{a.doc.stem}_mape_by_hour_month.{ext}", dpi=200)
     plt.close(fig)
-    lines += ["![MAPE by hour and by month, model against DF](figures/diagnostics_mape_by_hour_month.png)", ""]
+    lines += [f"![MAPE by hour and by month, model against DF](figures/{a.doc.stem}_mape_by_hour_month.png)", ""]
     a.doc.write_text("\n".join(lines), encoding="utf-8")
     print(summary.to_string())
     print(f"written {a.doc}")
