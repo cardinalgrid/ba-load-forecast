@@ -17,6 +17,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 
 from ..features import EXTREME_COLUMNS, FEATURE_COLUMNS, rows_for_days, target_temperature, training_days
 from ..information_set import InformationSet
+from ..sky import SKY_COLUMNS
 from .base import ForecastError
 
 
@@ -24,8 +25,9 @@ class Boosting:
     def __init__(self, train_days: int = 730, refit_days: int = 7, max_iter: int = 400, learning_rate: float = 0.05,
                  max_leaf_nodes: int = 31, min_train_days: int = 120, seed: int = 0, stations: bool = True,
                  special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None,
-                 extremes: bool = False):
+                 extremes: bool = False, sky: bool = False):
         self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS)
+        self.sky = sky                        # sun elevation and forecast cloud cover (sky.SKY_COLUMNS); needs Loader(sky=True)
         self.train_days = train_days
         self.refit_days = refit_days
         self.max_iter = max_iter
@@ -61,6 +63,8 @@ class Boosting:
         cols += [c for c in rows.columns if c.startswith("t_K")]
         if self.extremes:
             cols += EXTREME_COLUMNS
+        if self.sky and "sun" in rows.columns:
+            cols += SKY_COLUMNS
         return cols
 
     def needs_fit(self, info: InformationSet) -> bool:
@@ -78,7 +82,7 @@ class Boosting:
     def fit(self, info: InformationSet) -> None:
         days = training_days(info.day - timedelta(days=2), self.train_days)
         rows = rows_for_days(info.load_history, info.temp_history_f, days, self._station_frames(info, target=False),
-                             labels=self.day_labels(info))
+                             labels=self.day_labels(info), sky=info.sky if self.sky else None)
         rows = rows[rows["y"] > 0].dropna(subset=["y"])
         if self.label_column == "cluster":
             rows = rows[rows["cluster"] >= 0]
@@ -98,6 +102,6 @@ class Boosting:
         if self.needs_fit(info):
             self.fit(info)
         rows = rows_for_days(info.load_history, target_temperature(info), [info.day], self._station_frames(info, target=True),
-                             labels=self.day_labels(info, target=True))
+                             labels=self.day_labels(info, target=True), sky=info.sky if self.sky else None)
         x = rows[self.columns].to_numpy(dtype=float)
         return self.model.predict(x)

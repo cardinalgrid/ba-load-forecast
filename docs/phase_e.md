@@ -1,6 +1,6 @@
 # Phase E: the full recipe and calibrated prediction intervals
 
-Development BAs (BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA), 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Models: the additive model with special-day indicators, the boosting, their ensemble weighted by recent error (`ens_recent`), and the ensemble with the empirical bias correction (`ens_recent_bc` and the `ens_bc_` interval variants: the point forecast is the corrected median once 20 days of known errors exist). Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out.
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Models: the additive model with special-day indicators, the boosting, their ensemble weighted by recent error (`ens_recent`), and the ensemble with the empirical bias correction (`ens_recent_bc` and the `ens_bc_` interval variants: the point forecast is the corrected median once 20 days of known errors exist).
 
 ## All BAs, weighted by mean demand
 

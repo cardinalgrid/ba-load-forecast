@@ -23,6 +23,7 @@ import pandas as pd
 from grid_sentinel.calendar_us import day_types, special_days
 
 from .cutoff import CUTOFF_LOCAL_HOUR
+from .sky import SKY_COLUMNS
 
 EPOCH = pd.Timestamp("2015-01-01")
 LAGS = (1, 2, 3)
@@ -105,7 +106,7 @@ def calendar_features(ts: pd.DatetimeIndex) -> pd.DataFrame:
 
 
 def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: pd.DataFrame | None = None,
-                  labels: Mapping[date, int] | None = None) -> pd.DataFrame:
+                  labels: Mapping[date, int] | None = None, sky: pd.DataFrame | None = None) -> pd.DataFrame:
     """Feature rows for every hour of ``days`` with the target ``y`` (NaN where the load is unknown).
 
     ``stations``, when given, is an hourly frame with one temperature column per station; each becomes a
@@ -119,6 +120,9 @@ def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: 
         st = stations.asfreq("h") if not stations.empty else stations
         for c in st.columns:
             out[f"t_{c}"] = st[c].reindex(ts).to_numpy()
+    if sky is not None:
+        for c in SKY_COLUMNS:                                # sun elevation, forecast cloud cover, their product
+            out[c] = sky[c].reindex(ts).to_numpy(dtype=float)
     if labels is not None:
         out["cluster"] = [labels.get(d, -1) for d in ts.date]
     out["y"] = load.reindex(ts).to_numpy() if not load.empty else np.nan

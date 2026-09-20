@@ -32,6 +32,7 @@ from grid_sentinel.weather import fetch_isd_lite, hourly_temperature_f, read_isd
 from .cleaning import sentinel_clean
 from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hour, path_timestamps, run_for_day
 from .hrrr import load_station
+from .sky import all_days, forecast_as_seen, run_table, sky_frame
 from .stations_multi import BA_STATIONS_MULTI, station_table_for
 
 
@@ -70,6 +71,7 @@ class InformationSet:
     stations: list[str] = field(default_factory=list)
     temp_history_stations_f: pd.DataFrame | None = None       # one column per station, aligned with load_history
     temp_forecast_path_stations_f: pd.DataFrame | None = None  # one column per station, indexed by path_timestamps
+    sky: pd.DataFrame | None = None                            # sky.SKY_COLUMNS for the history and the target day
 
     @property
     def cutoff(self) -> datetime:
@@ -109,7 +111,8 @@ class Loader:
 
     def __init__(self, tidy_dir: Path, isd_dir: Path, hrrr_dir: Path, history_days: int = 730,
                  init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
-                 stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross"):
+                 stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
+                 sky: bool = False, cloud_dir: Path | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -129,6 +132,39 @@ class Loader:
         self._series: dict[tuple, pd.Series] = {}
         self._hrrr: dict[str, pd.DataFrame] = {}
         self._station_table: pd.DataFrame | None = None
+        # sky=True attaches the sun's elevation and the HRRR cloud cover as seen at each day's cut-off
+        self.sky = sky
+        self.cloud_dir = Path(cloud_dir) if cloud_dir else self.hrrr_dir.parent / "cloud"
+        self._cloud: dict[str, pd.Series | None] = {}
+        self._latlon: dict[str, tuple[float, float]] = {}
+
+    def latlon(self, ba: str) -> tuple[float, float]:
+        if ba not in self._latlon:
+            t = station_table_for([BA_STATION[ba]], self.isd_dir).iloc[0]
+            self._latlon[ba] = (float(t["lat"]), float(t["lon"]))
+        return self._latlon[ba]
+
+    def cloud_series(self, ba: str) -> pd.Series | None:
+        """Cloud cover (percent) forecast for every local hour by the run available at that day's cut-off,
+        mean over the BA's stations; None when no station has a cloud extraction."""
+        if ba not in self._cloud:
+            tables = [run_table(load_station(self.cloud_dir, icao), "cloud_pct") for icao in self.stations_of(ba)]
+            tables = [t for t in tables if t[0]]
+            if not tables:
+                self._cloud[ba] = None
+            else:
+                inits = sorted(i for t in tables for i in t[0])
+                first, last = inits[0].date(), (inits[-1] + pd.Timedelta(days=2)).date()
+
+                def offset_of_day(d):
+                    off = self.offset(ba, d.year)
+                    if off.empty:
+                        return np.nan
+                    v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
+                    return float(off.median()) if np.isnan(v) else float(v)
+
+                self._cloud[ba] = forecast_as_seen(tables, all_days(first, last), offset_of_day, self.init_hours)
+        return self._cloud[ba]
 
     def stations_of(self, ba: str) -> list[str]:
         if self.stations == "multi" and ba in BA_STATIONS_MULTI:
@@ -254,6 +290,11 @@ class Loader:
             temp = pd.concat([self._years(ba, start, day, lambda b, y, i=icao: self.station_temperature(i, b, y)) for icao in stations],
                              axis=1).mean(axis=1)
 
+        sky = None
+        if self.sky:
+            lat, lon = self.latlon(ba)
+            sky = sky_frame(history_index.union(hours), off, lat, lon, self.cloud_series(ba))
+
         persist = np.full(24, np.nan)
         for h in range(24):
             back = 1 if h <= cutoff.hour else 2
@@ -271,6 +312,6 @@ class Loader:
             actual=outcome.reindex(hours).to_numpy(dtype=float),
             day_type=int(day_types(d64)[0]), special_day=kinds.get(day),
             actual_plausible=plausible(outcome.reindex(hours).to_numpy(dtype=float), reference),
-            stations=stations, temp_history_stations_f=stations_hist,
+            sky=sky, stations=stations, temp_history_stations_f=stations_hist,
             temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None,
         )
