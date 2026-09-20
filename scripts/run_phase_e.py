@@ -14,6 +14,8 @@ Every group uses several stations per BA and six years of training. Groups:
 * ``sky``: on the BAs where behind-the-meter solar matters (ISO-NE, CAISO, FPL), the boosting with the sun's
   elevation and the HRRR cloud cover as seen at the cut-off, against the same boosting without them; its
   report is separate (``results/phase_e_sky/``, ``docs/phase_e_sky.md``).
+* ``pv``: on ISO-NE and CAISO, the sky boosting with the installed PV capacity terms (``sky.PV_COLUMNS``) against
+  the sky boosting without them; report in ``results/phase_e_pv/``, ``docs/phase_e_pv.md``.
 
 Per (group, BA) two parquet files go to ``--out``: the daily rows and the hourly forecasts of every model,
 of ``DF`` and the outcome. A BA whose station forecasts are not extracted yet is skipped, not marked done.
@@ -41,6 +43,7 @@ from ba_load_forecast.report import summarise, write_report
 ROOT = Path(__file__).resolve().parents[1]
 DEV_BAS = ("PJM", "MISO", "ERCO", "CISO", "SWPP", "NYIS", "ISNE", "TVA", "DUK", "BPAT", "FPL")
 SKY_BAS = ("ISNE", "CISO", "FPL")
+PV_BAS = ("ISNE", "CISO")
 TRAIN_DAYS = 2190
 HISTORY_DAYS = TRAIN_DAYS + 40
 
@@ -49,8 +52,8 @@ def log(msg: str) -> None:
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}", flush=True)
 
 
-def loader(a, sky: bool = False) -> Loader:
-    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky)
+def loader(a, sky: bool = False, pv: bool = False) -> Loader:
+    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv)
 
 
 def corrected_ensemble():
@@ -78,6 +81,12 @@ def group_models(group: str) -> list:
         return [add, boo, boo_sky, ens, ens_sky,
                 EmpiricalIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime"),
                 EmpiricalIntervals(ens_sky, by_regime=True, window_days=365, name="ens_sky_bc_regime")]
+    if group == "pv":
+        boo_sky = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_sky"))
+        boo_pv = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_pv"))   # same model; the loader adds the PV columns
+        ens_sky = Cached(Ensemble([add, boo_sky], weighting="recent", name="ens_sky"))
+        ens_pv = Cached(Ensemble([add, boo_pv], weighting="recent", name="ens_pv"))
+        return [add, boo_pv, ens_pv, EmpiricalIntervals(ens_pv, by_regime=True, window_days=365, name="ens_pv_bc_regime")]
     raise SystemExit(f"unknown group {group}")
 
 
@@ -104,12 +113,12 @@ def main(argv=None) -> int:
     waiting = []
     if not a.report_only:
         for group in a.groups:
-            for ba in (SKY_BAS if group == "sky" else a.bas):
+            for ba in (SKY_BAS if group == "sky" else PV_BAS if group == "pv" else a.bas):
                 f = a.out / f"{group}_{ba}.parquet"
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                ld = loader(a, sky=group == "sky")
+                ld = loader(a, sky=group in ("sky", "pv"), pv=group == "pv")
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -155,7 +164,14 @@ def main(argv=None) -> int:
                  "seen at each day's cut-off (available from December 2020) and their product; `ens_sky` and "
                  "`ens_sky_bc_regime` are the ensemble and the corrected ensemble built on it, next to the same models "
                  "without those features.")
-    if main is None and sky is None:
+    pv = report({"pv"}, a.results.parent / "phase_e_pv", a.doc.parent / "phase_e_pv.md",
+                "Phase E: the installed PV capacity as a feature",
+                "BAs with large solar behind the load: " + common +
+                "`boosting_ml_pv` is the sky boosting with three more columns: the installed PV capacity of the month (MW, from "
+                "Forms EIA-861M and EIA-860M), that capacity times the sun's elevation, and the same times one minus the forecast "
+                "cloud fraction; `ens_pv` and `ens_pv_bc_regime` are the ensemble and the corrected ensemble built on it. Compare "
+                "with `docs/phase_e_sky.md` (same BAs and days, without the capacity terms).")
+    if main is None and sky is None and pv is None:
         log("no rows to report")
         return 1
     if waiting:

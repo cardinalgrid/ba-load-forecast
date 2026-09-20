@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ba_load_forecast.sky import SKY_COLUMNS, cos_zenith, forecast_as_seen, run_table, sky_frame
+from ba_load_forecast.sky import PV_COLUMNS, SKY_COLUMNS, cos_zenith, forecast_as_seen, run_table, sky_frame
 
 
 def test_cos_zenith_follows_the_sun():
@@ -48,3 +48,19 @@ def test_sky_frame_columns():
     g = sky_frame(hours, off, 42.36, -71.01, None)
     assert g["cloud"].isna().all()
     assert g["sun"].notna().all()
+
+
+def test_sky_frame_with_pv_capacity():
+    hours = pd.date_range("2024-06-21 00:00", periods=24, freq="h")
+    off = pd.Series(4.0, index=hours)
+    cloud = pd.Series(25.0, index=hours)
+    pv = pd.Series([1000.0, 1100.0], index=pd.to_datetime(["2024-05-01", "2024-06-01"]))
+    f = sky_frame(hours, off, 42.36, -71.01, cloud, pv=pv)
+    assert list(f.columns) == SKY_COLUMNS + PV_COLUMNS
+    assert (f["pv_cap"] == 1100.0).all()                                # June's value held through the month
+    np.testing.assert_allclose(f["pv_clear"], 1100.0 * f["sun"])
+    np.testing.assert_allclose(f["pv_est"], f["pv_clear"] * 0.75)
+    g = sky_frame(pd.date_range("2023-01-01", periods=24, freq="h"), pd.Series(5.0, index=pd.date_range("2023-01-01", periods=24, freq="h")),
+                  42.36, -71.01, None, pv=pv)
+    assert (g["pv_cap"] == 1000.0).all()                                # before the first month: the first value
+    assert g["pv_est"].isna().all()

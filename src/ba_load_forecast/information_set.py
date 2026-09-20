@@ -32,7 +32,7 @@ from grid_sentinel.weather import fetch_isd_lite, hourly_temperature_f, read_isd
 from .cleaning import sentinel_clean
 from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hour, path_timestamps, run_for_day
 from .hrrr import load_station
-from .sky import all_days, forecast_as_seen, run_table, sky_frame
+from .sky import all_days, forecast_as_seen, pv_capacity, run_table, sky_frame
 from .stations_multi import BA_STATIONS_MULTI, station_table_for
 
 
@@ -112,7 +112,7 @@ class Loader:
     def __init__(self, tidy_dir: Path, isd_dir: Path, hrrr_dir: Path, history_days: int = 730,
                  init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
                  stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
-                 sky: bool = False, cloud_dir: Path | None = None):
+                 sky: bool = False, cloud_dir: Path | None = None, pv: bool = False):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -134,6 +134,8 @@ class Loader:
         self._station_table: pd.DataFrame | None = None
         # sky=True attaches the sun's elevation and the HRRR cloud cover as seen at each day's cut-off
         self.sky = sky
+        self.pv = pv                          # with sky=True: scale the sun by the installed PV capacity (sky.PV_COLUMNS)
+        self._pv: dict[str, pd.Series] | None = None
         self.cloud_dir = Path(cloud_dir) if cloud_dir else self.hrrr_dir.parent / "cloud"
         self._cloud: dict[str, pd.Series | None] = {}
         self._latlon: dict[str, tuple[float, float]] = {}
@@ -293,7 +295,12 @@ class Loader:
         sky = None
         if self.sky:
             lat, lon = self.latlon(ba)
-            sky = sky_frame(history_index.union(hours), off, lat, lon, self.cloud_series(ba))
+            pv = None
+            if self.pv:
+                if self._pv is None:
+                    self._pv = pv_capacity()
+                pv = self._pv.get(ba)
+            sky = sky_frame(history_index.union(hours), off, lat, lon, self.cloud_series(ba), pv=pv)
 
         persist = np.full(24, np.nan)
         for h in range(24):

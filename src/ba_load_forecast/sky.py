@@ -12,11 +12,18 @@ it at the 9 a.m. cut-off:
   the same kind of input it will be given.
 
 ``sun_clear = sun * (1 - cloud / 100)`` is their product: a crude clear-sky index, left to the model to use.
+
+The size of the effect grows with the installed PV capacity, which a forecaster knows: ``pv_capacity``
+reads the monthly capacity behind each BA's load (``docs/pv_capacity_monthly.csv``, built by
+``scripts/pv_capacity.py`` from Forms EIA-861M and EIA-860M) and ``PV_COLUMNS`` scale the geometry by it:
+``pv_cap`` (MW), ``pv_clear = pv_cap * sun`` (a clear-sky output proxy, available for the whole history) and
+``pv_est = pv_clear * (1 - cloud / 100)`` (missing where the cloud cover is).
 """
 
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -24,6 +31,15 @@ import pandas as pd
 from .cutoff import lead_hours, run_for_day
 
 SKY_COLUMNS = ["sun", "cloud", "sun_clear"]
+PV_COLUMNS = ["pv_cap", "pv_clear", "pv_est"]
+PV_TABLE = Path(__file__).resolve().parents[2] / "docs" / "pv_capacity_monthly.csv"
+
+
+def pv_capacity(path: Path | None = None) -> dict[str, pd.Series]:
+    """``{ba: monthly total PV capacity in MW}`` from the table written by ``scripts/pv_capacity.py``."""
+    t = pd.read_csv(path or PV_TABLE)
+    t["month"] = pd.to_datetime(t["month"])
+    return {ba: g.set_index("month")["total_mw"].sort_index() for ba, g in t.groupby("ba")}
 
 
 def cos_zenith(utc, lat: float, lon: float) -> np.ndarray:
@@ -74,8 +90,10 @@ def forecast_as_seen(tables: list[tuple[dict, np.ndarray]], days: list[date], of
     return pd.Series(values, index=pd.DatetimeIndex(index), dtype=float)
 
 
-def sky_frame(local_hours: pd.DatetimeIndex, offsets: pd.Series, lat: float, lon: float, cloud: pd.Series | None) -> pd.DataFrame:
-    """``SKY_COLUMNS`` for the local hours given (``offsets``: hours behind UTC per local hour)."""
+def sky_frame(local_hours: pd.DatetimeIndex, offsets: pd.Series, lat: float, lon: float, cloud: pd.Series | None,
+              pv: pd.Series | None = None) -> pd.DataFrame:
+    """``SKY_COLUMNS`` for the local hours given (``offsets``: hours behind UTC per local hour), plus ``PV_COLUMNS``
+    when ``pv`` (monthly installed capacity, MW) is given: the month's value is held through the month."""
     off = offsets.reindex(local_hours)
     off = off.fillna(off.median() if off.notna().any() else 0.0).to_numpy(dtype=float)
     utc = local_hours.to_numpy() + (off * 3600.0 * 1e9).astype("timedelta64[ns]")
@@ -83,6 +101,12 @@ def sky_frame(local_hours: pd.DatetimeIndex, offsets: pd.Series, lat: float, lon
     out = pd.DataFrame({"sun": sun}, index=local_hours)
     out["cloud"] = cloud.reindex(local_hours).to_numpy(dtype=float) if cloud is not None else np.nan
     out["sun_clear"] = out["sun"] * (1.0 - out["cloud"] / 100.0)
+    if pv is not None:
+        months = local_hours.to_period("M").to_timestamp()
+        cap = pv.reindex(pv.index.union(pd.DatetimeIndex(months.unique()))).ffill().bfill()
+        out["pv_cap"] = cap.reindex(months).to_numpy(dtype=float)
+        out["pv_clear"] = out["pv_cap"] * out["sun"]
+        out["pv_est"] = out["pv_clear"] * (1.0 - out["cloud"] / 100.0)
     return out
 
 
