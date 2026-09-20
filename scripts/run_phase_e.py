@@ -46,7 +46,7 @@ from ba_load_forecast.forecasters.additive import AdditiveModel
 from ba_load_forecast.forecasters.base import Cached
 from ba_load_forecast.forecasters.boosting import Boosting
 from ba_load_forecast.forecasters.ensemble import Ensemble
-from ba_load_forecast.forecasters.quantiles import EmpiricalIntervals
+from ba_load_forecast.forecasters.quantiles import AdaptiveIntervals, EmpiricalIntervals
 from ba_load_forecast.information_set import Loader
 from ba_load_forecast.report import summarise, write_report
 
@@ -74,55 +74,67 @@ def corrected_ensemble():
     return add, boo, ens
 
 
+def final_models(ba: str | None) -> list:
+    """The frozen recipe for one BA: PV terms and sky features only where solar behind the load matters."""
+    solar = ba in PV_BAS
+    add_f = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
+    boo_f = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
+    ens_f = Cached(Ensemble([add_f, boo_f], weighting="recent", name="final_ensemble"))
+    return [add_f, boo_f, ens_f,
+            AdaptiveIntervals(ens_f, by_regime=True, window_days=365, alpha_by_regime=True, name="final")]
+
+
+def sky_members(add):
+    boo_sky = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_sky"))
+    ens_sky = Cached(Ensemble([add, boo_sky], weighting="recent", name="ens_sky"))
+    return boo_sky, ens_sky
+
+
 def group_models(group: str, ba: str | None = None) -> list:
-    add, boo, ens = corrected_ensemble()
     if group == "final":
-        from ba_load_forecast.forecasters.quantiles import AdaptiveIntervals
+        return final_models(ba)
+    add, boo, ens = corrected_ensemble()
+    regime = dict(by_regime=True, window_days=365)
+    groups = {
+        "recipe": lambda: [add, boo, ens, EmpiricalIntervals(ens, name="ens_recent_bc")],
+        "intervals": lambda: [add, boo, ens,
+                              EmpiricalIntervals(ens, name="ens_bc_simple"),
+                              EmpiricalIntervals(ens, **regime, name="ens_bc_regime"),
+                              AdaptiveIntervals(ens, name="ens_bc_adaptive")],
+        "intervals2": lambda: [add, boo, ens,
+                               EmpiricalIntervals(ens, **regime, name="ens_bc_regime"),
+                               AdaptiveIntervals(ens, name="ens_bc_adaptive"),
+                               AdaptiveIntervals(ens, **regime, name="ens_bc_regime_aci"),
+                               AdaptiveIntervals(ens, **regime, alpha_by_regime=True, name="ens_bc_regime_aci2")],
+        "sky": lambda: sky_models(add, boo, ens, regime),
+        "pv": lambda: pv_models(add),
+        "pv2": lambda: pv2_models(add),
+    }
+    if group not in groups:
+        raise SystemExit(f"unknown group {group}")
+    return groups[group]()
 
-        solar = ba in PV_BAS
-        add_f = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
-        boo_f = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
-        ens_f = Cached(Ensemble([add_f, boo_f], weighting="recent", name="final_ensemble"))
-        return [add_f, boo_f, ens_f,
-                AdaptiveIntervals(ens_f, by_regime=True, window_days=365, alpha_by_regime=True, name="final")]
-    if group == "recipe":
-        return [add, boo, ens, EmpiricalIntervals(ens, name="ens_recent_bc")]
-    if group == "intervals":
-        from ba_load_forecast.forecasters.quantiles import AdaptiveIntervals
 
-        return [add, boo, ens,
-                EmpiricalIntervals(ens, name="ens_bc_simple"),
-                EmpiricalIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime"),
-                AdaptiveIntervals(ens, name="ens_bc_adaptive")]
-    if group == "intervals2":
-        from ba_load_forecast.forecasters.quantiles import AdaptiveIntervals
+def sky_models(add, boo, ens, regime) -> list:
+    boo_sky, ens_sky = sky_members(add)
+    return [add, boo, boo_sky, ens, ens_sky,
+            EmpiricalIntervals(ens, **regime, name="ens_bc_regime"),
+            EmpiricalIntervals(ens_sky, **regime, name="ens_sky_bc_regime")]
 
-        return [add, boo, ens,
-                EmpiricalIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime"),
-                AdaptiveIntervals(ens, name="ens_bc_adaptive"),
-                AdaptiveIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime_aci"),
-                AdaptiveIntervals(ens, by_regime=True, window_days=365, alpha_by_regime=True, name="ens_bc_regime_aci2")]
-    if group == "sky":
-        boo_sky = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_sky"))
-        ens_sky = Cached(Ensemble([add, boo_sky], weighting="recent", name="ens_sky"))
-        return [add, boo, boo_sky, ens, ens_sky,
-                EmpiricalIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime"),
-                EmpiricalIntervals(ens_sky, by_regime=True, window_days=365, name="ens_sky_bc_regime")]
-    if group == "pv2":
-        add_pv = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=True, name="additive_ml_pv"))
-        boo_sky = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_sky"))
-        ens_sky = Cached(Ensemble([add, boo_sky], weighting="recent", name="ens_sky"))
-        ens_pv2 = Cached(Ensemble([add_pv, boo_sky], weighting="recent", name="ens_pv2"))
-        return [add, add_pv, boo_sky, ens_sky, ens_pv2,
-                EmpiricalIntervals(ens_sky, by_regime=True, window_days=365, name="ens_sky_bc_regime"),
-                EmpiricalIntervals(ens_pv2, by_regime=True, window_days=365, name="ens_pv2_bc_regime")]
-    if group == "pv":
-        boo_sky = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_sky"))
-        boo_pv = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_pv"))   # same model; the loader adds the PV columns
-        ens_sky = Cached(Ensemble([add, boo_sky], weighting="recent", name="ens_sky"))
-        ens_pv = Cached(Ensemble([add, boo_pv], weighting="recent", name="ens_pv"))
-        return [add, boo_pv, ens_pv, EmpiricalIntervals(ens_pv, by_regime=True, window_days=365, name="ens_pv_bc_regime")]
-    raise SystemExit(f"unknown group {group}")
+
+def pv_models(add) -> list:
+    boo_pv = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_pv"))   # same model; the loader adds the PV columns
+    ens_pv = Cached(Ensemble([add, boo_pv], weighting="recent", name="ens_pv"))
+    return [add, boo_pv, ens_pv, EmpiricalIntervals(ens_pv, by_regime=True, window_days=365, name="ens_pv_bc_regime")]
+
+
+def pv2_models(add) -> list:
+    add_pv = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=True, name="additive_ml_pv"))
+    boo_sky, ens_sky = sky_members(add)
+    ens_pv2 = Cached(Ensemble([add_pv, boo_sky], weighting="recent", name="ens_pv2"))
+    return [add, add_pv, boo_sky, ens_sky, ens_pv2,
+            EmpiricalIntervals(ens_sky, by_regime=True, window_days=365, name="ens_sky_bc_regime"),
+            EmpiricalIntervals(ens_pv2, by_regime=True, window_days=365, name="ens_pv2_bc_regime")]
 
 
 def stations_ready(ld: Loader, ba: str) -> bool:
