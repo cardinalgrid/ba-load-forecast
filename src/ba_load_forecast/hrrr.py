@@ -27,6 +27,7 @@ from .hrrr_grid import BUCKET, CHUNK, GridPoint
 
 VARIABLE = "2m_above_ground/TMP"
 COLUMNS = ["icao", "init_utc", "lead_h", "valid_utc", "temp_f"]
+KEYS = ["icao", "init_utc", "lead_h", "valid_utc"]
 RETRY_WAITS_S = (5, 15, 45, 120, 300, 600)
 
 
@@ -55,9 +56,22 @@ def kelvin_to_f(k):
     return (np.asarray(k, dtype=float) - 273.15) * 9.0 / 5.0 + 32.0
 
 
-def run_root(day: date, init_hour: int, bucket: str = BUCKET) -> str:
+def _same(v):
+    return np.asarray(v, dtype=float)
+
+
+# field name in the output -> (variable path inside a run, conversion). ``cloud_pct`` is the total cloud
+# cover of the whole atmosphere in percent. (The surface short-wave radiation arrays of the archive are
+# empty before 2025, so cloud cover is what describes the sky over the whole period.)
+FIELDS = {
+    "temp_f": ("2m_above_ground/TMP", kelvin_to_f),
+    "cloud_pct": ("entire_atmosphere/TCDC", _same),
+}
+
+
+def run_root(day: date, init_hour: int, bucket: str = BUCKET, variable: str = VARIABLE) -> str:
     d = day.strftime("%Y%m%d")
-    return f"{bucket}/sfc/{d}/{d}_{init_hour:02d}z_fcst.zarr/{VARIABLE}/{VARIABLE}"
+    return f"{bucket}/sfc/{d}/{d}_{init_hour:02d}z_fcst.zarr/{variable}/{variable}"
 
 
 def run_meta(fs, root: str, log: Callable[[str], None] = print) -> dict | None:
@@ -86,13 +100,14 @@ def decode_chunk(raw: bytes, meta: dict) -> np.ndarray:
 
 
 def read_run(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket: str = BUCKET,
-             log: Callable[[str], None] = print) -> dict[str, np.ndarray] | None:
+             log: Callable[[str], None] = print, field: str = "temp_f") -> dict[str, np.ndarray] | None:
     """Temperature in Fahrenheit per lead (index 0 = lead 1 h) for every station, or None if the run is absent.
 
     Every chunk needed is fetched in one concurrent request; a chunk the archive lacks gives NaN for its
     stations, a chunk that fails for any other reason is fetched again (``with_retries``).
     """
-    root = run_root(day, init_hour, bucket)
+    variable, convert = FIELDS[field]
+    root = run_root(day, init_hour, bucket, variable)
     meta = run_meta(fs, root, log)
     if meta is None:
         return None
@@ -117,14 +132,14 @@ def read_run(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket
     out = {}
     for icao, p in points.items():
         b = blocks[p.chunk_key]
-        out[icao] = np.full(n_lead, np.nan) if b is None else kelvin_to_f(b[:, p.in_chunk_y, p.in_chunk_x])
+        out[icao] = np.full(n_lead, np.nan) if b is None else convert(b[:, p.in_chunk_y, p.in_chunk_x])
     return out
 
 
 def run_frame(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket: str = BUCKET,
-              log: Callable[[str], None] = print):
+              log: Callable[[str], None] = print, field: str = "temp_f"):
     """The tidy rows of one run (``COLUMNS``), or None when the run is absent."""
-    temps = read_run(fs, day, init_hour, points, bucket, log)
+    temps = read_run(fs, day, init_hour, points, bucket, log, field)
     if temps is None:
         return None
     init = datetime(day.year, day.month, day.day, init_hour)
@@ -132,8 +147,8 @@ def run_frame(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucke
     for icao, t in temps.items():
         lead = np.arange(1, len(t) + 1)
         parts.append(pd.DataFrame({"icao": icao, "init_utc": init, "lead_h": lead.astype("int16"),
-                                   "valid_utc": init + pd.to_timedelta(lead, unit="h"), "temp_f": t.astype("float32")}))
-    return pd.concat(parts, ignore_index=True)[COLUMNS]
+                                   "valid_utc": init + pd.to_timedelta(lead, unit="h"), field: t.astype("float32")}))
+    return pd.concat(parts, ignore_index=True)[[*KEYS, field]]
 
 
 def run_file(out_dir: Path, day: date, init_hour: int) -> Path:
@@ -148,7 +163,8 @@ def days_between(start: date, end: date) -> Iterable[date]:
 
 
 def extract(points: dict[str, GridPoint], start: date, end: date, out_dir: Path, init_hours: tuple[int, ...] = (12, 6),
-            fs=None, resume: bool = True, log: Callable[[str], None] = print, bucket: str = BUCKET) -> int:
+            fs=None, resume: bool = True, log: Callable[[str], None] = print, bucket: str = BUCKET,
+            field: str = "temp_f") -> int:
     """Write one run file per day and initialisation hour in ``[start, end]``; returns the number of runs fetched.
 
     With ``resume`` a run whose file exists is skipped, so an interrupted extraction continues where it stopped.
@@ -165,10 +181,10 @@ def extract(points: dict[str, GridPoint], start: date, end: date, out_dir: Path,
             f = run_file(out_dir, day, h)
             if resume and f.exists():
                 continue
-            frame = run_frame(fs, day, h, points, bucket, log)
+            frame = run_frame(fs, day, h, points, bucket, log, field)
             if frame is None:
                 frame = pd.DataFrame({c: pd.Series(dtype=t) for c, t in
-                                      zip(COLUMNS, ["object", "datetime64[ns]", "int16", "datetime64[ns]", "float32"], strict=True)})
+                                      zip([*KEYS, field], ["object", "datetime64[ns]", "int16", "datetime64[ns]", "float32"], strict=True)})
                 log(f"{day} {h:02d}Z: run not in the archive")
             tmp = f.with_suffix(".tmp")
             frame.to_parquet(tmp, index=False)

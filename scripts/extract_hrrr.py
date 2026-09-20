@@ -53,13 +53,15 @@ def main(argv=None) -> int:
     ap.add_argument("--stations", type=Path, default=ROOT / "docs" / "stations_grid.csv")
     ap.add_argument("--consolidate", action="store_true", help="gather the run files into one parquet per station")
     ap.add_argument("--no-resume", action="store_true")
+    ap.add_argument("--field", default="temp_f", choices=["temp_f", "cloud_pct"],
+                    help="what to extract: 2 m temperature (F) or total cloud cover (percent)")
     a = ap.parse_args(argv)
 
     if a.start and a.end:
         points = station_points(a.isd_dir, a.out / "HRRR_grid.npz", a.stations)
         log(f"extracting {a.start} to {a.end}, runs {a.init_hours}, {len(points)} stations")
         t0 = time.time()
-        n = extract(points, a.start, a.end, a.out, tuple(a.init_hours), resume=not a.no_resume, log=log)
+        n = extract(points, a.start, a.end, a.out, tuple(a.init_hours), resume=not a.no_resume, log=log, field=a.field)
         log(f"done: {n} runs fetched in {(time.time() - t0) / 60:.1f} min")
     if a.consolidate:
         counts = consolidate(a.out, log=log)
