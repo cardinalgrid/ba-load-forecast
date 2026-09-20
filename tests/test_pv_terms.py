@@ -3,6 +3,7 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from ba_load_forecast.forecasters.additive import AdditiveModel
 from ba_load_forecast.forecasters.base import ForecastError
@@ -54,9 +55,5 @@ def test_pv_terms_remove_the_midday_bias_of_a_growing_solar_dent():
 def test_pv_terms_need_the_capacity_table():
     load, temp = world(start="2021-01-01", days=400)
     info = info_with_sky(load, temp, None, date(2022, 1, 20))
-    try:
+    with pytest.raises(ForecastError, match="pv=True"):
         AdditiveModel(train_days=300, val_days=30, pv=True).predict(info)
-    except ForecastError as e:
-        assert "pv=True" in str(e)
-    else:
-        raise AssertionError("expected a ForecastError without the capacity table")
