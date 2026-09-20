@@ -66,3 +66,27 @@ def test_adaptive_intervals_recover_coverage_after_the_errors_grow():
     assert adaptive[after].mean() > simple[after].mean()
     assert adaptive.iloc[-60:].mean() > 0.85
     assert 0.005 <= model.alpha <= 0.5
+
+
+def test_regime_pool_with_adaptive_level_covers_cold_days_when_their_errors_grow():
+    rng = np.random.default_rng(2)
+    hours = pd.date_range("2023-01-01", periods=24 * 420, freq="h")
+    day_index = (hours.normalize() - hours[0].normalize()).days.to_numpy()
+    cold_day = day_index % 4 == 0
+    sigma = np.where(cold_day, np.where(day_index < 250, 0.03, 0.06), 0.01)   # cold-day errors double on day 250
+    load = pd.Series(1000.0 * (1 + rng.normal(0, 1, len(hours)) * sigma), index=hours)
+
+    def temp_of_day(d):
+        return 30.0 if (pd.Timestamp(d) - hours[0].normalize()).days % 4 == 0 else 65.0
+
+    days = [date(2023, 1, 5) + timedelta(days=k) for k in range(400)]
+    tail = days[300:]
+    cold = [d for d in tail if temp_of_day(d) == 30.0]
+    mild = [d for d in tail if temp_of_day(d) == 65.0]
+    regime = coverage(EmpiricalIntervals(Flat(), window_days=365, by_regime=True), load, temp_of_day, days)
+    model = AdaptiveIntervals(Flat(), window_days=365, by_regime=True, alpha_by_regime=True)
+    both = coverage(model, load, temp_of_day, days)
+    assert both[cold].mean() > regime[cold].mean()                    # the adaptive level reacts to the change
+    assert 0.80 < both[mild].mean() < 0.97                            # without breaking the mild days
+    assert set(model.alphas) <= {0, 1, 2, None}
+    assert len(model.alphas) >= 2                                     # one level per regime seen

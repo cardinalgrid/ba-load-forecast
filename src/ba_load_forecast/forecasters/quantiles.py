@@ -157,16 +157,29 @@ class AdaptiveIntervals(EmpiricalIntervals):
     outside the interval issued for it. When the intervals have been too narrow (cold spell, storm) alpha
     falls and the next intervals widen; long-run coverage converges to ``1 - target`` without assuming that
     errors are exchangeable. The median is read at 0.5 as before.
+
+    With ``by_regime`` the error pool is the regime-conditional one of ``EmpiricalIntervals`` (a longer window
+    is then advisable), and with ``alpha_by_regime`` one level is tracked per temperature regime, so that the
+    misses of a cold spell widen the next cold days and not the mild ones.
     """
 
     def __init__(self, base: Forecaster, target: float = 0.10, gamma: float = 0.02, window_days: int = 120,
-                 min_days: int = 20, name: str | None = None):
-        super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}")
+                 min_days: int = 20, name: str | None = None, by_regime: bool = False, alpha_by_regime: bool = False):
+        super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
+                         by_regime=by_regime)
         self.target = target
         self.gamma = gamma
-        self.alpha = target
+        self.alpha_by_regime = alpha_by_regime
+        self.alphas: dict[int | None, float] = {}          # level per regime (key None: the single level)
         self._issued: dict[date, tuple[np.ndarray, np.ndarray]] = {}
         self._scored: set[date] = set()
+
+    @property
+    def alpha(self) -> float:
+        return self.alphas.get(None, self.target)
+
+    def level_key(self, d: date) -> int | None:
+        return self._regime.get(d) if self.alpha_by_regime else None
 
     def update_alpha(self, info: InformationSet) -> None:
         for d in sorted(self._issued):
@@ -180,7 +193,8 @@ class AdaptiveIntervals(EmpiricalIntervals):
             if ok.sum() < 20:
                 continue
             miss = float(((actual[ok] < lo[ok]) | (actual[ok] > hi[ok])).mean())
-            self.alpha = float(np.clip(self.alpha + self.gamma * (self.target - miss), 0.005, 0.5))
+            key = self.level_key(d)
+            self.alphas[key] = float(np.clip(self.alphas.get(key, self.target) + self.gamma * (self.target - miss), 0.005, 0.5))
         for d in [d for d in self._issued if d < info.day - timedelta(days=self.window_days + 40)]:
             del self._issued[d]
             self._scored.discard(d)
@@ -188,6 +202,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
     def predict_quantiles(self, info: InformationSet) -> np.ndarray:
         p = self.predict(info)
         self.update_alpha(info)
-        q = self.band(p, self.relative_errors(info), (self.alpha / 2.0, 0.5, 1.0 - self.alpha / 2.0))
+        alpha = self.alphas.get(self.level_key(info.day), self.target)
+        q = self.band(p, self.error_pool(info), (alpha / 2.0, 0.5, 1.0 - alpha / 2.0))
         self._issued[info.day] = (q[0], q[-1])
         return q

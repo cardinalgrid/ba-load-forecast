@@ -14,6 +14,9 @@ Every group uses several stations per BA and six years of training. Groups:
 * ``sky``: on the BAs where behind-the-meter solar matters (ISO-NE, CAISO, FPL), the boosting with the sun's
   elevation and the HRRR cloud cover as seen at the cut-off, against the same boosting without them; its
   report is separate (``results/phase_e_sky/``, ``docs/phase_e_sky.md``).
+* ``intervals2``: the regime-conditional error pool (365 days) with the adaptive level, one level in all or one
+  per regime, against the regime-conditional and the adaptive intervals of ``intervals``; report in
+  ``results/phase_e_intervals2/``, ``docs/phase_e_intervals2.md``.
 * ``pv``: on ISO-NE and CAISO, the sky boosting with the installed PV capacity terms (``sky.PV_COLUMNS``) against
   the sky boosting without them; report in ``results/phase_e_pv/``, ``docs/phase_e_pv.md``.
 
@@ -75,6 +78,14 @@ def group_models(group: str) -> list:
                 EmpiricalIntervals(ens, name="ens_bc_simple"),
                 EmpiricalIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime"),
                 AdaptiveIntervals(ens, name="ens_bc_adaptive")]
+    if group == "intervals2":
+        from ba_load_forecast.forecasters.quantiles import AdaptiveIntervals
+
+        return [add, boo, ens,
+                EmpiricalIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime"),
+                AdaptiveIntervals(ens, name="ens_bc_adaptive"),
+                AdaptiveIntervals(ens, by_regime=True, window_days=365, name="ens_bc_regime_aci"),
+                AdaptiveIntervals(ens, by_regime=True, window_days=365, alpha_by_regime=True, name="ens_bc_regime_aci2")]
     if group == "sky":
         boo_sky = Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_ml_sky"))
         ens_sky = Cached(Ensemble([add, boo_sky], weighting="recent", name="ens_sky"))
@@ -164,6 +175,13 @@ def main(argv=None) -> int:
                  "seen at each day's cut-off (available from December 2020) and their product; `ens_sky` and "
                  "`ens_sky_bc_regime` are the ensemble and the corrected ensemble built on it, next to the same models "
                  "without those features.")
+    iv2 = report({"intervals2"}, a.results.parent / "phase_e_intervals2", a.doc.parent / "phase_e_intervals2.md",
+                 "Phase E: regime-conditional errors with an adaptive level",
+                 "Development BAs: " + common +
+                 "`ens_bc_regime` reads the 5th and 95th percentiles of the corrected ensemble's errors on the known days of the same "
+                 "temperature regime over the last year; `ens_bc_adaptive` reads them on the last 120 days at a level that adapts to "
+                 "the coverage achieved (adaptive conformal inference); `ens_bc_regime_aci` combines the two (regime pool, one adaptive "
+                 "level); `ens_bc_regime_aci2` tracks one adaptive level per regime.")
     pv = report({"pv"}, a.results.parent / "phase_e_pv", a.doc.parent / "phase_e_pv.md",
                 "Phase E: the installed PV capacity as a feature",
                 "BAs with large solar behind the load: " + common +
@@ -171,7 +189,7 @@ def main(argv=None) -> int:
                 "Forms EIA-861M and EIA-860M), that capacity times the sun's elevation, and the same times one minus the forecast "
                 "cloud fraction; `ens_pv` and `ens_pv_bc_regime` are the ensemble and the corrected ensemble built on it. Compare "
                 "with `docs/phase_e_sky.md` (same BAs and days, without the capacity terms).")
-    if main is None and sky is None and pv is None:
+    if main is None and sky is None and pv is None and iv2 is None:
         log("no rows to report")
         return 1
     if waiting:
