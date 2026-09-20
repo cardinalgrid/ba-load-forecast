@@ -54,10 +54,14 @@ long outputs to a local disk, not to a synced folder.
 | 18. Diagnostics of the sky group | `python scripts/diagnose.py --group sky --model ens_sky_bc_regime --out results/diagnostics_sky --doc docs/diagnostics_sky.md` | `results/diagnostics_sky/*.csv`, `docs/diagnostics_sky.md`, `docs/figures/diagnostics_sky_mape_by_hour_month.*` | 1 min |
 | 19. The BAs' forecast by hour, offsets and time alignment | `python scripts/df_profile.py` (EIA-930 files only; the comparison column reads the stored hourly forecasts of step 14) | `results/df_profile/*.csv`, `docs/df_hourly_bias.md` | 2 min |
 | 20. Installed PV capacity | `python scripts/pv_capacity.py` (downloads Forms EIA-861M and EIA-860M into `data/pv/`) | `docs/pv_capacity_monthly.csv` | 3 min |
-| 21. Phase E, pv group | `scriptsun_phase_e.cmd pv` (ISO-NE and CAISO; needs steps 16 and 20) | `results/phase_e_pv/*.csv`, `docs/phase_e_pv.md` | 1 h |
-| 22. Phase E, intervals2 group | `scriptsun_phase_e.cmd intervals2` (eleven BAs) | `results/phase_e_intervals2/*.csv`, `docs/phase_e_intervals2.md` | 2.5 h |
+| 21. Phase E, pv group | `scripts
+un_phase_e.cmd pv` (ISO-NE and CAISO; needs steps 16 and 20) | `results/phase_e_pv/*.csv`, `docs/phase_e_pv.md` | 1 h |
+| 22. Phase E, intervals2 group | `scripts
+un_phase_e.cmd intervals2` (eleven BAs) | `results/phase_e_intervals2/*.csv`, `docs/phase_e_intervals2.md` | 2.5 h |
+| 23. Phase E, final recipe | `scriptsun_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and CAISO) | `results/phase_e_final/*.csv`, `docs/phase_e_final.md` | 3 h |
+| 24. Benchmark profile and diagnostics of the final recipe | `python scripts/df_profile.py --group final --model final` and `python scripts/diagnose.py --group final --model final --out results/diagnostics_final --doc docs/diagnostics_final.md` | `docs/df_hourly_bias.md`, `docs/diagnostics_final.md` | 3 min |
 
-Tests: `pytest -q` (74 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (79 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 
