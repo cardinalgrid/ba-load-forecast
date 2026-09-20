@@ -81,6 +81,20 @@ by each BA's demand; documented load-shed days (`docs/load_shed_days.csv`) left 
 | Recency-effect regression (Hong) | 1 | 2 years | 4.27 | 3.64 | −2.49 | 33 % |
 | Profile of Note 2 | 1 | | 6.86 | 5.29 | −4.34 | 21 % |
 
+Phase E (`docs/phase_e.md`) adds FPL to the development set and runs the full recipe on the eleven BAs
+(8163 BA-days): the ensemble with a bias correction read from the errors of days in the same temperature
+regime over the last year reaches **2.58 %** (median 2.25 %), against **3.04 %** for the BAs' own forecasts
+on the same days, and is ahead on 60 % of the days. By BA it beats the BA's forecast at PJM (2.34 % against
+3.65 %), SPP (2.42 % against 3.85 %), MISO (2.09 % against 2.65 %) and NYISO (2.45 % against 2.67 %), ties at
+CAISO and FPL, is slightly behind at ERCOT (2.79 % against 2.63 %) and loses at BPA, Duke, TVA and ISO-NE
+(3.74 % against 2.36 %). At FPL the load of the former Gulf Power area joins the series in July 2022: without
+the bias correction the models under-forecast the peak by 8 to 11 % for the rest of the year; with it the
+error of that quarter falls from 10.3 % to 3.8 %. `docs/diagnostics.md` shows where the models lose, by hour
+and month: at ISO-NE the gap is concentrated between 09:00 and 12:00 and the midday bias drifts from −2.2 %
+to +1.3 % between 2020 and 2022, the signature of behind-the-meter solar, which no feature of the models
+describes yet. Adaptive conformal intervals reach the nominal 90 % coverage over the year (89.7 %) and
+still cover only 78 to 81 % of the hours inside the storms and on the coldest mornings.
+
 What the tables say, so far:
 
 - **Several weather stations per BA and six years of training are the two levers that matter.** With one

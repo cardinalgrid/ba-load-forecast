@@ -46,6 +46,9 @@ long outputs to a local disk, not to a synced folder.
 | 10. Phase D, base group | `scripts\run_phase_d.cmd base` | `%USERPROFILE%\ba-load-forecast-runs\phase_d\base_<BA>.parquet` | 2.5 h |
 | 11. Phase D, other groups | `scripts\run_phase_d_rest.cmd` (extremes, ensemble, special, quantiles; its own log, because Windows locks a log another job is appending to) | same folder; then `results/phase_d/*.csv`, `docs/phase_d.md` | 12 h |
 | 12. Report only | `python scripts/run_phase_d.py --report-only` | rebuilds `results/phase_d/` and `docs/phase_d.md` | 1 min |
+| 13. FPL stations | `scripts\run_fpl.cmd` (ISD-Lite, HRRR extraction for the FPL stations, consolidation) | `data/hrrr_fpl/` | 2 h |
+| 14. Phase E | `scripts\run_phase_e.cmd recipe` and `scripts\run_phase_e.cmd intervals` (one job and one log per group; eleven BAs) | `%USERPROFILE%\ba-load-forecast-runs\phase_e\<group>_<BA>.parquet` and `<group>_<BA>_hourly.parquet`; `results/phase_e/*.csv`, `docs/phase_e.md` | 2.5 h each |
+| 15. Diagnostics | `python scripts/diagnose.py --group intervals --model ens_bc_regime` | `results/diagnostics/*.csv`, `docs/diagnostics.md`, `docs/figures/diagnostics_mape_by_hour_month.*` | 1 min |
 
 Tests: `pytest -q` (57 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 

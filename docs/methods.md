@@ -83,6 +83,21 @@ window is 730 days in phases B and C and 2190 days in phase D.
 | Bias correction (`quantiles.EmpiricalIntervals`) | the median, per hour of the day, of the model's relative errors over the last 60 known days, applied to the forecast; at least 20 days | causal and cheap; found while building the intervals |
 | Quantiles (`quantiles.py`) | boosting with the pinball loss at 5, 50 and 95 %, sorted to remove crossings; or the empirical quantiles of the same relative errors used by the bias correction | a minimal version of a 90 % prediction interval |
 
+### Additions of phase E
+
+The development set has eleven BAs from phase E on: the ten above and FPL (Florida Power & Light). The
+FPL series contains a structural step inside the development period: the load of the former Gulf Power
+area joins it in mid-July 2022 (about 11 %, measured against the other Florida BAs). The series is not
+adjusted; a model has to absorb the step from the load lags, as it would in operation. FPL uses six
+stations (Miami, West Palm Beach, Melbourne, Fort Myers, Sarasota, Pensacola).
+
+| Piece | Specification | Why |
+|---|---|---|
+| Bias correction on the ensemble | the median relative error of the ensemble per hour of the day, from the known days **of the same temperature regime** as the target day over the last 365 days (all known days when fewer than 20 share the regime); before 20 known days exist the uncorrected forecast is used | the regime-conditional correction beats the 60-day one (2.58 % against 2.66 %); it is also what absorbs a structural step within weeks |
+| Adaptive intervals (`quantiles.AdaptiveIntervals`) | adaptive conformal inference [8]: the miscoverage level used to read the error quantiles is updated once per newly known day, `alpha <- alpha + 0.02 (0.10 - miss)`, clipped to 0.005 to 0.5, errors from a 120-day window | reaches the nominal 90 % over the year without assuming exchangeable errors |
+| Shared fitted members (`base.Cached`) | a wrapper that keeps the forecast of the last BA-day | the same fitted model is scored alone and inside ensembles at the cost of one fit |
+| Hourly forecasts (`evaluate(hourly=True)`) | the 24 values of every model, of `DF`, of the outcome and of the 5th and 95th percentiles are stored per BA and day | diagnostics by hour and month (`scripts/diagnose.py`, `docs/diagnostics.md`) and any later analysis without rerunning the models |
+
 ## 6. Special days and daily shapes
 
 The calendar (`grid_sentinel.calendar_us`) holds the federal holidays with their observance, the day
@@ -141,3 +156,5 @@ out-of-sample evaluation on other BAs or years has been run yet.
 [6] T. Hong and S. Fan, "Probabilistic electric load forecasting: A tutorial review," *International Journal of Forecasting*, vol. 32, no. 3, pp. 914-938, 2016. doi:10.1016/j.ijforecast.2015.11.011
 
 [7] G. Chicco, "Overview and performance assessment of the clustering methods for electrical load pattern grouping," *Energy*, vol. 42, no. 1, pp. 68-80, 2012. doi:10.1016/j.energy.2011.12.031
+
+[8] I. Gibbs and E. Candès, "Adaptive conformal inference under distribution shift," arXiv:2106.00170, 2021.
