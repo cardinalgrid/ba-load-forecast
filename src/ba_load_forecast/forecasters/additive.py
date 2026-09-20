@@ -6,6 +6,11 @@ that the response extrapolates linearly beyond the training range), plus the loa
 the last known day and of the same day a week before, the mean of the last 24 known hours, the day
 type and a trend. Ridge regression on standardised columns; the penalty is chosen on the last
 ``val_days`` of the training window and the model is refitted every ``refit_days``.
+
+With ``pv=True`` (needs ``Loader(sky=True, pv=True)``) two linear terms per hour describe the solar generation
+netted from the load: ``pv_clear``, the installed PV capacity times the sun's elevation, and ``pv_cloud``, the
+same times the forecast cloud fraction (zero where no cloud forecast exists). A linear term extrapolates as
+the capacity grows, which trees cannot do; this is the simplest form of load reconstitution.
 """
 
 from __future__ import annotations
@@ -18,10 +23,12 @@ from scipy.interpolate import BSpline
 
 from ..features import EXTREME_COLUMNS, rows_for_days, target_temperature, training_days
 from ..information_set import InformationSet
+from ..sky import PV_COLUMNS, SKY_COLUMNS
 from .base import ForecastError
 
 SMOOTH = ("t", "t_ma24", "t_day_max", "t_day_min")
 LINEAR = ("l_last_known", "l_d7", "l_mean24", "trend")
+PV_LINEAR = ("pv_clear", "pv_cloud")
 
 
 class SplineBasis:
@@ -42,7 +49,8 @@ class AdditiveModel:
     def __init__(self, train_days: int = 730, refit_days: int = 7, n_knots: int = 6,
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
-                 labels=None, name: str | None = None, extremes: bool = False):
+                 labels=None, name: str | None = None, extremes: bool = False, pv: bool = False):
+        self.pv = pv                          # linear PV terms (PV_LINEAR) from the sky frame; needs Loader(sky=True, pv=True)
         self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS) as linear regressors
         self.train_days = train_days
         self.refit_days = refit_days
@@ -79,6 +87,9 @@ class AdditiveModel:
         if self.extremes:
             for c in EXTREME_COLUMNS:
                 cols.append(rows[c].to_numpy(dtype=float))
+        if self.pv:
+            for c in PV_LINEAR:
+                cols.append(rows[c].to_numpy(dtype=float))
         return np.column_stack([c if c.ndim == 2 else c[:, None] for c in cols])
 
     def _standardise(self, x: np.ndarray, fit: bool) -> np.ndarray:
@@ -96,6 +107,16 @@ class AdditiveModel:
         pen[0, 0] = 0.0
         return np.linalg.solve(x.T @ x + pen, x.T @ y)
 
+    def _rows(self, info: InformationSet, temp: pd.Series, days: list[date], target: bool) -> pd.DataFrame:
+        rows = rows_for_days(info.load_history, temp, days, labels=self.day_labels(info, target=target),
+                             sky=info.sky if self.pv else None)
+        if self.pv:
+            if "pv_clear" not in rows.columns:
+                raise ForecastError("pv=True needs Loader(sky=True, pv=True) and a capacity table for the BA")
+            rows["pv_cloud"] = rows["pv_clear"] * rows["cloud"].fillna(0.0) / 100.0
+            rows = rows.drop(columns=[c for c in SKY_COLUMNS + PV_COLUMNS if c in rows.columns and c != "pv_clear"])
+        return rows
+
     # ---- fit / predict -------------------------------------------------------------------------------
     def needs_fit(self, info: InformationSet) -> bool:
         return (self.fitted_on is None or self.fitted_ba != info.ba or (info.day - self.fitted_on).days >= self.refit_days)
@@ -110,7 +131,7 @@ class AdditiveModel:
 
     def fit(self, info: InformationSet) -> None:
         days = training_days(info.day - timedelta(days=2), self.train_days)
-        rows = rows_for_days(info.load_history, info.temp_history_f, days, labels=self.day_labels(info))
+        rows = self._rows(info, info.temp_history_f, days, target=False)
         rows = rows.dropna()
         if self.label_column == "cluster":
             rows = rows[rows["cluster"] >= 0]
@@ -145,7 +166,7 @@ class AdditiveModel:
             raise ForecastError("no weather forecast for the day")
         if self.needs_fit(info):
             self.fit(info)
-        rows = rows_for_days(info.load_history, target_temperature(info), [info.day], labels=self.day_labels(info, target=True))
+        rows = self._rows(info, target_temperature(info), [info.day], target=True)
         feats = rows.drop(columns=["y"])
         if feats.isna().any().any():
             raise ForecastError("missing input for the target day: " + ", ".join(feats.columns[feats.isna().any()]))
