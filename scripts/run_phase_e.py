@@ -19,6 +19,10 @@ Every group uses several stations per BA and six years of training. Groups:
   ``results/phase_e_intervals2/``, ``docs/phase_e_intervals2.md``.
 * ``pv``: on ISO-NE and CAISO, the sky boosting with the installed PV capacity terms (``sky.PV_COLUMNS``) against
   the sky boosting without them; report in ``results/phase_e_pv/``, ``docs/phase_e_pv.md``.
+* ``final``: the frozen recipe on the eleven BAs, one run: the additive model with special-day indicators (with the
+  linear PV terms at ISO-NE and CAISO), the boosting (with the sky features at ISO-NE and CAISO), their ensemble weighted
+  by recent error, and the regime-conditional bias correction read at an adaptive level per regime (``final``); report in
+  ``results/phase_e_final/``, ``docs/phase_e_final.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -70,8 +74,17 @@ def corrected_ensemble():
     return add, boo, ens
 
 
-def group_models(group: str) -> list:
+def group_models(group: str, ba: str | None = None) -> list:
     add, boo, ens = corrected_ensemble()
+    if group == "final":
+        from ba_load_forecast.forecasters.quantiles import AdaptiveIntervals
+
+        solar = ba in PV_BAS
+        add_f = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
+        boo_f = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
+        ens_f = Cached(Ensemble([add_f, boo_f], weighting="recent", name="final_ensemble"))
+        return [add_f, boo_f, ens_f,
+                AdaptiveIntervals(ens_f, by_regime=True, window_days=365, alpha_by_regime=True, name="final")]
     if group == "recipe":
         return [add, boo, ens, EmpiricalIntervals(ens, name="ens_recent_bc")]
     if group == "intervals":
@@ -140,13 +153,14 @@ def main(argv=None) -> int:
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                ld = loader(a, sky=group in ("sky", "pv", "pv2"), pv=group in ("pv", "pv2"))
+                solar = group == "final" and ba in PV_BAS
+                ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar)
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
                     continue
                 t0 = time.time()
-                rows, hourly = evaluate(ld, group_models(group), [ba], a.start, a.end, log=log, hourly=True)
+                rows, hourly = evaluate(ld, group_models(group, ba), [ba], a.start, a.end, log=log, hourly=True)
                 hourly.to_parquet(a.out / f"{group}_{ba}_hourly.parquet", index=False)
                 tmp = f.with_suffix(".tmp")
                 rows.to_parquet(tmp, index=False)
@@ -207,7 +221,15 @@ def main(argv=None) -> int:
                  "elevation, and the same times the forecast cloud fraction (zero before December 2020); `ens_pv2` and "
                  "`ens_pv2_bc_regime` pair it with the sky boosting, next to the same ensemble built on the additive model "
                  "without those terms (`ens_sky`, `ens_sky_bc_regime`).")
-    if main is None and sky is None and pv is None and iv2 is None and pv2 is None:
+    final = report({"final"}, a.results.parent / "phase_e_final", a.doc.parent / "phase_e_final.md",
+                   "Phase E: the frozen recipe on the eleven BAs",
+                   "Development BAs: " + common +
+                   "One run of the recipe that phase E settled on. `final_additive` is the additive model with special-day indicators, "
+                   "with the linear PV terms at ISO-NE and CAISO; `final_boosting` is the boosting, with the sky features at ISO-NE and "
+                   "CAISO; `final_ensemble` weights the two by their recent error; `final` is that ensemble with the regime-conditional "
+                   "bias correction (median of the errors of the same temperature regime over the last year) and a 90 % interval read "
+                   "at an adaptive level per regime.")
+    if main is None and sky is None and pv is None and iv2 is None and pv2 is None and final is None:
         log("no rows to report")
         return 1
     if waiting:
