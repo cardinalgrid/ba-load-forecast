@@ -54,7 +54,7 @@ long outputs to a local disk, not to a synced folder.
 | 18. Diagnostics of the sky group | `python scripts/diagnose.py --group sky --model ens_sky_bc_regime --out results/diagnostics_sky --doc docs/diagnostics_sky.md` | `results/diagnostics_sky/*.csv`, `docs/diagnostics_sky.md`, `docs/figures/diagnostics_sky_mape_by_hour_month.*` | 1 min |
 | 19. The BAs' forecast by hour, offsets and time alignment | `python scripts/df_profile.py` (EIA-930 files only; the comparison column reads the stored hourly forecasts of step 14) | `results/df_profile/*.csv`, `docs/df_hourly_bias.md` | 2 min |
 
-Tests: `pytest -q` (57 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (72 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 
