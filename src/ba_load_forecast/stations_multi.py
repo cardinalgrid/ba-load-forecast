@@ -26,6 +26,9 @@ BA_STATIONS_MULTI: dict[str, tuple[str, ...]] = {
     "TVA": ("KBNA", "KMEM", "KTYS", "KHSV"),
     "DUK": ("KCLT", "KRDU", "KGSO", "KGSP"),
     "BPAT": ("KPDX", "KSEA", "KGEG", "KBOI"),
+    # Pensacola is in the list because the former Gulf Power load (north-west Florida) joins the FPL series
+    # in July 2022, a step of about 10 % that is visible against the other Florida BAs.
+    "FPL": ("KMIA", "KPBI", "KMLB", "KRSW", "KSRQ", "KPNS"),
 }
 
 

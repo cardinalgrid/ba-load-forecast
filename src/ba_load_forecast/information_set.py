@@ -119,7 +119,9 @@ class Loader:
         self.tidy_dir = Path(tidy_dir)
         self.isd_dir = Path(isd_dir)
         self.hrrr_dir = Path(hrrr_dir)
-        self.hrrr_dirs = [Path(d) for d in hrrr_dirs] if hrrr_dirs else [self.hrrr_dir, self.hrrr_dir.parent / "hrrr_multi"]
+        # by default every sibling folder whose name starts like the main one (hrrr, hrrr_multi, hrrr_fpl, ...)
+        self.hrrr_dirs = ([Path(d) for d in hrrr_dirs] if hrrr_dirs
+                          else [self.hrrr_dir, *sorted(p for p in self.hrrr_dir.parent.glob(f"{self.hrrr_dir.name}_*") if p.is_dir())])
         self.history_days = history_days
         self.init_hours = init_hours
         self.gross_guard = gross_guard
