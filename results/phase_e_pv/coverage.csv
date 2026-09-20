@@ -1,0 +1,6 @@
+model,scored_fraction
+DF,0.9973684210526316
+additive_ml_special,0.9822368421052632
+boosting_ml_pv,0.9960526315789474
+ens_pv,0.9960526315789474
+ens_pv_bc_regime,0.9960526315789474
