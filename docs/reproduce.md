@@ -43,6 +43,9 @@ long outputs to a local disk, not to a synced folder.
 | 7. Phase C, groups without extra stations | `scripts\run_phase_c.cmd single sentinel long` | `%USERPROFILE%\ba-load-forecast-runs\phase_c\<group>_<BA>.parquet` | about 6 h |
 | 8. Phase C, extra stations | `scripts\run_phase_c.cmd multi` (after step 6) | same folder; then `results/phase_c/*.csv`, `docs/phase_c.md` | 1 h |
 | 9. Report only | `python scripts/run_phase_c.py --report-only` | rebuilds `results/phase_c/` and `docs/phase_c.md` from the rows | 1 min |
+| 10. Phase D, base group | `scripts\run_phase_d.cmd base` | `%USERPROFILE%\ba-load-forecast-runs\phase_d\base_<BA>.parquet` | 2.5 h |
+| 11. Phase D, other groups | `scripts\run_phase_d_rest.cmd` (extremes, ensemble, special, quantiles; its own log, because Windows locks a log another job is appending to) | same folder; then `results/phase_d/*.csv`, `docs/phase_d.md` | 12 h |
+| 12. Report only | `python scripts/run_phase_d.py --report-only` | rebuilds `results/phase_d/` and `docs/phase_d.md` | 1 min |
 
 Tests: `pytest -q` (57 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 

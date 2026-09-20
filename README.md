@@ -56,45 +56,53 @@ direction of the errors the storm reviews describe. Whether that is what happene
 for the forecasting phases, not for this table: at the Southeast stations, where the largest Elliott
 under-forecast was reported, the public weather forecast erred cold, not warm.
 
-## Results so far (phases B and C)
+## Results so far (phases B to D)
 
-`docs/phase_b.md` and `docs/phase_c.md` score the model families against the BA's own forecast on the
-ten development BAs (PJM, MISO, ERCOT, CAISO, SPP, NYISO, ISO-NE, TVA, Duke, BPA) from 2 December 2020 to
-the end of 2022, under the 9 a.m. cut-off, with the HRRR temperature as the only weather input. Mean over
-7457 BA-days, weighted by each BA's demand; documented load-shed days (`docs/load_shed_days.csv`) left out:
+`docs/phase_b.md`, `docs/phase_c.md` and `docs/phase_d.md` score the model families against the BA's own
+forecast on the ten development BAs (PJM, MISO, ERCOT, CAISO, SPP, NYISO, ISO-NE, TVA, Duke, BPA) from
+2 December 2020 to the end of 2022, under the 9 a.m. cut-off, with the HRRR temperature as the only
+weather input. Mean over the BA-days on which every model of phase D produced a forecast (7253), weighted
+by each BA's demand; documented load-shed days (`docs/load_shed_days.csv`) left out:
 
 | Model | Stations per BA | Training | MAPE (%) | Median MAPE (%) | Under-forecast at the peak (%) | Days with lower MAPE than `DF` |
 |---|---|---|---|---|---|---|
-| The BA's own forecast (`DF`) | | | 3.00 | 2.70 | −1.12 | |
-| Gradient boosting | 4 to 5 | 2 years | 3.06 | 2.65 | −2.03 | 50 % |
-| Additive model (per-hour splines) | 4 to 5 | 2 years | 3.12 | 2.70 | −1.96 | 50 % |
-| Additive model | 1 | 6 years | 3.55 | 3.00 | −2.46 | 43 % |
-| Recency-effect regression (Hong) | 4 to 5 | 2 years | 3.63 | 3.16 | −2.25 | 41 % |
-| Additive model | 1 | 2 years | 3.74 | 3.12 | −2.28 | 41 % |
-| Gradient boosting | 1 | 2 years | 3.91 | 3.19 | −2.61 | 38 % |
+| Ensemble of the additive model and the boosting, weighted by recent error | 4 to 5 | 6 years | 2.76 | 2.40 | −1.99 | 56 % |
+| Additive model with an empirical bias correction | 4 to 5 | 6 years | 2.80 | 2.41 | −1.84 | 55 % |
+| Gradient boosting | 4 to 5 | 6 years | 2.90 | 2.54 | −1.92 | 53 % |
+| The BA's own forecast (`DF`) | | | 3.01 | 2.70 | −1.10 | |
+| Additive model (per-hour splines) | 4 to 5 | 6 years | 3.03 | 2.66 | −2.28 | 51 % |
+| Gradient boosting | 4 to 5 | 2 years | 3.08 | 2.66 | −2.05 | 50 % |
+| Additive model | 1 | 6 years | 3.57 | 3.03 | −2.47 | 43 % |
+| Recency-effect regression (Hong) | 4 to 5 | 6 years | 3.66 | 3.19 | −2.23 | 41 % |
 | Recency-effect regression (Hong) | 1 | 2 years | 4.27 | 3.64 | −2.49 | 33 % |
 | Profile of Note 2 | 1 | | 6.86 | 5.29 | −4.34 | 21 % |
-| Last known day | | | 6.95 | 5.82 | −4.23 | 19 % |
 
-What the table says, so far:
+What the tables say, so far:
 
-- **The number of weather stations is the largest lever.** With one airport per BA no model reaches the
-  operators; with four or five, the additive model and the boosting are within 0.1 point of them overall,
-  tie on the median day and are ahead on half of the days. They beat the BA's forecast at PJM (2.89 %
-  against 3.65 %) and SPP (2.68 % against 3.78 %), both with Diebold-Mariano p below 1e-15, tie at MISO,
-  and lose at the other seven, by a lot at ISO-NE (4.3 % against 2.4 %).
-- **Six years of training instead of two** is the second lever (0.2 point with one station); it is what
-  lets the additive model extrapolate into the cold tail: at PJM in Winter Storm Elliott its under-forecast
-  at the peak goes from −6.4 % to −2.2 %, against −3.1 % for the BA. The two levers have not been combined yet.
-- **Cleaning the history with grid-data-sentinel** instead of the gross-fault guard changes the annual mean
-  by 0.01 point on these ten BAs: the value of that cleaning is on the days with faults, not on average.
-- **Special-day treatments** (indicators, a separate model, substitution by the resembled day type) do not
-  move the annual mean; their evaluation on the special days alone is pending. **Data-driven day labels**
-  from the shape clusters (`docs/day_clusters.md`) make every model worse by about 0.9 point: within a
-  temperature regime the normalised shape barely depends on the calendar, so the label adds noise.
-- **At the daily peak the models still under-forecast more than the operators** (−2.0 % against −1.1 %),
-  and inside the storms the picture is mixed: with several stations the additive model matches or beats
-  the BA at the peak in Elliott at MISO, TVA, NYISO and PJM, and is worse at Duke, ERCOT, BPA and SPP.
+- **Several weather stations per BA and six years of training are the two levers that matter.** With one
+  airport and two years no model reaches the operators; with four or five stations and six years the
+  boosting alone is below the BAs' aggregate, and the ensemble of the additive model and the boosting is
+  0.25 point below it, ahead on 56 % of the days. The ensemble beats the BA's forecast at PJM (2.64 %
+  against 3.65 %), SPP (2.53 % against 3.88 %), MISO (2.26 % against 2.64 %) and NYISO (2.51 % against
+  2.66 %), and loses at ERCOT, CAISO, Duke, TVA, BPA and, by a wide margin, ISO-NE (3.87 % against 2.36 %).
+- **A cheap bias correction helps:** the median of the model's relative errors over the last 60 known days,
+  per hour of the day, applied to the forecast, takes the additive model from 3.03 % to 2.80 % and reduces
+  its under-forecast at the peak more than anything else tried (−2.28 % to −1.84 %).
+- **Explicit cold and heat terms** add nothing on top of the spline response with a linear tail.
+  **Cleaning the history with grid-data-sentinel** instead of the gross-fault guard changes the annual mean
+  by 0.01 point. **Data-driven day labels** from the shape clusters (`docs/day_clusters.md`) make every
+  model worse: within a temperature regime the normalised shape barely depends on the calendar.
+- **Special days:** on the special days themselves (247 BA-days) indicators take the additive model from
+  3.92 % to 3.59 %, below the BA's 3.69 %; on the eves the BAs stay ahead (3.43 % against 3.55 % for the
+  ensemble). A separate special-day model changes nothing.
+- **At the daily peak the models still under-forecast more than the operators** (−1.8 to −2.0 % against
+  −1.1 %). Inside the storms, the bias-corrected additive model matches or beats the BA at the peak in
+  Winter Storm Elliott at seven of the ten BAs (PJM −1.2 % against −3.1 %, NYISO −0.5 % against −3.4 %),
+  and in Uri at five; the boosting is the worst of the models at the peak outside its training range
+  (ERCOT in Uri, −12.9 %).
+- **Prediction intervals** (5th to 95th percentile) are too narrow where they matter: empirical intervals
+  around the additive model cover 85 % of the hours over the year, 72 % inside the storms and 76 % on the
+  30 coldest mornings of each BA; the quantile boosting covers less. Calibration by regime is open work.
 
 Caveats: the training history is cleaned of gross faults only (readings outside 0.2 to 5 times the
 four-week median); on the days when a BA shed firm load the "load that occurred" is the load served, so

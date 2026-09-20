@@ -1,0 +1,17 @@
+model,scored_fraction
+DF,0.996578947368421
+additive_long,0.9859210526315789
+additive_ml,0.9859210526315789
+additive_ml_ext,0.9859210526315789
+additive_ml_ext_separate,0.9859210526315789
+additive_ml_ext_special,0.9859210526315789
+additive_multi,0.9859210526315789
+boosting_ml,0.995
+boosting_ml_ext,0.995
+boosting_multi,0.995
+emp_additive_ml,0.9582894736842105
+ens_mean,0.995
+ens_mean3,0.995
+ens_recent,0.995
+qboost_ml,0.995
+recency_ml,0.995
