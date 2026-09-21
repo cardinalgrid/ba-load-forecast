@@ -10,7 +10,7 @@ set LOG=%TEMP%\dswrf_%HOUR%.log
 cd /d "%~dp0.."
 echo START %DATE% %TIME% >> "%LOG%"
 call :stage scripts\extract_dswrf.py --start 2020-12-02 --end 2022-12-31 --init-hours %HOUR% --stations data\cloud\stations.csv --out data\dswrf
-if "%HOUR%"=="12" call :stage scripts\extract_dswrf.py --consolidate --out data\dswrf
+rem consolidation runs by hand once both jobs are done: python scripts\extract_dswrf.py --consolidate --out data\dswrf
 echo ALL_DONE >> "%LOG%"
 exit /b 0
 
