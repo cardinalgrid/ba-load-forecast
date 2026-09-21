@@ -206,7 +206,7 @@ events of the period the recipe is behind at the peak in January 2024 (−3.45 %
 2025 (−2.61 % against −2.63 %), with the daily MAPE slightly behind in the first and ahead in the second. The
 interval coverage is where the development left it: at the nominal level over the year, 81 % inside the storms.
 
-Against `DF` with its own hourly bias removed the recipe is ahead at SPP and MISO only. The public data's forecasts
+Against `DF` with its own hourly bias removed the recipe is ahead at SPP only. The public data's forecasts
 are beaten in three years the recipe never saw; the forecasters are not.
 
 ## Layout
