@@ -152,13 +152,17 @@ ten BAs it changes the annual mean by 0.01 point.
 
 The pieces above were tested in groups, each on the BA-days its own models could score. The recipe that phase E settled on was then run once on the eleven BAs (`scripts/run_phase_e.py --groups final`, `docs/phase_e_final.md`) so that the reported numbers come from a single set of days: 2.56 % against 3.04 % for `DF` on 8163 BA-days (median 2.23 %, ahead on 61 % of the days; Diebold-Mariano significant at 5 % at ten of the eleven BAs, FPL being a tie), under-forecast at the peak −1.85 % against −1.26 %, interval coverage 89.5 % over the year, 76.9 % inside the storms and 80.7 % on the coldest mornings. Against `DF` with its own trailing hourly bias removed (2.17 %) the recipe is behind at ten BAs.
 
+## 8b. Phase F: the recipe after three more tests
+
+Phase F tested one change per limitation, on the same development days, and kept two (`docs/phase_e_intervals3.md`, `docs/phase_e_peak.md`, `docs/phase_e_irradiance.md`; the pieces are described in the table of section 5). The recipe after phase F, run once on the eleven BAs (`scripts/run_phase_e.py --groups final2`, `docs/phase_f_final.md`): 2.55 % against 3.04 % for `DF` on 8163 BA-days (median 2.21 %, ahead on 61 % of the days, Diebold-Mariano significant at ten of the eleven BAs), mean error at the actual peak +0.10 % (was −0.79 %) and under-forecast at the peak −1.37 % (was −1.85 %; `DF` −1.26 %), interval coverage 88.9 % over the year, 79.0 % inside the storms and 84.6 % on the coldest mornings (were 89.5, 76.9 and 80.7 %). Against `DF` with its own trailing hourly bias removed (2.17 %) the recipe is still behind at ten BAs.
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
 description of any operator's process. The HRRR is a weather model with its own error and not the
 forecast any BA used; the BAs' forecasters have vendor weather and internal information this study
 does not have. Special days, events and the ten BAs are choices of the study. Prediction intervals
-are too narrow on the coldest mornings. A large part of the margin over the BAs' published forecasts comes from offsets and, at PJM, a one-hour misalignment in the published `DF` (section 4a); against `DF` with its own hourly bias removed the models are behind at ten of the eleven BAs. Results are for the development period and BAs; no
+are too narrow inside the storms (79 % coverage) and slightly so on the coldest mornings (85 %). A large part of the margin over the BAs' published forecasts comes from offsets and, at PJM, a one-hour misalignment in the published `DF` (section 4a); against `DF` with its own hourly bias removed the models are behind at ten of the eleven BAs. Results are for the development period and BAs; no
 out-of-sample evaluation on other BAs or years has been run yet.
 
 ## References

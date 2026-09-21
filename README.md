@@ -155,6 +155,34 @@ four-week median); on the days when a BA shed firm load the "load that occurred"
 those BA-days are left out of every table; the BAs' forecasters use weather vendors and internal
 information that this study does not have.
 
+## Phase F: three fixes where the recipe lost (`docs/phase_f_final.md`)
+
+Phase F tried one change for each limitation of phase E and kept two. **Coldest days**: the median correction and the
+band are read from the 40 known days of the target day's regime nearest in forecast minimum temperature
+(`docs/phase_e_intervals3.md`): coverage on the coldest mornings 80.7 % to 84.3 %, band wider there only, and a
+slightly better point (2.56 % to 2.53 %); an exponential tail beyond the pool's outer deciles changed nothing.
+**Peak**: the point is read at the 60th percentile of the errors around the forecast peak (`docs/phase_e_peak.md`),
+because the actual peak is a maximum over noisy hours and the error measured there is biased downward even for an
+unbiased forecast: under-forecast at the peak −1.85 % to −1.44 % for 0.016 point of MAPE, better at all 22 event-BA
+pairs. **Forecast irradiance** (`docs/phase_e_irradiance.md`): the HRRR surface short-wave flux, read from the GRIB2
+archive by byte range because the Zarr archive lacks it before 2025, did not help at ISO-NE or CAISO and was not
+adopted.
+
+The recipe after phase F, in one run on the eleven BAs (8163 BA-days):
+
+| | MAPE (%) | Median MAPE (%) | Error at the peak (%) | Under-forecast at the peak (%) | Days with lower MAPE than `DF` | Coverage of the 90 % interval: year / storms / coldest mornings |
+|---|---|---|---|---|---|---|
+| Recipe after phase F (`final2`) | **2.55** | 2.21 | +0.10 | **−1.37** | 61 % | 88.9 % / 79.0 % / 84.6 % |
+| Recipe after phase E (`final`) | 2.56 | 2.23 | −0.79 | −1.85 | 61 % | 89.5 % / 76.9 % / 80.7 % |
+| The BA's own forecast (`DF`) | 3.04 | 2.74 | +0.09 | −1.26 | | |
+| `DF` with its own trailing hourly bias removed | 2.17 | | | | | |
+
+By BA the picture of phase E holds (ahead at PJM, SPP, MISO, NYISO and CAISO, even at FPL, behind at ERCOT, BPA,
+Duke, TVA and ISO-NE; Diebold-Mariano significant everywhere except FPL). Inside the storms the under-forecast at the
+peak is now −2.64 % in Uri and −2.55 % in Elliott, against −2.00 % and −2.43 % for `DF`, and the daily MAPE is still
+behind the BAs' (3.89 % against 3.62 % in Uri, 4.54 % against 4.49 % in Elliott). What remains open is written in the
+limitations: the midday hours at ISO-NE, the storms, and the distance to the forecasters' own accuracy.
+
 ## Layout
 
 | Module | Responsibility |

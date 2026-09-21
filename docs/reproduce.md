@@ -58,10 +58,17 @@ long outputs to a local disk, not to a synced folder.
 un_phase_e.cmd pv` (ISO-NE and CAISO; needs steps 16 and 20) | `results/phase_e_pv/*.csv`, `docs/phase_e_pv.md` | 1 h |
 | 22. Phase E, intervals2 group | `scripts
 un_phase_e.cmd intervals2` (eleven BAs) | `results/phase_e_intervals2/*.csv`, `docs/phase_e_intervals2.md` | 2.5 h |
-| 23. Phase E, final recipe | `scriptsun_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and CAISO) | `results/phase_e_final/*.csv`, `docs/phase_e_final.md` | 3 h |
+| 23. Phase E, final recipe | `scripts
+un_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and CAISO) | `results/phase_e_final/*.csv`, `docs/phase_e_final.md` | 3 h |
 | 24. Benchmark profile and diagnostics of the final recipe | `python scripts/df_profile.py --group final --model final` and `python scripts/diagnose.py --group final --model final --out results/diagnostics_final --doc docs/diagnostics_final.md` | `docs/df_hourly_bias.md`, `docs/diagnostics_final.md` | 3 min |
+| 25. Phase F, intervals for the coldest days | `scripts\run_phase_e.cmd intervals3` | `results/phase_e_intervals3/*.csv`, `docs/phase_e_intervals3.md` | 2.5 h |
+| 26. Phase F, peak | `scripts\run_phase_e.cmd peak` | `results/phase_e_peak/*.csv`, `docs/phase_e_peak.md` | 2.5 h |
+| 27. Forecast irradiance, 15 stations | `scripts\run_dswrf.cmd 12` and `scripts\run_dswrf.cmd 6` (two jobs, one per run hour; needs `pip install eccodes`), then `python scripts/extract_dswrf.py --consolidate --out data/dswrf` | `data/dswrf/` | 10 h |
+| 28. Phase F, irradiance | `scripts\run_phase_e.cmd irradiance` (ISO-NE and CAISO) | `results/phase_e_irradiance/*.csv`, `docs/phase_e_irradiance.md` | 1 h |
+| 29. Phase F, final recipe | `scripts\run_phase_e.cmd final2` (eleven BAs, one run) | `results/phase_f_final/*.csv`, `docs/phase_f_final.md` | 2.5 h |
+| 30. Benchmark profile and diagnostics of the phase F recipe | `python scripts/df_profile.py --group final2 --model final2` and `python scripts/diagnose.py --group final2 --model final2 --out results/diagnostics_final2 --doc docs/diagnostics_final2.md` | `docs/df_hourly_bias.md`, `docs/diagnostics_final2.md` | 3 min |
 
-Tests: `pytest -q` (79 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (82 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 
