@@ -146,19 +146,15 @@ def sky_members(add):
     return boo_sky, ens_sky
 
 
+PER_BA_GROUPS = {          # groups whose members depend on the BA (solar features at ISO-NE and CAISO)
+    "final": final_models, "intervals3": intervals3_models, "peak": peak_models, "irradiance": irradiance_models,
+    "final2": final2_models, "frozen": final2_models,      # frozen: the same recipe, on other days
+}
+
+
 def group_models(group: str, ba: str | None = None) -> list:
-    if group == "final":
-        return final_models(ba)
-    if group == "intervals3":
-        return intervals3_models(ba)
-    if group == "peak":
-        return peak_models(ba)
-    if group == "irradiance":
-        return irradiance_models(ba)
-    if group == "final2":
-        return final2_models(ba)
-    if group == "frozen":
-        return final2_models(ba)             # the same recipe, on other days
+    if group in PER_BA_GROUPS:
+        return PER_BA_GROUPS[group](ba)
     add, boo, ens = corrected_ensemble()
     regime = dict(by_regime=True, window_days=365)
     groups = {
@@ -231,7 +227,7 @@ def main(argv=None) -> int:
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                solar = group in ("final", "intervals3", "peak", "irradiance", "final2", "frozen") and ba in PV_BAS
+                solar = group in PER_BA_GROUPS and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS))
                 if not stations_ready(ld, ba):
