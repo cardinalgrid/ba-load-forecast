@@ -145,6 +145,10 @@ ten BAs it changes the annual mean by 0.01 point.
 | History cleaned by grid-data-sentinel | 0.01 | kept as a control run |
 | A neural network | not implemented | deferred |
 
+## 8a. The recipe in one run
+
+The pieces above were tested in groups, each on the BA-days its own models could score. The recipe that phase E settled on was then run once on the eleven BAs (`scripts/run_phase_e.py --groups final`, `docs/phase_e_final.md`) so that the reported numbers come from a single set of days: 2.56 % against 3.04 % for `DF` on 8163 BA-days (median 2.23 %, ahead on 61 % of the days; Diebold-Mariano significant at 5 % at ten of the eleven BAs, FPL being a tie), under-forecast at the peak −1.85 % against −1.26 %, interval coverage 89.5 % over the year, 76.9 % inside the storms and 80.7 % on the coldest mornings. Against `DF` with its own trailing hourly bias removed (2.17 %) the recipe is behind at ten BAs.
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a

@@ -60,7 +60,7 @@ direction of the errors the storm reviews describe. Whether that is what happene
 for the forecasting phases, not for this table: at the Southeast stations, where the largest Elliott
 under-forecast was reported, the public weather forecast erred cold, not warm.
 
-## Results so far (phases B to D)
+## Results of phases B to D
 
 `docs/phase_b.md`, `docs/phase_c.md` and `docs/phase_d.md` score the model families against the BA's own
 forecast on the ten development BAs (PJM, MISO, ERCOT, CAISO, SPP, NYISO, ISO-NE, TVA, Duke, BPA) from
@@ -81,23 +81,47 @@ by each BA's demand; documented load-shed days (`docs/load_shed_days.csv`) left 
 | Recency-effect regression (Hong) | 1 | 2 years | 4.27 | 3.64 | −2.49 | 33 % |
 | Profile of Note 2 | 1 | | 6.86 | 5.29 | −4.34 | 21 % |
 
-Phase E (`docs/phase_e.md`) adds FPL to the development set and runs the full recipe on the eleven BAs
-(8163 BA-days): the ensemble with a bias correction read from the errors of days in the same temperature
-regime over the last year reaches **2.58 %** (median 2.25 %), against **3.04 %** for the BAs' own forecasts
-on the same days, and is ahead on 60 % of the days. By BA it beats the BA's forecast at PJM (2.34 % against
-3.65 %), SPP (2.42 % against 3.85 %), MISO (2.09 % against 2.65 %) and NYISO (2.45 % against 2.67 %), ties at
-CAISO and FPL, is slightly behind at ERCOT (2.79 % against 2.63 %) and loses at BPA, Duke, TVA and ISO-NE
-(3.74 % against 2.36 %). At FPL the load of the former Gulf Power area joins the series in July 2022: without
-the bias correction the models under-forecast the peak by 8 to 11 % for the rest of the year; with it the
-error of that quarter falls from 10.3 % to 3.8 %. `docs/diagnostics.md` shows where the models lose, by hour
-and month: at ISO-NE the gap is concentrated between 09:00 and 12:00 and the midday bias drifts from −2.2 %
-to +1.3 % between 2020 and 2022, the signature of behind-the-meter solar, which no feature of the models
-describes yet. Adaptive conformal intervals reach the nominal 90 % coverage over the year (89.7 %) and
-still cover only 78 to 81 % of the hours inside the storms and on the coldest mornings.
+## Phase E: the recipe, in one run (`docs/phase_e_final.md`)
 
-Two later steps qualify those numbers. **Sky features** (`docs/phase_e_sky.md`): the short-wave flux is empty in the public HRRR Zarr archive until 2025, so the boosting received the sun's elevation and the HRRR total cloud cover as seen at each day's cut-off instead; the corrected ensemble improves from 3.74 % to 3.57 % at ISO-NE and from 2.76 % to 2.70 % at CAISO (now below CAISO's 2.80 %), not at FPL, and the midday gap at ISO-NE remains. **The benchmark itself** (`docs/df_hourly_bias.md`): the published `DF` of PJM is stamped one hour earlier than the demand from 2019 on (moved by one hour its MAPE is 2.3 to 2.5 %, not 3.4 to 3.9 %), NYISO's is 2.4 % low at every hour, MISO's and SPP's are 1 to 4 % high, ISO-NE's is 3 to 6 % low before dawn and FPL's 4 to 7 % low in the evening. With its own trailing hourly bias removed, `DF` reaches 2.17 % over the eleven BAs, ahead of the corrected ensemble (2.59 %) everywhere except SPP. The models beat the forecasts as published; they do not yet beat the forecasters.
+Phase E adds FPL to the development set, settles the recipe and runs it once on the eleven BAs (8163 BA-days,
+2 December 2020 to 31 December 2022). The recipe: the additive model with special-day indicators and the
+boosting, each on four to six stations per BA and six years of history, combined by their recent error, with
+a bias correction read from the errors of the known days in the same temperature regime over the last year;
+at ISO-NE and CAISO the additive model carries two linear terms for the installed PV capacity and the boosting
+carries the sun's elevation and the HRRR cloud cover as seen at the cut-off. The 90 % interval is read at a level
+that adapts to the coverage achieved, one level per regime.
 
-Two more steps close phase E. **Load reconstitution in its simplest form** (`docs/phase_e_pv2.md`): the installed PV capacity (Forms EIA-861M and EIA-860M) times the sun's elevation, and times the forecast cloud fraction, as linear terms of the additive model, take the corrected ensemble at ISO-NE from 3.58 % to 3.43 % and at CAISO from 2.71 % to 2.65 %; the same capacity inside the boosting adds nothing, because trees do not extrapolate. **Intervals** (`docs/phase_e_intervals2.md`): reading the regime-conditional errors at an adaptive level per regime gives 89.5 % coverage over the year with bands 4 % narrower than adaptive conformal inference alone, and still 77 to 81 % inside the storms and on the coldest mornings.
+| | MAPE (%) | Median MAPE (%) | Under-forecast at the peak (%) | Days with lower MAPE than `DF` | Coverage of the 90 % interval: year / storms / coldest mornings |
+|---|---|---|---|---|---|
+| Recipe (`final`) | **2.56** | 2.23 | −1.85 | 61 % | 89.5 % / 76.9 % / 80.7 % |
+| The BA's own forecast (`DF`) | 3.04 | 2.74 | −1.26 | | |
+| `DF` with its own trailing hourly bias removed (`docs/df_hourly_bias.md`) | 2.17 | | | | |
+
+By BA (MAPE, recipe against `DF`; the Diebold-Mariano test on daily MAPE is significant at 5 % everywhere except FPL):
+ahead at PJM (2.34 against 3.65), SPP (2.42 against 3.85), MISO (2.09 against 2.65), NYISO (2.45 against 2.67) and
+CAISO (2.64 against 2.80); even at FPL (3.91 against 3.92); behind at ERCOT (2.79 against 2.63), BPA (2.52 against
+2.07), Duke (3.31 against 2.84), TVA (3.04 against 2.23) and ISO-NE (3.43 against 2.36). Against `DF` with its
+hourly bias removed the recipe is ahead only at SPP.
+
+What each step of phase E was worth, on the same days (`docs/phase_e.md`, `docs/phase_e_sky.md`, `docs/phase_e_pv.md`,
+`docs/phase_e_pv2.md`, `docs/phase_e_intervals2.md`):
+
+- **Bias correction by temperature regime** instead of the last 60 days: 2.66 % to 2.58 %; it is also what absorbs the
+  Gulf Power step at FPL (July 2022, +11 %) within weeks.
+- **Sky features in the boosting** (the short-wave flux is empty in the public HRRR Zarr archive until 2025, so the
+  sun's elevation and the total cloud cover stand in): ISO-NE 3.74 % to 3.57 %, CAISO 2.76 % to 2.70 %, FPL unchanged.
+- **Installed PV capacity** (Forms EIA-861M and EIA-860M) inside the boosting: nothing, because trees do not extrapolate a
+  capacity that is always above its training range. As two linear terms of the additive model (the simplest load
+  reconstitution): ISO-NE 3.58 % to 3.43 %, CAISO 2.71 % to 2.65 %. The midday gap to ISO-NE's own forecast narrows by
+  0.3 to 0.4 point and remains (about 5 % against 2 % at 11:00): no public forecast irradiance exists at the cut-off
+  for these years.
+- **Intervals**: the regime-conditional errors read at an adaptive level per regime reach the nominal coverage over the
+  year with bands 4 % narrower than adaptive conformal inference alone; inside the storms and on the coldest mornings
+  every variant covers 77 to 81 % of the hours.
+- **The benchmark itself** (`docs/df_hourly_bias.md`): PJM's published `DF` is stamped one hour earlier than its demand
+  from February 2019 on (moved by one hour its MAPE is 2.3 to 2.5 %, not 3.4 to 3.9 %); NYISO's is 2.4 % low at every
+  hour, MISO's and SPP's 1 to 4 % high, ISO-NE's 3 to 6 % low before dawn, FPL's 4 to 7 % low in the evening. The
+  recipe beats the forecasts as published; it does not yet beat the forecasters.
 
 What the tables say, so far:
 
