@@ -200,8 +200,10 @@ By year: 2.74 % against 2.95 % in 2023, 2.83 % against 3.10 % in 2024, 3.13 % ag
 picture of the development period holds: ahead at PJM (2.28 against 3.53), SPP (2.54 against 3.43), MISO (1.91 against
 2.73) and CAISO; even at NYISO (2.87 against 2.94, the one BA where the Diebold-Mariano test is not significant);
 behind at ERCOT, FPL, BPA, Duke, TVA and ISO-NE (3.85 against 2.55). CAISO needs a caveat: its published `DF` breaks
-down over these years (5.5 %, 7.0 %, 8.1 %) and the hour-label test flags it as stamped one hour off from 2023 on, so
-the 2.81 % against 6.73 % there is a win over the published data, not over the forecaster. Inside the two winter
+down over these years (5.5 %, 7.0 %, 8.1 %) because, by CAISO's own OASIS series, the EIA-930 demand column has carried
+hour labels one hour off since 14 June 2022 while the forecast column equals CAISO's day-ahead forecast exactly, and
+because CAISO's forecast error against its own actual load also grew (2.5 % in January 2022, 6.1 % in January 2025); the
+2.81 % against 6.73 % there is a win over the published data, not over the forecaster. Inside the two winter
 events of the period the recipe is behind at the peak in January 2024 (−3.45 % against −2.45 %) and level in January
 2025 (−2.61 % against −2.63 %), with the daily MAPE slightly behind in the first and ahead in the second. The
 interval coverage is where the development left it: at the nominal level over the year, 81 % inside the storms.
