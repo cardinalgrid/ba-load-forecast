@@ -21,13 +21,16 @@ def cold_world(seed=3, days=420):
     return load, temp_of_day
 
 
-def bands(model, load, temp_of_day, days):
+def bands(model, load, temp_of_day, days, score_from=None):
+    """Run the model day by day; keep coverage and width from ``score_from`` on (the pool needs time to fill)."""
     out = {}
     for d in days:
         info = make_info(d, load, pd.Series(50.0, index=load.index), np.full(24, temp_of_day[d]))
         try:
             q = model.predict_quantiles(info)
         except Exception:
+            continue
+        if score_from is not None and d < score_from:
             continue
         actual = load.reindex(info.timestamps).to_numpy()
         out[d] = (float(np.mean((actual >= q[0]) & (actual <= q[2]))), float(np.mean(q[2] - q[0])) / 1000.0)
@@ -36,10 +39,10 @@ def bands(model, load, temp_of_day, days):
 
 def test_nearest_pool_widens_the_coldest_days_and_not_the_mild_ones():
     load, temp_of_day = cold_world()
-    days = [date(2023, 1, 5) + timedelta(days=k) for k in range(400)][200:]
+    days = [date(2023, 1, 5) + timedelta(days=k) for k in range(400)]
     fixed = dict(by_regime=True, window_days=365, gamma=0.0)              # no level adaptation: the pool alone is compared
-    base = bands(AdaptiveIntervals(Flat(), **fixed), load, temp_of_day, days)
-    nn = bands(AdaptiveIntervals(Flat(), **fixed, nearest=40), load, temp_of_day, days)
+    base = bands(AdaptiveIntervals(Flat(), **fixed), load, temp_of_day, days, score_from=days[200])
+    nn = bands(AdaptiveIntervals(Flat(), **fixed, nearest=40), load, temp_of_day, days, score_from=days[200])
     coldest = [d for d in base.index if temp_of_day[d] < 5.0]
     mild = [d for d in base.index if temp_of_day[d] == 65.0]
     assert nn.loc[coldest, "width"].mean() > base.loc[coldest, "width"].mean() * 1.1   # the pool of the coldest days is wider
