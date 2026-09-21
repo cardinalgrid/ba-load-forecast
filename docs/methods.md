@@ -156,14 +156,18 @@ The pieces above were tested in groups, each on the BA-days its own models could
 
 Phase F tested one change per limitation, on the same development days, and kept two (`docs/phase_e_intervals3.md`, `docs/phase_e_peak.md`, `docs/phase_e_irradiance.md`; the pieces are described in the table of section 5). The recipe after phase F, run once on the eleven BAs (`scripts/run_phase_e.py --groups final2`, `docs/phase_f_final.md`): 2.55 % against 3.04 % for `DF` on 8163 BA-days (median 2.21 %, ahead on 61 % of the days, Diebold-Mariano significant at ten of the eleven BAs), mean error at the actual peak +0.10 % (was −0.79 %) and under-forecast at the peak −1.37 % (was −1.85 %; `DF` −1.26 %), interval coverage 88.9 % over the year, 79.0 % inside the storms and 84.6 % on the coldest mornings (were 89.5, 76.9 and 80.7 %). Against `DF` with its own trailing hourly bias removed (2.17 %) the recipe is still behind at ten BAs.
 
+## 8c. Frozen evaluation
+
+The recipe of section 8b was frozen and run once on 1 January 2023 to 31 December 2025 on the eleven development BAs (`scripts/run_phase_e.py --groups frozen --start 2023-01-01 --end 2025-12-31`, `docs/frozen_evaluation.md`), the models learning day by day from the six years before each day; nothing was changed after these numbers were seen. Results on 10 470 BA-days: 2.52 % against 3.22 % for `DF` (median 2.18 % against 2.90 %; ahead on 62 % of the days; Diebold-Mariano significant at 5 % at ten of the eleven BAs, NYISO being level), error at the actual peak +0.06 %, under-forecast at the peak −1.37 % against −1.31 %, interval coverage 89.1 % over the year, 80.8 % inside the two winter events (January 2024 and January 2025) and 84.5 % on the coldest mornings. Against `DF` with its own trailing hourly bias removed (2.16 %) the recipe is ahead at SPP and MISO only. Two features of the benchmark in these years are documented in `docs/df_hourly_bias_2023_2025.md`: CAISO's published `DF` degrades to 5.5 to 8.1 % and the hour-label test flags it as stamped one hour off from 2023 on, and NYISO's `DF` is published as zero on three days (which the complete-case rule does not remove, since only the outcome is checked for plausibility). The FPL outcome has four days with a spike at the peak of two to five times the forecast within the plausibility bounds; they stay in the tables.
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
 description of any operator's process. The HRRR is a weather model with its own error and not the
 forecast any BA used; the BAs' forecasters have vendor weather and internal information this study
 does not have. Special days, events and the ten BAs are choices of the study. Prediction intervals
-are too narrow inside the storms (79 % coverage) and slightly so on the coldest mornings (85 %). A large part of the margin over the BAs' published forecasts comes from offsets and, at PJM, a one-hour misalignment in the published `DF` (section 4a); against `DF` with its own hourly bias removed the models are behind at ten of the eleven BAs. Results are for the development period and BAs; no
-out-of-sample evaluation on other BAs or years has been run yet.
+are too narrow inside the storms (79 % coverage) and slightly so on the coldest mornings (85 %). A large part of the margin over the BAs' published forecasts comes from offsets and, at PJM, a one-hour misalignment in the published `DF` (section 4a); against `DF` with its own hourly bias removed the models are behind at ten of the eleven BAs. The frozen evaluation covers three later years on the same eleven BAs;
+no evaluation on other BAs has been run yet.
 
 ## References
 

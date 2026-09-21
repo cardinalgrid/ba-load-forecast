@@ -67,6 +67,9 @@ un_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and
 | 28. Phase F, irradiance | `scripts\run_phase_e.cmd irradiance` (ISO-NE and CAISO) | `results/phase_e_irradiance/*.csv`, `docs/phase_e_irradiance.md` | 1 h |
 | 29. Phase F, final recipe | `scripts\run_phase_e.cmd final2` (eleven BAs, one run) | `results/phase_f_final/*.csv`, `docs/phase_f_final.md` | 2.5 h |
 | 30. Benchmark profile and diagnostics of the phase F recipe | `python scripts/df_profile.py --group final2 --model final2` and `python scripts/diagnose.py --group final2 --model final2 --out results/diagnostics_final2 --doc docs/diagnostics_final2.md` | `docs/df_hourly_bias.md`, `docs/diagnostics_final2.md` | 3 min |
+| 31. Frozen evaluation, 2023 to 2025 | three parallel processes of `python scripts/run_phase_e.py --groups frozen --start 2023-01-01 --end 2025-12-31 --bas <group>` (PJM MISO ERCO CISO; SWPP NYIS ISNE TVA; DUK BPAT FPL), then the same command with `--report-only` and all BAs | `%USERPROFILE%\ba-load-forecast-runs\phase_e\frozen_<BA>*.parquet`; `results/frozen_2023_2025/*.csv`, `docs/frozen_evaluation.md` | 1.5 h |
+| 32. Benchmark profile, 2023 to 2025 | `python scripts/df_profile.py --group frozen --model final2 --start 2023-01-01 --end 2025-12-31 --out results/df_profile_2023_2025 --doc docs/df_hourly_bias_2023_2025.md` | `docs/df_hourly_bias_2023_2025.md` | 3 min |
+| 33. Diagnostics, 2023 to 2025 | `python scripts/diagnose.py --group frozen --model final2 --out results/diagnostics_frozen --doc docs/diagnostics_frozen.md` | `docs/diagnostics_frozen.md` | 1 min |
 
 Tests: `pytest -q` (82 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 

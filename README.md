@@ -183,6 +183,32 @@ peak is now −2.64 % in Uri and −2.55 % in Elliott, against −2.00 % and −
 behind the BAs' (3.89 % against 3.62 % in Uri, 4.54 % against 4.49 % in Elliott). What remains open is written in the
 limitations: the midday hours at ISO-NE, the storms, and the distance to the forecasters' own accuracy.
 
+## Frozen evaluation: 2023 to 2025, nothing changed (`docs/frozen_evaluation.md`)
+
+Every number above comes from the 25 months on which the recipe was chosen. The recipe was then frozen and run once
+on the three following years, 1 January 2023 to 31 December 2025, on the same eleven BAs (10 470 BA-days), with the
+models learning day by day from the six years before each day as they would in operation, and nothing changed
+after these numbers were seen.
+
+| | MAPE (%) | Median MAPE (%) | Error at the peak (%) | Under-forecast at the peak (%) | Days with lower MAPE than `DF` | Coverage of the 90 % interval: year / storms / coldest mornings |
+|---|---|---|---|---|---|---|
+| Recipe (`final2`) | **2.52** | 2.18 | +0.06 | −1.37 | 62 % | 89.1 % / 80.8 % / 84.5 % |
+| The BA's own forecast (`DF`) | 3.22 | 2.90 | −0.08 | −1.31 | | |
+| `DF` with its own trailing hourly bias removed (`docs/df_hourly_bias_2023_2025.md`) | 2.16 | | | | | |
+
+By year: 2.74 % against 2.95 % in 2023, 2.83 % against 3.10 % in 2024, 3.13 % against 3.63 % in 2025. By BA the
+picture of the development period holds: ahead at PJM (2.28 against 3.53), SPP (2.54 against 3.43), MISO (1.91 against
+2.73) and CAISO; even at NYISO (2.87 against 2.94, the one BA where the Diebold-Mariano test is not significant);
+behind at ERCOT, FPL, BPA, Duke, TVA and ISO-NE (3.85 against 2.55). CAISO needs a caveat: its published `DF` breaks
+down over these years (5.5 %, 7.0 %, 8.1 %) and the hour-label test flags it as stamped one hour off from 2023 on, so
+the 2.81 % against 6.73 % there is a win over the published data, not over the forecaster. Inside the two winter
+events of the period the recipe is behind at the peak in January 2024 (−3.45 % against −2.45 %) and level in January
+2025 (−2.61 % against −2.63 %), with the daily MAPE slightly behind in the first and ahead in the second. The
+interval coverage is where the development left it: at the nominal level over the year, 81 % inside the storms.
+
+Against `DF` with its own hourly bias removed the recipe is ahead at SPP and MISO only. The public data's forecasts
+are beaten in three years the recipe never saw; the forecasters are not.
+
 ## Layout
 
 | Module | Responsibility |
