@@ -36,6 +36,8 @@ Every group uses several stations per BA and six years of training. Groups:
 * ``final2``: the phase F recipe in one run on the eleven BAs: the phase E members (irradiance in place of the cloud
   fraction where ``IRR_BAS`` says so), the nearest-temperature pool and the peak read at the 60th percentile;
   report in ``results/phase_f_final/``, ``docs/phase_f_final.md``.
+* ``frozen``: the phase F recipe (``final2``), unchanged, on days the development never saw; run with
+  ``--start 2023-01-01 --end 2025-12-31``; report in ``results/frozen_2023_2025/``, ``docs/frozen_evaluation.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -155,6 +157,8 @@ def group_models(group: str, ba: str | None = None) -> list:
         return irradiance_models(ba)
     if group == "final2":
         return final2_models(ba)
+    if group == "frozen":
+        return final2_models(ba)             # the same recipe, on other days
     add, boo, ens = corrected_ensemble()
     regime = dict(by_regime=True, window_days=365)
     groups = {
@@ -227,7 +231,7 @@ def main(argv=None) -> int:
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                solar = group in ("final", "intervals3", "peak", "irradiance", "final2") and ba in PV_BAS
+                solar = group in ("final", "intervals3", "peak", "irradiance", "final2", "frozen") and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS))
                 if not stations_ready(ld, ba):
@@ -332,7 +336,15 @@ def main(argv=None) -> int:
                     "CAISO, the PV terms; boosting with the sky features there), their ensemble by recent error, the median correction "
                     "and the 90 % band read from the 40 known days of the same regime nearest in forecast minimum temperature, at an "
                     "adaptive level per regime, and the point read at the 60th percentile around the forecast peak.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2)):
+    frozen = report({"frozen"}, a.results.parent / "frozen_2023_2025", a.doc.parent / "frozen_evaluation.md",
+                    "Frozen evaluation: the recipe on days the development never saw",
+                    "Development BAs: " + common +
+                    "The recipe settled at the end of phase F (`final2`: additive model with special days and, at ISO-NE and CAISO, "
+                    "the PV terms; boosting with the sky features there; ensemble by recent error; median correction and 90 % band from "
+                    "the 40 known days of the same regime nearest in forecast minimum temperature, adaptive level per regime; point at "
+                    "the 60th percentile around the forecast peak), run once on 2023 to 2025 without any change after seeing these days. "
+                    "The models keep learning day by day from the six years before each day, as in operation.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen)):
         log("no rows to report")
         return 1
     if waiting:
