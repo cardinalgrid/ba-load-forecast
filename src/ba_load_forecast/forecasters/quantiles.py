@@ -92,6 +92,7 @@ class EmpiricalIntervals:
         self.name = name or f"emp_{base.name}"
         self._stored: dict[date, np.ndarray] = {}
         self._regime: dict[date, int | None] = {}
+        self._tmin: dict[date, float] = {}
 
     @staticmethod
     def regime_of(info: InformationSet) -> int | None:
@@ -102,24 +103,31 @@ class EmpiricalIntervals:
         p = np.asarray(self.base.predict(info), dtype=float)
         self._stored[info.day] = p
         self._regime[info.day] = self.regime_of(info)
+        self._tmin[info.day] = float(np.nanmin(info.temp_forecast_f)) if np.isfinite(info.temp_forecast_f).any() else np.nan
         for d in [d for d in self._stored if d < info.day - timedelta(days=self.window_days + 40)]:
             del self._stored[d]
             self._regime.pop(d, None)
+            self._tmin.pop(d, None)
         return p
 
-    def relative_errors(self, info: InformationSet, only_regime: int | None = None) -> np.ndarray:
-        """(n_days, 24) relative errors (actual - forecast) / forecast on the known days of the window."""
+    def known_days(self, info: InformationSet, only_regime: int | None = None) -> list[date]:
         first = info.day - timedelta(days=self.window_days + 2)
+        return [d for d in self._stored if first <= d <= info.day - timedelta(days=2)
+                and (only_regime is None or self._regime.get(d) == only_regime)]
+
+    def errors_of(self, info: InformationSet, days: list[date]) -> np.ndarray:
+        """(n_days, 24) relative errors (actual - forecast) / forecast on the given known days."""
         rows = []
-        for d, p in self._stored.items():
-            if d < first or d > info.day - timedelta(days=2):
-                continue
-            if only_regime is not None and self._regime.get(d) != only_regime:
-                continue
+        for d in days:
+            p = self._stored[d]
             hours = pd.date_range(pd.Timestamp(d), periods=24, freq="h")
             actual = info.load_history.reindex(hours).to_numpy(dtype=float)
             rows.append((actual - p) / p)
         return np.array(rows) if rows else np.empty((0, 24))
+
+    def relative_errors(self, info: InformationSet, only_regime: int | None = None) -> np.ndarray:
+        """(n_days, 24) relative errors on the known days of the window (of one regime when asked)."""
+        return self.errors_of(info, self.known_days(info, only_regime))
 
     def error_pool(self, info: InformationSet) -> np.ndarray:
         if self.by_regime:
@@ -161,15 +169,24 @@ class AdaptiveIntervals(EmpiricalIntervals):
     With ``by_regime`` the error pool is the regime-conditional one of ``EmpiricalIntervals`` (a longer window
     is then advisable), and with ``alpha_by_regime`` one level is tracked per temperature regime, so that the
     misses of a cold spell widen the next cold days and not the mild ones.
+
+    Two refinements for the coldest days, where the regime pool still mixes a -15 C day with a +5 C one:
+    ``nearest=k`` keeps, of the pool, only the ``k`` known days closest to the target day in forecast daily
+    minimum temperature (the regime pool is used when fewer than ``min_days`` qualify); ``tail=True`` reads the
+    outer quantiles from an exponential fitted to the errors beyond the pool 10th and 90th percentiles instead
+    of from the empirical distribution, so that a level below the smallest observed error is still defined.
     """
 
     def __init__(self, base: Forecaster, target: float = 0.10, gamma: float = 0.02, window_days: int = 120,
-                 min_days: int = 20, name: str | None = None, by_regime: bool = False, alpha_by_regime: bool = False):
+                 min_days: int = 20, name: str | None = None, by_regime: bool = False, alpha_by_regime: bool = False,
+                 nearest: int | None = None, tail: bool = False):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         self.target = target
         self.gamma = gamma
         self.alpha_by_regime = alpha_by_regime
+        self.nearest = nearest
+        self.tail = tail
         self.alphas: dict[int | None, float] = {}          # level per regime (key None: the single level)
         self._issued: dict[date, tuple[np.ndarray, np.ndarray]] = {}
         self._scored: set[date] = set()
@@ -198,6 +215,40 @@ class AdaptiveIntervals(EmpiricalIntervals):
         for d in [d for d in self._issued if d < info.day - timedelta(days=self.window_days + 40)]:
             del self._issued[d]
             self._scored.discard(d)
+
+    def error_pool(self, info: InformationSet) -> np.ndarray:
+        if self.nearest is None:
+            return super().error_pool(info)
+        days = self.known_days(info)
+        tmin = self._tmin.get(info.day, np.nan)
+        if self.by_regime:
+            r = self.regime_of(info)
+            same = [d for d in days if self._regime.get(d) == r] if r is not None else []
+            if len(same) >= self.min_days:
+                days = same
+        if np.isfinite(tmin) and len(days) > self.nearest:
+            def distance(d):
+                t = self._tmin.get(d, np.nan)
+                return abs(t - tmin) if np.isfinite(t) else np.inf
+            days = sorted(days, key=distance)[: self.nearest]
+        return self.errors_of(info, days)
+
+    def band(self, p: np.ndarray, e: np.ndarray, levels: tuple[float, ...]) -> np.ndarray:
+        q = super().band(p, e, levels)
+        if not self.tail:
+            return q
+        lo_level, hi_level = levels[0], levels[-1]
+        for h in range(24):
+            eh = e[:, h]
+            eh = eh[np.isfinite(eh)]
+            q10, q90 = np.quantile(eh, 0.10), np.quantile(eh, 0.90)
+            low = q10 - eh[eh < q10]
+            high = eh[eh > q90] - q90
+            if lo_level < 0.10 and len(low) >= 3:
+                q[0, h] = p[h] * (1.0 + q10 - low.mean() * np.log(0.10 / lo_level))
+            if hi_level > 0.90 and len(high) >= 3:
+                q[-1, h] = p[h] * (1.0 + q90 + high.mean() * np.log(0.10 / (1.0 - hi_level)))
+        return np.sort(q, axis=0)
 
     def predict_quantiles(self, info: InformationSet) -> np.ndarray:
         p = self.predict(info)

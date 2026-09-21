@@ -23,6 +23,9 @@ Every group uses several stations per BA and six years of training. Groups:
   linear PV terms at ISO-NE and CAISO), the boosting (with the sky features at ISO-NE and CAISO), their ensemble weighted
   by recent error, and the regime-conditional bias correction read at an adaptive level per regime (``final``); report in
   ``results/phase_e_final/``, ``docs/phase_e_final.md``.
+* ``intervals3``: the final recipe's interval against two refinements for the coldest days: the error pool
+  restricted to the 40 or 60 known days nearest in forecast minimum temperature, and an exponential tail
+  beyond the pool's outer deciles; report in ``results/phase_e_intervals3/``, ``docs/phase_e_intervals3.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -74,14 +77,31 @@ def corrected_ensemble():
     return add, boo, ens
 
 
-def final_models(ba: str | None) -> list:
-    """The frozen recipe for one BA: PV terms and sky features only where solar behind the load matters."""
+def final_members(ba: str | None):
+    """The frozen recipe's members for one BA: PV terms and sky features only where solar behind the load matters."""
     solar = ba in PV_BAS
     add_f = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
     boo_f = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
     ens_f = Cached(Ensemble([add_f, boo_f], weighting="recent", name="final_ensemble"))
+    return add_f, boo_f, ens_f
+
+
+FINAL_INTERVAL = dict(by_regime=True, window_days=365, alpha_by_regime=True)
+
+
+def final_models(ba: str | None) -> list:
+    add_f, boo_f, ens_f = final_members(ba)
+    return [add_f, boo_f, ens_f, AdaptiveIntervals(ens_f, **FINAL_INTERVAL, name="final")]
+
+
+def intervals3_models(ba: str | None) -> list:
+    add_f, boo_f, ens_f = final_members(ba)
     return [add_f, boo_f, ens_f,
-            AdaptiveIntervals(ens_f, by_regime=True, window_days=365, alpha_by_regime=True, name="final")]
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, name="final"),
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, nearest=40, name="final_nn40"),
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, nearest=60, name="final_nn60"),
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, tail=True, name="final_tail"),
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, nearest=40, tail=True, name="final_nn40_tail")]
 
 
 def sky_members(add):
@@ -93,6 +113,8 @@ def sky_members(add):
 def group_models(group: str, ba: str | None = None) -> list:
     if group == "final":
         return final_models(ba)
+    if group == "intervals3":
+        return intervals3_models(ba)
     add, boo, ens = corrected_ensemble()
     regime = dict(by_regime=True, window_days=365)
     groups = {
@@ -165,7 +187,7 @@ def main(argv=None) -> int:
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                solar = group == "final" and ba in PV_BAS
+                solar = group in ("final", "intervals3") and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar)
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
@@ -241,7 +263,14 @@ def main(argv=None) -> int:
                    "CAISO; `final_ensemble` weights the two by their recent error; `final` is that ensemble with the regime-conditional "
                    "bias correction (median of the errors of the same temperature regime over the last year) and a 90 % interval read "
                    "at an adaptive level per regime.")
-    if main is None and sky is None and pv is None and iv2 is None and pv2 is None and final is None:
+    iv3 = report({"intervals3"}, a.results.parent / "phase_e_intervals3", a.doc.parent / "phase_e_intervals3.md",
+                 "Phase E: intervals for the coldest days",
+                 "Development BAs: " + common +
+                 "`final` is the recipe's interval (regime-conditional errors over a year, adaptive level per regime); "
+                 "`final_nn40` and `final_nn60` restrict the pool to the 40 or 60 known days nearest to the target day in forecast "
+                 "daily minimum temperature; `final_tail` reads the outer quantiles from an exponential fitted beyond the pool's "
+                 "10th and 90th percentiles; `final_nn40_tail` does both.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3)):
         log("no rows to report")
         return 1
     if waiting:
