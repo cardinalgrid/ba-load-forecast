@@ -33,6 +33,9 @@ Every group uses several stations per BA and six years of training. Groups:
 * ``irradiance``: on ISO-NE and CAISO, the recipe (nearest-temperature pool) with the forecast surface short-wave flux
   from the HRRR GRIB2 archive, as seen at the cut-off, in the boosting and, times the PV capacity, in the additive
   model, against the same recipe without it; report in ``results/phase_e_irradiance/``, ``docs/phase_e_irradiance.md``.
+* ``final2``: the phase F recipe in one run on the eleven BAs: the phase E members (irradiance in place of the cloud
+  fraction where ``IRR_BAS`` says so), the nearest-temperature pool and the peak read at the 60th percentile;
+  report in ``results/phase_f_final/``, ``docs/phase_f_final.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -64,6 +67,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DEV_BAS = ("PJM", "MISO", "ERCO", "CISO", "SWPP", "NYIS", "ISNE", "TVA", "DUK", "BPAT", "FPL")
 SKY_BAS = ("ISNE", "CISO", "FPL")
 PV_BAS = ("ISNE", "CISO")
+IRR_BAS: tuple[str, ...] = ()          # BAs whose final2 members use the forecast irradiance (set after the irradiance group)
 TRAIN_DAYS = 2190
 HISTORY_DAYS = TRAIN_DAYS + 40
 
@@ -91,6 +95,12 @@ def final_members(ba: str | None, irradiance: bool = False, suffix: str = ""):
     boo_f = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name=f"final_boosting{suffix}"))
     ens_f = Cached(Ensemble([add_f, boo_f], weighting="recent", name=f"final_ensemble{suffix}"))
     return add_f, boo_f, ens_f
+
+
+def final2_models(ba: str | None) -> list:
+    add_f, boo_f, ens_f = final_members(ba, irradiance=ba in IRR_BAS)
+    return [add_f, boo_f, ens_f,
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, nearest=40, peak="quantile", peak_quantile=0.60, name="final2")]
 
 
 def irradiance_models(ba: str | None) -> list:
@@ -143,6 +153,8 @@ def group_models(group: str, ba: str | None = None) -> list:
         return peak_models(ba)
     if group == "irradiance":
         return irradiance_models(ba)
+    if group == "final2":
+        return final2_models(ba)
     add, boo, ens = corrected_ensemble()
     regime = dict(by_regime=True, window_days=365)
     groups = {
@@ -215,9 +227,9 @@ def main(argv=None) -> int:
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                solar = group in ("final", "intervals3", "peak", "irradiance") and ba in PV_BAS
+                solar = group in ("final", "intervals3", "peak", "irradiance", "final2") and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
-                            irradiance=group == "irradiance")
+                            irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS))
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -313,7 +325,14 @@ def main(argv=None) -> int:
                  "from December 2020): the boosting as a column, the additive model as the installed PV capacity times the flux, in "
                  "place of the capacity times the cloud fraction. `final_nn40` and `final_nn40_irr` are the corrected ensembles with "
                  "the nearest-temperature pool, without and with it.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr)):
+    final2 = report({"final2"}, a.results.parent / "phase_f_final", a.doc.parent / "phase_f_final.md",
+                    "Phase F: the recipe in one run",
+                    "Development BAs: " + common +
+                    "One run of the recipe after phase F: the phase E members (additive model with special days and, at ISO-NE and "
+                    "CAISO, the PV terms; boosting with the sky features there), their ensemble by recent error, the median correction "
+                    "and the 90 % band read from the 40 known days of the same regime nearest in forecast minimum temperature, at an "
+                    "adaptive level per regime, and the point read at the 60th percentile around the forecast peak.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2)):
         log("no rows to report")
         return 1
     if waiting:
