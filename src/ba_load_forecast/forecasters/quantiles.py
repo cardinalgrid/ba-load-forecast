@@ -129,14 +129,31 @@ class EmpiricalIntervals:
         """(n_days, 24) relative errors on the known days of the window (of one regime when asked)."""
         return self.errors_of(info, self.known_days(info, only_regime))
 
-    def error_pool(self, info: InformationSet) -> np.ndarray:
+    def pool_days(self, info: InformationSet) -> list[date]:
+        """The known days whose errors describe the target day: those of its regime when enough, else all."""
         if self.by_regime:
             r = self.regime_of(info)
             if r is not None:
-                e = self.relative_errors(info, only_regime=r)
-                if len(e) >= self.min_days:
-                    return e
-        return self.relative_errors(info)
+                same = self.known_days(info, only_regime=r)
+                if len(same) >= self.min_days:
+                    return same
+        return self.known_days(info)
+
+    def error_pool(self, info: InformationSet) -> np.ndarray:
+        return self.errors_of(info, self.pool_days(info))
+
+    def peak_errors(self, info: InformationSet, days: list[date]) -> np.ndarray:
+        """The relative error at the hour of the actual peak, one value per known day."""
+        out = []
+        for d in days:
+            p = self._stored[d]
+            hours = pd.date_range(pd.Timestamp(d), periods=24, freq="h")
+            actual = info.load_history.reindex(hours).to_numpy(dtype=float)
+            if np.isfinite(actual).sum() < 20:
+                continue
+            h = int(np.nanargmax(actual))
+            out.append((actual[h] - p[h]) / p[h])
+        return np.array(out)
 
     def band(self, p: np.ndarray, e: np.ndarray, levels: tuple[float, ...]) -> np.ndarray:
         if len(e) < self.min_days:
@@ -179,7 +196,8 @@ class AdaptiveIntervals(EmpiricalIntervals):
 
     def __init__(self, base: Forecaster, target: float = 0.10, gamma: float = 0.02, window_days: int = 120,
                  min_days: int = 20, name: str | None = None, by_regime: bool = False, alpha_by_regime: bool = False,
-                 nearest: int | None = None, tail: bool = False):
+                 nearest: int | None = None, tail: bool = False, peak: str | None = None, peak_window: float = 0.97,
+                 peak_quantile: float = 0.55):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         self.target = target
@@ -187,6 +205,9 @@ class AdaptiveIntervals(EmpiricalIntervals):
         self.alpha_by_regime = alpha_by_regime
         self.nearest = nearest
         self.tail = tail
+        self.peak = peak                      # None, "lift" or "quantile" (see peak_adjust)
+        self.peak_window = peak_window        # hours whose forecast is within this fraction of the forecast maximum
+        self.peak_quantile = peak_quantile
         self.alphas: dict[int | None, float] = {}          # level per regime (key None: the single level)
         self._issued: dict[date, tuple[np.ndarray, np.ndarray]] = {}
         self._scored: set[date] = set()
@@ -216,22 +237,17 @@ class AdaptiveIntervals(EmpiricalIntervals):
             del self._issued[d]
             self._scored.discard(d)
 
-    def error_pool(self, info: InformationSet) -> np.ndarray:
+    def pool_days(self, info: InformationSet) -> list[date]:
+        days = super().pool_days(info)
         if self.nearest is None:
-            return super().error_pool(info)
-        days = self.known_days(info)
+            return days
         tmin = self._tmin.get(info.day, np.nan)
-        if self.by_regime:
-            r = self.regime_of(info)
-            same = [d for d in days if self._regime.get(d) == r] if r is not None else []
-            if len(same) >= self.min_days:
-                days = same
         if np.isfinite(tmin) and len(days) > self.nearest:
             def distance(d):
                 t = self._tmin.get(d, np.nan)
                 return abs(t - tmin) if np.isfinite(t) else np.inf
             days = sorted(days, key=distance)[: self.nearest]
-        return self.errors_of(info, days)
+        return days
 
     def band(self, p: np.ndarray, e: np.ndarray, levels: tuple[float, ...]) -> np.ndarray:
         q = super().band(p, e, levels)
@@ -250,10 +266,46 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 q[-1, h] = p[h] * (1.0 + q90 + high.mean() * np.log(0.10 / (1.0 - hi_level)))
         return np.sort(q, axis=0)
 
+    def peak_adjust(self, info: InformationSet, p: np.ndarray, e: np.ndarray, q: np.ndarray, days: list[date]) -> np.ndarray:
+        """Shift the band upward around the forecast peak.
+
+        The corrected point is a median per hour of the day; the actual peak is a maximum over noisy hours and the
+        error measured at it is biased downward even for an unbiased forecast. ``"lift"`` replaces, at the hours
+        within ``peak_window`` of the forecast maximum, the hourly median correction by the median of the errors
+        measured at the actual peak hour of the pool days (half of the difference at the neighbouring hours);
+        ``"quantile"`` reads the point at ``peak_quantile`` instead of the median at those hours (and at the
+        mid-point between the two at the neighbours). The whole band moves with the point.
+        """
+        window = p >= self.peak_window * np.nanmax(p)
+        weight = window.astype(float)
+        weight[1:] = np.maximum(weight[1:], 0.5 * window[:-1])
+        weight[:-1] = np.maximum(weight[:-1], 0.5 * window[1:])
+        shift = np.zeros(24)
+        if self.peak == "lift":
+            pe = self.peak_errors(info, days)
+            if len(pe) < self.min_days:
+                return q
+            m_peak = float(np.median(pe))
+            for h in range(24):
+                eh = e[:, h]
+                eh = eh[np.isfinite(eh)]
+                shift[h] = weight[h] * p[h] * (m_peak - float(np.median(eh)))
+        elif self.peak == "quantile":
+            for h in range(24):
+                eh = e[:, h]
+                eh = eh[np.isfinite(eh)]
+                level = 0.5 + weight[h] * (self.peak_quantile - 0.5)
+                shift[h] = p[h] * (float(np.quantile(eh, level)) - float(np.median(eh)))
+        return q + np.maximum(shift, 0.0)[None, :]
+
     def predict_quantiles(self, info: InformationSet) -> np.ndarray:
         p = self.predict(info)
         self.update_alpha(info)
         alpha = self.alphas.get(self.level_key(info.day), self.target)
-        q = self.band(p, self.error_pool(info), (alpha / 2.0, 0.5, 1.0 - alpha / 2.0))
+        days = self.pool_days(info)
+        e = self.errors_of(info, days)
+        q = self.band(p, e, (alpha / 2.0, 0.5, 1.0 - alpha / 2.0))
+        if self.peak:
+            q = self.peak_adjust(info, p, e, q, days)
         self._issued[info.day] = (q[0], q[-1])
         return q

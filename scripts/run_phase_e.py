@@ -26,6 +26,10 @@ Every group uses several stations per BA and six years of training. Groups:
 * ``intervals3``: the final recipe's interval against two refinements for the coldest days: the error pool
   restricted to the 40 or 60 known days nearest in forecast minimum temperature, and an exponential tail
   beyond the pool's outer deciles; report in ``results/phase_e_intervals3/``, ``docs/phase_e_intervals3.md``.
+* ``peak``: the final recipe against two corrections of the under-forecast at the daily peak: the hourly median
+  correction replaced, around the forecast peak, by the median error measured at the actual peak hour of the pool
+  days (``lift``), or the point read at the 55th percentile there (``quantile``); report in
+  ``results/phase_e_peak/``, ``docs/phase_e_peak.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -94,6 +98,15 @@ def final_models(ba: str | None) -> list:
     return [add_f, boo_f, ens_f, AdaptiveIntervals(ens_f, **FINAL_INTERVAL, name="final")]
 
 
+def peak_models(ba: str | None) -> list:
+    add_f, boo_f, ens_f = final_members(ba)
+    return [add_f, boo_f, ens_f,
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, name="final"),
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, peak="lift", name="final_peak_lift"),
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, peak="quantile", name="final_peak_q55"),
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, peak="quantile", peak_quantile=0.60, name="final_peak_q60")]
+
+
 def intervals3_models(ba: str | None) -> list:
     add_f, boo_f, ens_f = final_members(ba)
     return [add_f, boo_f, ens_f,
@@ -115,6 +128,8 @@ def group_models(group: str, ba: str | None = None) -> list:
         return final_models(ba)
     if group == "intervals3":
         return intervals3_models(ba)
+    if group == "peak":
+        return peak_models(ba)
     add, boo, ens = corrected_ensemble()
     regime = dict(by_regime=True, window_days=365)
     groups = {
@@ -187,7 +202,7 @@ def main(argv=None) -> int:
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                solar = group in ("final", "intervals3") and ba in PV_BAS
+                solar = group in ("final", "intervals3", "peak") and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar)
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
@@ -270,7 +285,14 @@ def main(argv=None) -> int:
                  "`final_nn40` and `final_nn60` restrict the pool to the 40 or 60 known days nearest to the target day in forecast "
                  "daily minimum temperature; `final_tail` reads the outer quantiles from an exponential fitted beyond the pool's "
                  "10th and 90th percentiles; `final_nn40_tail` does both.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3)):
+    peak = report({"peak"}, a.results.parent / "phase_e_peak", a.doc.parent / "phase_e_peak.md",
+                  "Phase E: the under-forecast at the daily peak",
+                  "Development BAs: " + common +
+                  "`final` is the recipe; `final_peak_lift` replaces the hourly median correction, at the hours within 3 % of the "
+                  "forecast maximum, by the median of the errors measured at the actual peak hour of the pool days; `final_peak_q55` and "
+                  "`final_peak_q60` read the point at the 55th or 60th percentile of the errors at those hours instead of the median. "
+                  "The 90 % band moves with the point.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak)):
         log("no rows to report")
         return 1
     if waiting:
