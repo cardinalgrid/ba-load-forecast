@@ -112,7 +112,8 @@ class Loader:
     def __init__(self, tidy_dir: Path, isd_dir: Path, hrrr_dir: Path, history_days: int = 730,
                  init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
                  stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
-                 sky: bool = False, cloud_dir: Path | None = None, pv: bool = False):
+                 sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
+                 dswrf_dir: Path | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -138,6 +139,10 @@ class Loader:
         self._pv: dict[str, pd.Series] | None = None
         self.cloud_dir = Path(cloud_dir) if cloud_dir else self.hrrr_dir.parent / "cloud"
         self._cloud: dict[str, pd.Series | None] = {}
+        # irradiance=True attaches the forecast surface short-wave flux as seen at the cut-off (hrrr_grib extraction)
+        self.irradiance = irradiance
+        self.dswrf_dir = Path(dswrf_dir) if dswrf_dir else self.hrrr_dir.parent / "dswrf"
+        self._dswrf: dict[str, pd.Series | None] = {}
         self._latlon: dict[str, tuple[float, float]] = {}
 
     def latlon(self, ba: str) -> tuple[float, float]:
@@ -149,11 +154,18 @@ class Loader:
     def cloud_series(self, ba: str) -> pd.Series | None:
         """Cloud cover (percent) forecast for every local hour by the run available at that day's cut-off,
         mean over the BA's stations; None when no station has a cloud extraction."""
-        if ba not in self._cloud:
-            tables = [run_table(load_station(self.cloud_dir, icao), "cloud_pct") for icao in self.stations_of(ba)]
+        return self.as_seen_series(ba, self._cloud, self.cloud_dir, "cloud_pct")
+
+    def dswrf_series(self, ba: str) -> pd.Series | None:
+        """Forecast surface short-wave flux (W/m2) as seen at the cut-off, mean over the BA's stations."""
+        return self.as_seen_series(ba, self._dswrf, self.dswrf_dir, "dswrf_wm2")
+
+    def as_seen_series(self, ba: str, cache: dict, folder: Path, field: str) -> pd.Series | None:
+        if ba not in cache:
+            tables = [run_table(load_station(folder, icao), field) for icao in self.stations_of(ba)]
             tables = [t for t in tables if t[0]]
             if not tables:
-                self._cloud[ba] = None
+                cache[ba] = None
             else:
                 inits = sorted(i for t in tables for i in t[0])
                 first, last = inits[0].date(), (inits[-1] + pd.Timedelta(days=2)).date()
@@ -165,8 +177,8 @@ class Loader:
                     v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
                     return float(off.median()) if np.isnan(v) else float(v)
 
-                self._cloud[ba] = forecast_as_seen(tables, all_days(first, last), offset_of_day, self.init_hours)
-        return self._cloud[ba]
+                cache[ba] = forecast_as_seen(tables, all_days(first, last), offset_of_day, self.init_hours)
+        return cache[ba]
 
     def stations_of(self, ba: str) -> list[str]:
         if self.stations == "multi" and ba in BA_STATIONS_MULTI:
@@ -300,7 +312,8 @@ class Loader:
                 if self._pv is None:
                     self._pv = pv_capacity()
                 pv = self._pv.get(ba)
-            sky = sky_frame(history_index.union(hours), off, lat, lon, self.cloud_series(ba), pv=pv)
+            sky = sky_frame(history_index.union(hours), off, lat, lon, self.cloud_series(ba), pv=pv,
+                            dswrf=self.dswrf_series(ba) if self.irradiance else None)
 
         persist = np.full(24, np.nan)
         for h in range(24):

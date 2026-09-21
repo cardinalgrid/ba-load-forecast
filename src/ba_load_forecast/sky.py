@@ -18,6 +18,10 @@ reads the monthly capacity behind each BA's load (``docs/pv_capacity_monthly.csv
 ``scripts/pv_capacity.py`` from Forms EIA-861M and EIA-860M) and ``PV_COLUMNS`` scale the geometry by it:
 ``pv_cap`` (MW), ``pv_clear = pv_cap * sun`` (a clear-sky output proxy, available for the whole history) and
 ``pv_est = pv_clear * (1 - cloud / 100)`` (missing where the cloud cover is).
+
+When the forecast surface short-wave flux is available (``hrrr_grib``, W/m², from December 2020), ``dswrf`` carries
+it as seen at the cut-off, like the cloud cover, and ``pv_irr = pv_cap * dswrf / 1000`` is the capacity scaled by
+it: the closest thing to the operators' own solar estimate that public data allow.
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ from .cutoff import lead_hours, run_for_day
 
 SKY_COLUMNS = ["sun", "cloud", "sun_clear"]
 PV_COLUMNS = ["pv_cap", "pv_clear", "pv_est"]
+IRRADIANCE_COLUMNS = ["dswrf", "pv_irr"]
 PV_TABLE = Path(__file__).resolve().parents[2] / "docs" / "pv_capacity_monthly.csv"
 
 
@@ -91,7 +96,7 @@ def forecast_as_seen(tables: list[tuple[dict, np.ndarray]], days: list[date], of
 
 
 def sky_frame(local_hours: pd.DatetimeIndex, offsets: pd.Series, lat: float, lon: float, cloud: pd.Series | None,
-              pv: pd.Series | None = None) -> pd.DataFrame:
+              pv: pd.Series | None = None, dswrf: pd.Series | None = None) -> pd.DataFrame:
     """``SKY_COLUMNS`` for the local hours given (``offsets``: hours behind UTC per local hour), plus ``PV_COLUMNS``
     when ``pv`` (monthly installed capacity, MW) is given: the month's value is held through the month."""
     off = offsets.reindex(local_hours)
@@ -107,6 +112,10 @@ def sky_frame(local_hours: pd.DatetimeIndex, offsets: pd.Series, lat: float, lon
         out["pv_cap"] = cap.reindex(months).to_numpy(dtype=float)
         out["pv_clear"] = out["pv_cap"] * out["sun"]
         out["pv_est"] = out["pv_clear"] * (1.0 - out["cloud"] / 100.0)
+    if dswrf is not None:
+        out["dswrf"] = dswrf.reindex(local_hours).to_numpy(dtype=float)
+        if pv is not None:
+            out["pv_irr"] = out["pv_cap"] * out["dswrf"] / 1000.0
     return out
 
 

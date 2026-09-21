@@ -30,6 +30,9 @@ Every group uses several stations per BA and six years of training. Groups:
   correction replaced, around the forecast peak, by the median error measured at the actual peak hour of the pool
   days (``lift``), or the point read at the 55th percentile there (``quantile``); report in
   ``results/phase_e_peak/``, ``docs/phase_e_peak.md``.
+* ``irradiance``: on ISO-NE and CAISO, the recipe (nearest-temperature pool) with the forecast surface short-wave flux
+  from the HRRR GRIB2 archive, as seen at the cut-off, in the boosting and, times the PV capacity, in the additive
+  model, against the same recipe without it; report in ``results/phase_e_irradiance/``, ``docs/phase_e_irradiance.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -69,8 +72,8 @@ def log(msg: str) -> None:
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}", flush=True)
 
 
-def loader(a, sky: bool = False, pv: bool = False) -> Loader:
-    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv)
+def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False) -> Loader:
+    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance)
 
 
 def corrected_ensemble():
@@ -81,13 +84,21 @@ def corrected_ensemble():
     return add, boo, ens
 
 
-def final_members(ba: str | None):
+def final_members(ba: str | None, irradiance: bool = False, suffix: str = ""):
     """The frozen recipe's members for one BA: PV terms and sky features only where solar behind the load matters."""
     solar = ba in PV_BAS
-    add_f = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
-    boo_f = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
-    ens_f = Cached(Ensemble([add_f, boo_f], weighting="recent", name="final_ensemble"))
+    add_f = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, irradiance=irradiance, name=f"final_additive{suffix}"))
+    boo_f = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name=f"final_boosting{suffix}"))
+    ens_f = Cached(Ensemble([add_f, boo_f], weighting="recent", name=f"final_ensemble{suffix}"))
     return add_f, boo_f, ens_f
+
+
+def irradiance_models(ba: str | None) -> list:
+    add_f, boo_f, ens_f = final_members(ba)
+    add_i, boo_i, ens_i = final_members(ba, irradiance=True, suffix="_irr")
+    return [add_f, add_i, boo_f, boo_i, ens_f, ens_i,
+            AdaptiveIntervals(ens_f, **FINAL_INTERVAL, nearest=40, name="final_nn40"),
+            AdaptiveIntervals(ens_i, **FINAL_INTERVAL, nearest=40, name="final_nn40_irr")]
 
 
 FINAL_INTERVAL = dict(by_regime=True, window_days=365, alpha_by_regime=True)
@@ -130,6 +141,8 @@ def group_models(group: str, ba: str | None = None) -> list:
         return intervals3_models(ba)
     if group == "peak":
         return peak_models(ba)
+    if group == "irradiance":
+        return irradiance_models(ba)
     add, boo, ens = corrected_ensemble()
     regime = dict(by_regime=True, window_days=365)
     groups = {
@@ -197,13 +210,14 @@ def main(argv=None) -> int:
     waiting = []
     if not a.report_only:
         for group in a.groups:
-            for ba in (SKY_BAS if group == "sky" else PV_BAS if group in ("pv", "pv2") else a.bas):
+            for ba in (SKY_BAS if group == "sky" else PV_BAS if group in ("pv", "pv2", "irradiance") else a.bas):
                 f = a.out / f"{group}_{ba}.parquet"
                 if f.exists():
                     log(f"{group} {ba}: done already")
                     continue
-                solar = group in ("final", "intervals3", "peak") and ba in PV_BAS
-                ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar)
+                solar = group in ("final", "intervals3", "peak", "irradiance") and ba in PV_BAS
+                ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
+                            irradiance=group == "irradiance")
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -292,7 +306,14 @@ def main(argv=None) -> int:
                   "forecast maximum, by the median of the errors measured at the actual peak hour of the pool days; `final_peak_q55` and "
                   "`final_peak_q60` read the point at the 55th or 60th percentile of the errors at those hours instead of the median. "
                   "The 90 % band moves with the point.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak)):
+    irr = report({"irradiance"}, a.results.parent / "phase_e_irradiance", a.doc.parent / "phase_e_irradiance.md",
+                 "Phase F: forecast irradiance as a feature",
+                 "BAs with large solar behind the load: " + common +
+                 "`*_irr` models receive the HRRR forecast surface short-wave flux as seen at each day's cut-off (GRIB2 archive, "
+                 "from December 2020): the boosting as a column, the additive model as the installed PV capacity times the flux, in "
+                 "place of the capacity times the cloud fraction. `final_nn40` and `final_nn40_irr` are the corrected ensembles with "
+                 "the nearest-temperature pool, without and with it.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr)):
         log("no rows to report")
         return 1
     if waiting:

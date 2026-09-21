@@ -23,12 +23,13 @@ from scipy.interpolate import BSpline
 
 from ..features import EXTREME_COLUMNS, rows_for_days, target_temperature, training_days
 from ..information_set import InformationSet
-from ..sky import PV_COLUMNS, SKY_COLUMNS
+from ..sky import IRRADIANCE_COLUMNS, PV_COLUMNS, SKY_COLUMNS
 from .base import ForecastError
 
 SMOOTH = ("t", "t_ma24", "t_day_max", "t_day_min")
 LINEAR = ("l_last_known", "l_d7", "l_mean24", "trend")
 PV_LINEAR = ("pv_clear", "pv_cloud")
+PV_IRRADIANCE = ("pv_clear", "pv_irr")
 
 
 class SplineBasis:
@@ -49,8 +50,9 @@ class AdditiveModel:
     def __init__(self, train_days: int = 730, refit_days: int = 7, n_knots: int = 6,
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
-                 labels=None, name: str | None = None, extremes: bool = False, pv: bool = False):
+                 labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False):
         self.pv = pv                          # linear PV terms (PV_LINEAR) from the sky frame; needs Loader(sky=True, pv=True)
+        self.irradiance = irradiance          # with pv: capacity times the forecast irradiance instead of times the cloud fraction
         self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS) as linear regressors
         self.train_days = train_days
         self.refit_days = refit_days
@@ -88,7 +90,7 @@ class AdditiveModel:
             for c in EXTREME_COLUMNS:
                 cols.append(rows[c].to_numpy(dtype=float))
         if self.pv:
-            for c in PV_LINEAR:
+            for c in (PV_IRRADIANCE if self.irradiance else PV_LINEAR):
                 cols.append(rows[c].to_numpy(dtype=float))
         return np.column_stack([c if c.ndim == 2 else c[:, None] for c in cols])
 
@@ -114,7 +116,12 @@ class AdditiveModel:
             if "pv_clear" not in rows.columns:
                 raise ForecastError("pv=True needs Loader(sky=True, pv=True) and a capacity table for the BA")
             rows["pv_cloud"] = rows["pv_clear"] * rows["cloud"].fillna(0.0) / 100.0
-            rows = rows.drop(columns=[c for c in SKY_COLUMNS + PV_COLUMNS if c in rows.columns and c != "pv_clear"])
+            if self.irradiance:
+                if "pv_irr" not in rows.columns:
+                    raise ForecastError("irradiance=True needs Loader(irradiance=True) and a DSWRF extraction for the BA")
+                rows["pv_irr"] = rows["pv_irr"].fillna(0.0)          # no irradiance forecast before December 2020
+            keep = {"pv_clear", "pv_cloud"} | ({"pv_irr"} if self.irradiance else set())
+            rows = rows.drop(columns=[c for c in SKY_COLUMNS + PV_COLUMNS + IRRADIANCE_COLUMNS if c in rows.columns and c not in keep])
         return rows
 
     # ---- fit / predict -------------------------------------------------------------------------------

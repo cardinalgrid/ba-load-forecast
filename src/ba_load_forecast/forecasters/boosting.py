@@ -17,7 +17,7 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 
 from ..features import EXTREME_COLUMNS, FEATURE_COLUMNS, rows_for_days, target_temperature, training_days
 from ..information_set import InformationSet
-from ..sky import PV_COLUMNS, SKY_COLUMNS
+from ..sky import IRRADIANCE_COLUMNS, PV_COLUMNS, SKY_COLUMNS
 from .base import ForecastError
 
 
@@ -64,7 +64,7 @@ class Boosting:
         if self.extremes:
             cols += EXTREME_COLUMNS
         if self.sky and "sun" in rows.columns:
-            cols += [c for c in SKY_COLUMNS + PV_COLUMNS if c in rows.columns]
+            cols += [c for c in SKY_COLUMNS + PV_COLUMNS + IRRADIANCE_COLUMNS if c in rows.columns]
         return cols
 
     def needs_fit(self, info: InformationSet) -> bool:
