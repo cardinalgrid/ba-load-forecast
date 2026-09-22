@@ -27,5 +27,6 @@ def test_apply_hour_bias_moves_each_path_hour_by_its_local_hour():
     path = np.zeros(39)
     bias = np.arange(24, dtype=float)
     out = apply_hour_bias(path, path_ts, bias)
-    assert out[0] == 9.0 and out[-1] == 23.0
+    assert out[0] == 9.0
+    assert out[-1] == 23.0
     assert out[15] == 0.0                                                # 00:00 of the target day
