@@ -25,6 +25,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from grid_sentinel.calendar_us import day_types, special_days
+from grid_sentinel.consistency import day_is_plausible, forecast_is_plausible, neighbour_spikes
 from grid_sentinel.data import load_series_local, tidy_frame, utc_offset
 from grid_sentinel.stations import BA_STATION
 from grid_sentinel.weather import fetch_isd_lite, hourly_temperature_f, read_isd_lite
@@ -104,24 +105,16 @@ LABEL_OFFSETS = Path(__file__).resolve().parents[2] / "docs" / "hour_label_offse
 
 
 def jumps(actual: np.ndarray, limit: float = JUMP) -> np.ndarray:
-    """True at the hours whose value is more than ``limit`` (relative) away from the mean of their neighbours.
-    The first and last hour are judged against their single neighbour. A BA-level load does not move by 40 %
-    from one hour to the next and back; such hours are telemetry or reporting faults."""
-    a = np.asarray(actual, dtype=float)
-    out = np.zeros(len(a), dtype=bool)
-    for h in range(len(a)):
-        nb = [a[k] for k in (h - 1, h + 1) if 0 <= k < len(a) and np.isfinite(a[k])]
-        if nb and np.isfinite(a[h]):
-            ref = float(np.mean(nb))
-            out[h] = ref > 0 and abs(a[h] - ref) / ref > limit
-    return out
+    """The Sentinel's spike mask (``grid_sentinel.consistency.neighbour_spikes``): an hour far both from its
+    neighbours and from the day's level. Kept under this name for the callers of the first protocol."""
+    return neighbour_spikes(actual, limit)
 
 
 def plausible(actual: np.ndarray, reference: float, jump: float | None = JUMP) -> bool:
     """False when any hour of the day that occurred is a gross fault against the recent median, or (with
-    ``jump``) a spike against its neighbours."""
+    ``jump``) a spike against its neighbours and the day's level."""
     a = np.asarray(actual, dtype=float)
-    if jump is not None and jumps(a, jump).any():
+    if jump is not None and not day_is_plausible(a, jump):
         return False
     if np.isnan(reference) or reference <= 0:
         return True
@@ -130,14 +123,13 @@ def plausible(actual: np.ndarray, reference: float, jump: float | None = JUMP) -
 
 
 def forecast_plausible(forecast: np.ndarray, actual: np.ndarray, limit: float = FORECAST_FAULT) -> bool:
-    """False when the published forecast is missing, non-positive or more than ``limit`` (relative) away from
-    the outcome at any hour where both exist: a reporting fault of the benchmark, on which no model is scored."""
+    """The Sentinel's verdict on a published forecast (``grid_sentinel.consistency.forecast_is_plausible``):
+    False when it is missing, non-positive or more than ``limit`` (relative) away from the outcome at any
+    hour where both exist. A reporting fault of the benchmark, on which no model is scored."""
     f = np.asarray(forecast, dtype=float)
-    a = np.asarray(actual, dtype=float)
-    if f.shape != (24,) or np.isnan(f).any() or (f <= 0).any():
+    if f.shape != (24,):
         return False
-    both = np.isfinite(a) & (a > 0)
-    return bool(np.all(np.abs(f[both] / a[both] - 1.0) <= limit))
+    return forecast_is_plausible(f, np.asarray(actual, dtype=float), limit, n_hours=24)
 
 
 def label_offsets(path: Path | None = None) -> pd.DataFrame:
