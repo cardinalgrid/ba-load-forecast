@@ -187,7 +187,7 @@ def ens2_models(ba: str | None) -> list:
 FINAL3 = dict(                 # what phase G adds to the recipe; set from the feat, hp and ens2 reports before the final3 run
     extra_additive=(), extra_boosting=(), sun_everywhere=False,
     boosting=dict(), additive=dict(), train_days=TRAIN_DAYS,
-    weighting="recent", third_member=False, ratio=False, nearest=40,
+    weighting="recent", third_member=False, ratio=False, nearest=40, temp_bias_days=0,
 )
 
 
@@ -329,7 +329,7 @@ def main(argv=None) -> int:
                 solar = group in PER_BA_GROUPS and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
-                            temp_bias_days=30 if group == "tbias" else 0)
+                            temp_bias_days=30 if group == "tbias" else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0)
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
