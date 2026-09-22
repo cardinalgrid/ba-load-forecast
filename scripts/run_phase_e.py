@@ -184,10 +184,10 @@ def ens2_models(ba: str | None) -> list:
             AdaptiveIntervals(ens, **dict(final, nearest=50), name="final2_nn50")]
 
 
-FINAL3 = dict(                 # what phase G adds to the recipe; set from the feat, hp and ens2 reports before the final3 run
-    extra_additive=(), extra_boosting=(), sun_everywhere=False,
+FINAL3 = dict(                 # what phase G adds to the recipe (set from the feat, hp and ens2 reports; see docs/methods.md)
+    extra_additive=("load", "temp"), extra_boosting=("load", "temp"), sun_everywhere=False,
     boosting=dict(), additive=dict(), train_days=TRAIN_DAYS,
-    weighting="recent", third_member=False, ratio=False, nearest=40, temp_bias_days=0,
+    weighting="recent", third_member=True, ratio=False, nearest=40, temp_bias_days=0,
 )
 
 
