@@ -211,6 +211,10 @@ interval coverage is where the development left it: at the nominal level over th
 Against `DF` with its own hourly bias removed the recipe is ahead at SPP only. The public data's forecasts
 are beaten in three years the recipe never saw; the forecasters are not.
 
+## Protocol v2: the benchmark with its labels fixed (`docs/phase_g_protocol.md`)
+
+After the frozen run the evaluation gained three data rules: a day with a reporting fault in the published forecast (missing, zero, or more than 50 % off the outcome at any hour) or a spike in the outcome (an hour more than 40 % off its neighbours) is left out for everyone, and the documented hour-label offsets of the published series are applied on reading (PJM's forecast one hour early from February 2019, CAISO's demand one hour late from 14 June 2022, both checked against the operators' own published data). The recipe barely moves (2.54 %); the benchmark improves to 2.69 % (PJM 2.45 %, CAISO 2.38 %). Under these rules the recipe is ahead by 0.15 point on the development period, better on 53 % of the days, ahead at PJM, SPP, MISO and NYISO, level at FPL, behind at the other six. This is the evaluation used from here on.
+
 ## Layout
 
 | Module | Responsibility |
