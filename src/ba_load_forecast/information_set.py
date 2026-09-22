@@ -132,6 +132,33 @@ def forecast_plausible(forecast: np.ndarray, actual: np.ndarray, limit: float = 
     return forecast_is_plausible(f, np.asarray(actual, dtype=float), limit, n_hours=24)
 
 
+def hourly_bias_table(observed: pd.Series, seen: pd.Series) -> pd.DataFrame:
+    """Days in rows, local hours in columns: observed minus forecast-as-seen-at-the-cut-off, in degrees."""
+    e = (observed.asfreq("h") - seen.reindex(observed.asfreq("h").index)).dropna()
+    if e.empty:
+        return pd.DataFrame(columns=range(24))
+    return pd.DataFrame({"day": e.index.normalize(), "hour": e.index.hour, "e": e.to_numpy()}).pivot(
+        index="day", columns="hour", values="e").reindex(columns=range(24))
+
+
+def rolling_hour_bias(table: pd.DataFrame, day: date, window_days: int, min_days: int = 10) -> np.ndarray:
+    """The median error of the forecast per local hour over the ``window_days`` days ending two days before
+    ``day`` (the last day fully known at the cut-off); zero where fewer than ``min_days`` errors exist."""
+    if table.empty:
+        return np.zeros(24)
+    last = pd.Timestamp(day) - pd.Timedelta(days=2)
+    rows = table.loc[last - pd.Timedelta(days=window_days - 1): last]
+    med = rows.median(axis=0, skipna=True).where(rows.count(axis=0) >= min_days, 0.0)
+    return med.reindex(range(24)).fillna(0.0).to_numpy(dtype=float)
+
+
+def apply_hour_bias(path: np.ndarray, path_ts: pd.DatetimeIndex, bias: np.ndarray) -> np.ndarray:
+    """Add the local-hour bias to a temperature path (observed minus forecast: the forecast is moved toward
+    what has been observed at that hour lately)."""
+    hours = pd.DatetimeIndex(path_ts).hour.to_numpy()
+    return np.asarray(path, dtype=float) + np.asarray(bias, dtype=float)[hours]
+
+
 def label_offsets(path: Path | None = None) -> pd.DataFrame:
     """The documented hour-label offsets of the published series (``docs/hour_label_offsets.csv``)."""
     p = Path(path) if path else LABEL_OFFSETS
@@ -175,13 +202,17 @@ class Loader:
                  init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
                  stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
-                 dswrf_dir: Path | None = None, align_labels: bool = True):
+                 dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
         repairs the load history with grid-data-sentinel (``cleaning.sentinel_clean``, one year at a time, warmed
         up on the year before) before the gross-fault guard; the outcome is never cleaned."""
         self.cleaning = cleaning
+        # temp_bias_days > 0: the HRRR temperature path of the target day is corrected by the median of the forecast's
+        # own error per local hour over that many known days (forecast as seen at the cut-off against the observation)
+        self.temp_bias_days = temp_bias_days
+        self._bias_tables: dict[tuple[str, str], pd.DataFrame] = {}
         # align_labels applies the documented hour-label offsets of the published series (docs/hour_label_offsets.csv)
         self.offsets = label_offsets() if align_labels else pd.DataFrame(columns=["ba", "column", "start", "end", "shift_hours"])
         self.tidy_dir = Path(tidy_dir)
@@ -243,6 +274,42 @@ class Loader:
 
                 cache[ba] = forecast_as_seen(tables, all_days(first, last), offset_of_day, self.init_hours)
         return cache[ba]
+
+    def temp_seen_series(self, ba: str, icao: str) -> pd.Series | None:
+        """The 2 m temperature forecast for every local hour by the run available at that day's cut-off, one station."""
+        cache: dict = self.__dict__.setdefault("_temp_seen", {})
+        key = (ba, icao)
+        if key not in cache:
+            table = run_table(self.hrrr(icao), "temp_f")
+            if not table[0]:
+                cache[key] = None
+            else:
+                inits = sorted(table[0])
+                first, last = inits[0].date(), (inits[-1] + pd.Timedelta(days=2)).date()
+
+                def offset_of_day(d):
+                    off = self.offset(ba, d.year)
+                    if off.empty:
+                        return np.nan
+                    v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
+                    return float(off.median()) if np.isnan(v) else float(v)
+
+                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.init_hours)
+        return cache[key]
+
+    def hour_bias(self, ba: str, icao: str, day: date) -> np.ndarray:
+        """The forecast's recent bias per local hour at one station, known at the cut-off of ``day``."""
+        key = (ba, icao)
+        if key not in self._bias_tables:
+            seen = self.temp_seen_series(ba, icao)
+            if seen is None:
+                self._bias_tables[key] = pd.DataFrame(columns=range(24))
+            else:
+                years = range(seen.index.min().year, seen.index.max().year + 1)
+                observed = pd.concat([self.station_temperature(icao, ba, y) for y in years])
+                observed = observed[~observed.index.duplicated()].sort_index()
+                self._bias_tables[key] = hourly_bias_table(observed, seen)
+        return rolling_hour_bias(self._bias_tables[key], day, self.temp_bias_days)
 
     def stations_of(self, ba: str) -> list[str]:
         if self.stations == "multi" and ba in BA_STATIONS_MULTI:
@@ -356,6 +423,8 @@ class Loader:
         for icao in stations:
             rows = self.hrrr(icao)
             paths[icao] = forecast_path(rows, day, off_path, run) if run is not None and len(rows) else np.full(PATH_HOURS, np.nan)
+            if self.temp_bias_days and run is not None and len(rows):
+                paths[icao] = apply_hour_bias(paths[icao], path_ts, self.hour_bias(ba, icao, day))
         path_frame = pd.DataFrame(paths, index=path_ts)
         temp_path = path_frame.mean(axis=1, skipna=False).to_numpy() if len(stations) > 1 else path_frame.iloc[:, 0].to_numpy()
         temp_fc = temp_path[-24:]

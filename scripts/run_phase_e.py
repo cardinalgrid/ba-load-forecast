@@ -47,6 +47,8 @@ Every group uses several stations per BA and six years of training. Groups:
   knots, validation window, penalty grid; training length); report ``docs/phase_g_parameters.md``.
 * ``ens2``: the corrected ensemble with hourly weights, with the recency regression as a third member, with the
   boosting on a ratio target, and with a trimmed-mean correction; report ``docs/phase_g_ensemble.md``.
+* ``tbias``: the phase F recipe with the HRRR temperature path corrected by its own recent bias per local hour
+  (``Loader(temp_bias_days=30)``); report ``docs/phase_g_tbias.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -87,8 +89,9 @@ def log(msg: str) -> None:
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}", flush=True)
 
 
-def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False) -> Loader:
-    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance)
+def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0) -> Loader:
+    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
+                  temp_bias_days=temp_bias_days)
 
 
 def corrected_ensemble():
@@ -244,6 +247,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
     "final3": final3_models, "frozen3": final3_models,
+    "tbias": final2_models,
 }
 
 
@@ -324,7 +328,8 @@ def main(argv=None) -> int:
                     continue
                 solar = group in PER_BA_GROUPS and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
-                            irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS))
+                            irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
+                            temp_bias_days=30 if group == "tbias" else 0)
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -468,7 +473,12 @@ def main(argv=None) -> int:
                      "The recipe after phase G on 2023 to 2025 under protocol v2. This is a second look at these years: the choices of "
                      "phase G were made on the development period, but the frozen run of `final2` had already been seen; the honest "
                      "reading compares this table with `docs/frozen_evaluation.md` and treats the difference as an estimate, not a proof.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3)):
+    tbias = report({"tbias"}, a.results.parent / "phase_g_tbias", a.doc.parent / "phase_g_tbias.md",
+                   "Phase G: the temperature forecast corrected by its own recent bias", g_common +
+                   "The phase F recipe with the HRRR 2 m temperature path of every station moved by the median of the forecast's own "
+                   "error at that local hour over the last 30 known days (forecast as seen at the cut-off against the airport observation). "
+                   "Compare with `docs/phase_g_protocol.md` (same recipe, no correction).")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias)):
         log("no rows to report")
         return 1
     if waiting:
