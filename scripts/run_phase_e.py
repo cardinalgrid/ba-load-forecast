@@ -181,6 +181,33 @@ def ens2_models(ba: str | None) -> list:
             AdaptiveIntervals(ens, **dict(final, nearest=50), name="final2_nn50")]
 
 
+FINAL3 = dict(                 # what phase G adds to the recipe; set from the feat, hp and ens2 reports before the final3 run
+    extra_additive=(), extra_boosting=(), sun_everywhere=False,
+    boosting=dict(), additive=dict(), train_days=TRAIN_DAYS,
+    weighting="recent", third_member=False, ratio=False, nearest=40,
+)
+
+
+def final3_models(ba: str | None) -> list:
+    """The phase G recipe: the phase F recipe with the options of ``FINAL3``."""
+    from ba_load_forecast.forecasters.recency import RecencyRegression
+
+    c = FINAL3
+    solar = ba in PV_BAS
+    add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
+                               **c["additive"], name="final3_additive"))
+    boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
+                          target="ratio" if c["ratio"] else "level", **c["boosting"], name="final3_boosting"))
+    members = [add, boo]
+    if c["third_member"]:
+        rec = RecencyRegression(train_days=c["train_days"])
+        rec.name = "final3_recency"
+        members.append(Cached(rec))
+    ens = Cached(Ensemble(members, weighting=c["weighting"], name="final3_ensemble"))
+    return [*members, ens,
+            AdaptiveIntervals(ens, **FINAL_INTERVAL, nearest=c["nearest"], peak="quantile", peak_quantile=0.60, name="final3")]
+
+
 def final_models(ba: str | None) -> list:
     add_f, boo_f, ens_f = final_members(ba)
     return [add_f, boo_f, ens_f, AdaptiveIntervals(ens_f, **FINAL_INTERVAL, name="final")]
@@ -216,6 +243,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final2": final2_models, "frozen": final2_models,      # frozen: the same recipe, on other days
     "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
+    "final3": final3_models, "frozen3": final3_models,
 }
 
 
@@ -431,7 +459,16 @@ def main(argv=None) -> int:
                   "`ens_hourly` weights the members per hour of the day; `ens_three` adds the recency regression; `ens_ratio` uses "
                   "a boosting trained on the load divided by the last known 24 h mean; `final2_*` are the corrected versions with "
                   "the recipe's correction; `final2_nn30` and `final2_nn50` change the size of the nearest-temperature pool.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2)):
+    final3 = report({"final3"}, a.results.parent / "phase_g_final", a.doc.parent / "phase_g_final.md",
+                    "Phase G: the recipe after phase G, in one run", g_common +
+                    "The phase F recipe with what phase G added (see `docs/methods.md`), run once on the development period.")
+    frozen3 = report({"frozen3"}, a.results.parent / "frozen3_2023_2025", a.doc.parent / "frozen_evaluation_v2.md",
+                     "Second look at 2023 to 2025: the recipe after phase G, under protocol v2",
+                     "Development BAs: " + common +
+                     "The recipe after phase G on 2023 to 2025 under protocol v2. This is a second look at these years: the choices of "
+                     "phase G were made on the development period, but the frozen run of `final2` had already been seen; the honest "
+                     "reading compares this table with `docs/frozen_evaluation.md` and treats the difference as an estimate, not a proof.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3)):
         log("no rows to report")
         return 1
     if waiting:
