@@ -1,6 +1,7 @@
 """Synthetic public data in the layouts the loaders expect: tidy EIA-930, ISD-Lite and the HRRR extraction."""
 
 import gzip
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -104,3 +105,11 @@ def public_data(tmp_path):
     write_isd(isd, "724080", "13739", "2023-11-30 00:00", "2024-01-22 00:00")
     write_hrrr(hrrr, "KPHL", "2024-01-15 12:00")
     return tidy, isd, hrrr
+
+
+@pytest.fixture(autouse=True)
+def no_label_offsets(monkeypatch):
+    """The synthetic fixtures carry no hour-label faults: the documented offsets of the real series stay out of the tests."""
+    from ba_load_forecast import information_set
+
+    monkeypatch.setattr(information_set, "LABEL_OFFSETS", Path("no-such-offsets.csv"))

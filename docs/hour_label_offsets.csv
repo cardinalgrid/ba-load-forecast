@@ -1,0 +1,3 @@
+ba,column,start,end,shift_hours,checked_against,note
+PJM,forecast,2019-02-01,,1,PJM Data Miner 2 (hrl_load_metered RTO and load_frcstd_hist RTO; five days from 2018 to 2024),"the published DF value stamped t belongs to hour t+1 (hour beginning submitted as hour ending); published labels are right through January 2019; weekly test flips between the weeks ending 27 January and 3 February 2019"
+CISO,demand,2022-06-14,,-1,CAISO OASIS (SLD_FCST ACTUAL and DAM; CA ISO-TAC; whole months from January 2022 to January 2025),"the published D value stamped t belongs to hour t-1; DF equals CAISO's day-ahead forecast exactly; daily test flips on 14 June 2022"

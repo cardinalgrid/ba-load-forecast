@@ -68,6 +68,7 @@ class InformationSet:
     day_type: int
     special_day: int | None
     actual_plausible: bool = True
+    benchmark_plausible: bool = True                            # the published forecast is free of reporting faults
     stations: list[str] = field(default_factory=list)
     temp_history_stations_f: pd.DataFrame | None = None       # one column per station, aligned with load_history
     temp_forecast_path_stations_f: pd.DataFrame | None = None  # one column per station, indexed by path_timestamps
@@ -97,13 +98,82 @@ def gross_guard(load: pd.Series) -> pd.Series:
     return load.mask(bad)
 
 
-def plausible(actual: np.ndarray, reference: float) -> bool:
-    """False when any hour of the day that occurred is a gross fault against the recent median."""
+JUMP = 0.4              # an hour more than this far from the mean of its two neighbours is a reporting fault, not load
+FORECAST_FAULT = 0.5    # a published forecast more than this far from the outcome at any hour is a reporting fault
+LABEL_OFFSETS = Path(__file__).resolve().parents[2] / "docs" / "hour_label_offsets.csv"
+
+
+def jumps(actual: np.ndarray, limit: float = JUMP) -> np.ndarray:
+    """True at the hours whose value is more than ``limit`` (relative) away from the mean of their neighbours.
+    The first and last hour are judged against their single neighbour. A BA-level load does not move by 40 %
+    from one hour to the next and back; such hours are telemetry or reporting faults."""
     a = np.asarray(actual, dtype=float)
+    out = np.zeros(len(a), dtype=bool)
+    for h in range(len(a)):
+        nb = [a[k] for k in (h - 1, h + 1) if 0 <= k < len(a) and np.isfinite(a[k])]
+        if nb and np.isfinite(a[h]):
+            ref = float(np.mean(nb))
+            out[h] = ref > 0 and abs(a[h] - ref) / ref > limit
+    return out
+
+
+def plausible(actual: np.ndarray, reference: float, jump: float | None = JUMP) -> bool:
+    """False when any hour of the day that occurred is a gross fault against the recent median, or (with
+    ``jump``) a spike against its neighbours."""
+    a = np.asarray(actual, dtype=float)
+    if jump is not None and jumps(a, jump).any():
+        return False
     if np.isnan(reference) or reference <= 0:
         return True
     ok = a[~np.isnan(a)]
     return bool(np.all((ok >= GROSS_LOW * reference) & (ok <= GROSS_HIGH * reference)))
+
+
+def forecast_plausible(forecast: np.ndarray, actual: np.ndarray, limit: float = FORECAST_FAULT) -> bool:
+    """False when the published forecast is missing, non-positive or more than ``limit`` (relative) away from
+    the outcome at any hour where both exist: a reporting fault of the benchmark, on which no model is scored."""
+    f = np.asarray(forecast, dtype=float)
+    a = np.asarray(actual, dtype=float)
+    if f.shape != (24,) or np.isnan(f).any() or (f <= 0).any():
+        return False
+    both = np.isfinite(a) & (a > 0)
+    return bool(np.all(np.abs(f[both] / a[both] - 1.0) <= limit))
+
+
+def label_offsets(path: Path | None = None) -> pd.DataFrame:
+    """The documented hour-label offsets of the published series (``docs/hour_label_offsets.csv``)."""
+    p = Path(path) if path else LABEL_OFFSETS
+    if not p.exists():
+        return pd.DataFrame(columns=["ba", "column", "start", "end", "shift_hours"])
+    t = pd.read_csv(p)
+    t["start"] = pd.to_datetime(t["start"])
+    t["end"] = pd.to_datetime(t["end"])
+    return t
+
+
+def apply_label_offsets(s: pd.Series, ba: str, column: str, offsets: pd.DataFrame) -> pd.Series:
+    """Move the timestamps of ``s`` (local hour beginning) by the documented offset of ``ba``/``column`` inside
+    each offset period, so that every value carries the hour it belongs to. Values that land on an hour
+    already occupied keep the moved one; the hour left empty at a switch stays missing."""
+    if s.empty or offsets.empty:
+        return s
+    rows = offsets[(offsets["ba"] == ba) & (offsets["column"] == column)]
+    if rows.empty:
+        return s
+    idx = pd.DatetimeIndex(s.index)
+    new_index = idx.to_numpy().copy()
+    moved = np.zeros(len(idx), dtype=bool)
+    for r in rows.itertuples(index=False):
+        mask = idx >= r.start
+        if pd.notna(r.end):
+            mask &= idx <= r.end
+        new_index[mask] = (idx[mask] + pd.Timedelta(hours=int(r.shift_hours))).to_numpy()
+        moved |= mask
+    out = pd.Series(s.to_numpy(), index=pd.DatetimeIndex(new_index), name=s.name)
+    keep = pd.Series(moved, index=out.index)
+    out = out[~out.index.duplicated(keep="last") | keep.to_numpy()]
+    out = out[~out.index.duplicated(keep="last")]
+    return out.sort_index()
 
 
 class Loader:
@@ -113,13 +183,15 @@ class Loader:
                  init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
                  stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
-                 dswrf_dir: Path | None = None):
+                 dswrf_dir: Path | None = None, align_labels: bool = True):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
         repairs the load history with grid-data-sentinel (``cleaning.sentinel_clean``, one year at a time, warmed
         up on the year before) before the gross-fault guard; the outcome is never cleaned."""
         self.cleaning = cleaning
+        # align_labels applies the documented hour-label offsets of the published series (docs/hour_label_offsets.csv)
+        self.offsets = label_offsets() if align_labels else pd.DataFrame(columns=["ba", "column", "start", "end", "shift_hours"])
         self.tidy_dir = Path(tidy_dir)
         self.isd_dir = Path(isd_dir)
         self.hrrr_dir = Path(hrrr_dir)
@@ -197,7 +269,7 @@ class Loader:
 
     # ---- cached readers -------------------------------------------------------------------------------
     def raw_load(self, ba: str, year: int) -> pd.Series:
-        return self._cached(("raw", ba, year), lambda: load_series_local(self.tidy_dir, ba, year))
+        return self._cached(("raw", ba, year), lambda: apply_label_offsets(load_series_local(self.tidy_dir, ba, year), ba, "demand", self.offsets))
 
     def load(self, ba: str, year: int) -> pd.Series:
         """The load series used as history: raw, or repaired by the Sentinel when ``cleaning="sentinel"``."""
@@ -224,7 +296,7 @@ class Loader:
                 return pd.Series(dtype=float)
             s = d.set_index("local_end")["forecast"].astype(float)
             s.index = pd.DatetimeIndex(s.index) - pd.Timedelta(hours=1)
-            return s
+            return apply_label_offsets(s, ba, "forecast", self.offsets)
 
         return self._cached(("forecast", ba, year), read)
 
@@ -332,6 +404,7 @@ class Loader:
             actual=outcome.reindex(hours).to_numpy(dtype=float),
             day_type=int(day_types(d64)[0]), special_day=kinds.get(day),
             actual_plausible=plausible(outcome.reindex(hours).to_numpy(dtype=float), reference),
+            benchmark_plausible=forecast_plausible(fcst.reindex(hours).to_numpy(dtype=float), outcome.reindex(hours).to_numpy(dtype=float)),
             sky=sky, stations=stations, temp_history_stations_f=stations_hist,
             temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None,
         )

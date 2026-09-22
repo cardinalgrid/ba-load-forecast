@@ -48,8 +48,9 @@ def score_day(info: InformationSet, forecasters: Sequence[Forecaster], hourly: l
               "run_init": None if info.run is None else f"{info.run[0]}T{info.run[1]:02d}", "temp_min_f": temp_min}
     empty_q = {k: np.nan for k in QUANTILE_FIELDS}
     rows = []
-    actual = info.actual if info.actual_plausible else np.full(24, np.nan)   # a gross fault in the outcome: no one is scored
-    note = None if info.actual_plausible else "implausible actual"
+    scorable = info.actual_plausible and info.benchmark_plausible     # a fault in the outcome or in the published forecast: no one is scored
+    actual = info.actual if scorable else np.full(24, np.nan)
+    note = None if scorable else ("implausible actual" if not info.actual_plausible else "implausible DF")
     for fc in forecasters:
         error = note
         qm = empty_q

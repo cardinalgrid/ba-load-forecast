@@ -38,6 +38,9 @@ Every group uses several stations per BA and six years of training. Groups:
   report in ``results/phase_f_final/``, ``docs/phase_f_final.md``.
 * ``frozen``: the phase F recipe (``final2``), unchanged, on days the development never saw; run with
   ``--start 2023-01-01 --end 2025-12-31``; report in ``results/frozen_2023_2025/``, ``docs/frozen_evaluation.md``.
+* ``protocol``: the phase F recipe (``final2``) scored under protocol v2: reporting faults of the published forecast
+  and spikes in the outcome leave the day out for everyone, and the documented hour-label offsets are applied to the
+  published series before anything else; report in ``results/phase_g_protocol/``, ``docs/phase_g_protocol.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -149,6 +152,7 @@ def sky_members(add):
 PER_BA_GROUPS = {          # groups whose members depend on the BA (solar features at ISO-NE and CAISO)
     "final": final_models, "intervals3": intervals3_models, "peak": peak_models, "irradiance": irradiance_models,
     "final2": final2_models, "frozen": final2_models,      # frozen: the same recipe, on other days
+    "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
 }
 
 
@@ -340,7 +344,15 @@ def main(argv=None) -> int:
                     "the 40 known days of the same regime nearest in forecast minimum temperature, adaptive level per regime; point at "
                     "the 60th percentile around the forecast peak), run once on 2023 to 2025 without any change after seeing these days. "
                     "The models keep learning day by day from the six years before each day, as in operation.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen)):
+    proto = report({"protocol"}, a.results.parent / "phase_g_protocol", a.doc.parent / "phase_g_protocol.md",
+                   "Phase G: the recipe under protocol v2",
+                   "Development BAs: " + common +
+                   "The phase F recipe (`final2`), scored under protocol v2: a day on which the published forecast is missing, "
+                   "non-positive or more than 50 % away from the outcome at any hour is left out for every model, as is a day with an "
+                   "hour more than 40 % away from the mean of its neighbours; and the documented hour-label offsets "
+                   "(`docs/hour_label_offsets.csv`: PJM forecast +1 h from February 2019, CAISO demand -1 h from 14 June 2022) are "
+                   "applied to the published series before anything else, for the models and for `DF` alike.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto)):
         log("no rows to report")
         return 1
     if waiting:
