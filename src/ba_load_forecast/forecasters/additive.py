@@ -21,7 +21,14 @@ import numpy as np
 import pandas as pd
 from scipy.interpolate import BSpline
 
-from ..features import EXTREME_COLUMNS, rows_for_days, target_temperature, training_days
+from ..features import (
+    EXTRA_LOAD_COLUMNS,
+    EXTRA_TEMP_COLUMNS,
+    EXTREME_COLUMNS,
+    rows_for_days,
+    target_temperature,
+    training_days,
+)
 from ..information_set import InformationSet
 from ..sky import IRRADIANCE_COLUMNS, PV_COLUMNS, SKY_COLUMNS
 from .base import ForecastError
@@ -50,7 +57,9 @@ class AdditiveModel:
     def __init__(self, train_days: int = 730, refit_days: int = 7, n_knots: int = 6,
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
-                 labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False):
+                 labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False,
+                 extra: tuple[str, ...] = ()):
+        self.extra = tuple(extra)             # optional linear blocks: "load" (EXTRA_LOAD_COLUMNS), "temp" (EXTRA_TEMP_COLUMNS)
         self.pv = pv                          # linear PV terms (PV_LINEAR) from the sky frame; needs Loader(sky=True, pv=True)
         self.irradiance = irradiance          # with pv: capacity times the forecast irradiance instead of times the cloud fraction
         self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS) as linear regressors
@@ -92,6 +101,10 @@ class AdditiveModel:
         if self.pv:
             for c in (PV_IRRADIANCE if self.irradiance else PV_LINEAR):
                 cols.append(rows[c].to_numpy(dtype=float))
+        for block, names in (("load", EXTRA_LOAD_COLUMNS), ("temp", EXTRA_TEMP_COLUMNS)):
+            if block in self.extra:
+                for c in names:
+                    cols.append(rows[c].to_numpy(dtype=float))
         return np.column_stack([c if c.ndim == 2 else c[:, None] for c in cols])
 
     def _standardise(self, x: np.ndarray, fit: bool) -> np.ndarray:
@@ -124,6 +137,9 @@ class AdditiveModel:
             rows = rows.drop(columns=[c for c in SKY_COLUMNS + PV_COLUMNS + IRRADIANCE_COLUMNS if c in rows.columns and c not in keep])
         return rows
 
+    def _extra_columns(self) -> list[str]:
+        return ([*EXTRA_LOAD_COLUMNS] if "load" in self.extra else []) + ([*EXTRA_TEMP_COLUMNS] if "temp" in self.extra else [])
+
     # ---- fit / predict -------------------------------------------------------------------------------
     def needs_fit(self, info: InformationSet) -> bool:
         return (self.fitted_on is None or self.fitted_ba != info.ba or (info.day - self.fitted_on).days >= self.refit_days)
@@ -139,6 +155,8 @@ class AdditiveModel:
     def fit(self, info: InformationSet) -> None:
         days = training_days(info.day - timedelta(days=2), self.train_days)
         rows = self._rows(info, info.temp_history_f, days, target=False)
+        rows = rows.drop(columns=[c for c in EXTRA_LOAD_COLUMNS + EXTRA_TEMP_COLUMNS
+                                  if c in rows.columns and c not in self._extra_columns()])
         rows = rows.dropna()
         if self.label_column == "cluster":
             rows = rows[rows["cluster"] >= 0]
@@ -174,6 +192,8 @@ class AdditiveModel:
         if self.needs_fit(info):
             self.fit(info)
         rows = self._rows(info, target_temperature(info), [info.day], target=True)
+        rows = rows.drop(columns=[c for c in EXTRA_LOAD_COLUMNS + EXTRA_TEMP_COLUMNS
+                                  if c in rows.columns and c not in self._extra_columns()])
         feats = rows.drop(columns=["y"])
         if feats.isna().any().any():
             raise ForecastError("missing input for the target day: " + ", ".join(feats.columns[feats.isna().any()]))

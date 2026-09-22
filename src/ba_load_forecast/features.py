@@ -33,6 +33,44 @@ CALENDAR_COLUMNS = ["hour", "day_type", "special_kind", "doy_sin", "doy_cos", "t
 FEATURE_COLUMNS = [*CALENDAR_COLUMNS, *TEMP_COLUMNS, *LOAD_COLUMNS]
 COLD_F, HEAT_F = 32.0, 85.0
 EXTREME_COLUMNS = ["cold_h", "cold_ma24", "cold_hours", "heat_h", "heat_ma24"]
+# optional blocks (phase G): more load memory, and the thermal history and shape of the day
+EXTRA_LOAD_COLUMNS = ["l_d14", "l_d21", "l_d7_mean24"]
+EXTRA_TEMP_COLUMNS = ["t_prev_max", "t_prev_min", "hdh72", "cdh72", "t_day_range", "t_h07", "t_h17"]
+BALANCE_F = 65.0
+
+
+def extra_load_features(load: pd.Series, ts: pd.DatetimeIndex) -> pd.DataFrame:
+    """Load two and three weeks back at the same hour, and the mean of the same weekday last week."""
+    lo = load.asfreq("h") if not load.empty else load
+    out = pd.DataFrame(index=ts)
+    out["l_d14"] = lo.reindex(ts - pd.Timedelta(days=14)).to_numpy()
+    out["l_d21"] = lo.reindex(ts - pd.Timedelta(days=21)).to_numpy()
+    day_mean = lo.groupby(lo.index.normalize()).mean() if len(lo) else pd.Series(dtype=float)
+    out["l_d7_mean24"] = day_mean.reindex(ts.normalize() - pd.Timedelta(days=7)).to_numpy()
+    return out
+
+
+def extra_temp_features(temp: pd.Series, ts: pd.DatetimeIndex) -> pd.DataFrame:
+    """Yesterday's extremes, heating and cooling degree-hours of the 72 hours before the day (thermal inertia of
+    buildings), the day's range and its temperature at 07:00 and 17:00 (the ramps)."""
+    t = temp.asfreq("h") if not temp.empty else temp
+    out = pd.DataFrame(index=ts)
+    days = ts.normalize()
+    daily = t.groupby(t.index.normalize()) if len(t) else None
+    dmax = daily.max() if daily is not None else pd.Series(dtype=float)
+    dmin = daily.min() if daily is not None else pd.Series(dtype=float)
+    out["t_prev_max"] = dmax.reindex(days - pd.Timedelta(days=1)).to_numpy()
+    out["t_prev_min"] = dmin.reindex(days - pd.Timedelta(days=1)).to_numpy()
+    hdh = (BALANCE_F - t).clip(lower=0).rolling(72, min_periods=60).sum()
+    cdh = (t - BALANCE_F).clip(lower=0).rolling(72, min_periods=60).sum()
+    out["hdh72"] = hdh.reindex(days - pd.Timedelta(hours=1)).to_numpy()      # the 72 hours ending at 23:00 of D-1
+    out["cdh72"] = cdh.reindex(days - pd.Timedelta(hours=1)).to_numpy()
+    tt = t.reindex(ts)
+    grp = pd.DataFrame({"day": days, "t": tt.to_numpy()}).groupby("day")["t"]
+    out["t_day_range"] = (grp.transform("max") - grp.transform("min")).to_numpy()
+    out["t_h07"] = t.reindex(days + pd.Timedelta(hours=7)).to_numpy()
+    out["t_h17"] = t.reindex(days + pd.Timedelta(hours=17)).to_numpy()
+    return out
 
 
 def extreme_features(temp: pd.Series, ts: pd.DatetimeIndex) -> pd.DataFrame:
@@ -114,7 +152,7 @@ def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: 
     """
     ts = hourly_index(days)
     out = pd.concat([calendar_features(ts), temperature_features(temp, ts), load_features(load, ts),
-                     extreme_features(temp, ts)], axis=1)
+                     extreme_features(temp, ts), extra_load_features(load, ts), extra_temp_features(temp, ts)], axis=1)
     if stations is not None and len(stations.columns):
         st = stations.asfreq("h") if not stations.empty else stations
         for c in st.columns:

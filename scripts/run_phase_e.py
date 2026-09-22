@@ -41,6 +41,12 @@ Every group uses several stations per BA and six years of training. Groups:
 * ``protocol``: the phase F recipe (``final2``) scored under protocol v2: reporting faults of the published forecast
   and spikes in the outcome leave the day out for everyone, and the documented hour-label offsets are applied to the
   published series before anything else; report in ``results/phase_g_protocol/``, ``docs/phase_g_protocol.md``.
+* ``feat``: the recipe's members with the phase G feature blocks (more load memory, thermal history and day shape,
+  the sun's elevation for every BA), each against the plain member; report ``docs/phase_g_features.md``.
+* ``hp``: the members with other parameters (boosting depth, rate, leaf size, regularisation, refit period; additive
+  knots, validation window, penalty grid; training length); report ``docs/phase_g_parameters.md``.
+* ``ens2``: the corrected ensemble with hourly weights, with the recency regression as a third member, with the
+  boosting on a ratio target, and with a trimmed-mean correction; report ``docs/phase_g_ensemble.md``.
 * ``pv2``: on the same BAs, the additive model with linear PV terms (capacity times the sun, and times the cloud
   fraction) in the ensemble with the sky boosting, against the ensemble without them; report in
   ``results/phase_e_pv2/``, ``docs/phase_e_pv2.md``.
@@ -119,6 +125,62 @@ def irradiance_models(ba: str | None) -> list:
 FINAL_INTERVAL = dict(by_regime=True, window_days=365, alpha_by_regime=True)
 
 
+def feat_models(ba: str | None) -> list:
+    solar = ba in PV_BAS
+    add = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
+    boo = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
+    return [add, boo,
+            Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, extra=("load",), name="additive_xload")),
+            Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, extra=("temp",), name="additive_xtemp")),
+            Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, extra=("load", "temp"), name="additive_xall")),
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, extra=("load",), name="boosting_xload")),
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, extra=("temp",), name="boosting_xtemp")),
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=True, name="boosting_xsun")),
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=True, extra=("load", "temp"), name="boosting_xall"))]
+
+
+def hp_models(ba: str | None) -> list:
+    solar = ba in PV_BAS
+    add = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
+    boo = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
+    return [add, boo,
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, max_iter=800, learning_rate=0.03, max_leaf_nodes=63, name="boosting_deep")),
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, max_iter=300, max_leaf_nodes=15, min_samples_leaf=50, name="boosting_shallow")),
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, l2=1.0, name="boosting_l2")),
+            Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, refit_days=3, name="boosting_refit3")),
+            Cached(Boosting(train_days=2555, sky=solar, name="boosting_7y")),
+            Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, n_knots=8, name="additive_k8")),
+            Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, n_knots=10, name="additive_k10")),
+            Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, val_days=90, name="additive_val90")),
+            Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar,
+                                 lambdas=(0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0), name="additive_lam")),
+            Cached(AdditiveModel(train_days=2555, special_days=True, pv=solar, name="additive_7y"))]
+
+
+def ens2_models(ba: str | None) -> list:
+    from ba_load_forecast.forecasters.recency import RecencyRegression
+
+    solar = ba in PV_BAS
+    add = Cached(AdditiveModel(train_days=TRAIN_DAYS, special_days=True, pv=solar, name="final_additive"))
+    boo = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, name="final_boosting"))
+    boo_ratio = Cached(Boosting(train_days=TRAIN_DAYS, sky=solar, target="ratio", name="boosting_ratio"))
+    rec_model = RecencyRegression(train_days=TRAIN_DAYS)
+    rec_model.name = "recency_ml"
+    rec = Cached(rec_model)
+    ens = Cached(Ensemble([add, boo], weighting="recent", name="final_ensemble"))
+    ens_h = Cached(Ensemble([add, boo], weighting="hourly", name="ens_hourly"))
+    ens_3 = Cached(Ensemble([add, boo, rec], weighting="recent", name="ens_three"))
+    ens_r = Cached(Ensemble([add, boo_ratio], weighting="recent", name="ens_ratio"))
+    final = dict(FINAL_INTERVAL, nearest=40, peak="quantile", peak_quantile=0.60)
+    return [add, boo, boo_ratio, rec, ens, ens_h, ens_3, ens_r,
+            AdaptiveIntervals(ens, **final, name="final2"),
+            AdaptiveIntervals(ens_h, **final, name="final2_hourly"),
+            AdaptiveIntervals(ens_3, **final, name="final2_three"),
+            AdaptiveIntervals(ens_r, **final, name="final2_ratio"),
+            AdaptiveIntervals(ens, **dict(final, nearest=30), name="final2_nn30"),
+            AdaptiveIntervals(ens, **dict(final, nearest=50), name="final2_nn50")]
+
+
 def final_models(ba: str | None) -> list:
     add_f, boo_f, ens_f = final_members(ba)
     return [add_f, boo_f, ens_f, AdaptiveIntervals(ens_f, **FINAL_INTERVAL, name="final")]
@@ -153,6 +215,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final": final_models, "intervals3": intervals3_models, "peak": peak_models, "irradiance": irradiance_models,
     "final2": final2_models, "frozen": final2_models,      # frozen: the same recipe, on other days
     "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
+    "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
 }
 
 
@@ -352,7 +415,23 @@ def main(argv=None) -> int:
                    "hour more than 40 % away from the mean of its neighbours; and the documented hour-label offsets "
                    "(`docs/hour_label_offsets.csv`: PJM forecast +1 h from February 2019, CAISO demand -1 h from 14 June 2022) are "
                    "applied to the published series before anything else, for the models and for `DF` alike.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto)):
+    g_common = "Development BAs: " + common + "Protocol v2 (`docs/phase_g_protocol.md`). "
+    feat = report({"feat"}, a.results.parent / "phase_g_features", a.doc.parent / "phase_g_features.md",
+                  "Phase G: feature blocks", g_common +
+                  "`*_xload` adds the load two and three weeks back and the mean of the same weekday last week; `*_xtemp` adds "
+                  "yesterday's extremes, the heating and cooling degree-hours of the previous 72 hours, the day's range and its "
+                  "temperature at 07:00 and 17:00; `boosting_xsun` gives every BA the sun's elevation; `*_xall` combines them.")
+    hp = report({"hp"}, a.results.parent / "phase_g_parameters", a.doc.parent / "phase_g_parameters.md",
+                "Phase G: parameters", g_common +
+                "Boosting: `deep` 800 iterations at rate 0.03 with 63 leaves; `shallow` 300 iterations, 15 leaves, 50 samples per leaf; "
+                "`l2` regularisation 1.0; `refit3` refitted every 3 days; `7y` trained on 2555 days. Additive: 8 and 10 knots; 90 "
+                "validation days; a penalty grid from 0.001 to 1000; 2555 training days.")
+    ens2 = report({"ens2"}, a.results.parent / "phase_g_ensemble", a.doc.parent / "phase_g_ensemble.md",
+                  "Phase G: ensemble and correction", g_common +
+                  "`ens_hourly` weights the members per hour of the day; `ens_three` adds the recency regression; `ens_ratio` uses "
+                  "a boosting trained on the load divided by the last known 24 h mean; `final2_*` are the corrected versions with "
+                  "the recipe's correction; `final2_nn30` and `final2_nn50` change the size of the nearest-temperature pool.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2)):
         log("no rows to report")
         return 1
     if waiting:

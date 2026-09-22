@@ -1,6 +1,6 @@
 # Phase E: intervals for the coldest days
 
-Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `final` is the recipe's interval (regime-conditional errors over a year, adaptive level per regime); `final_nn40` and `final_nn60` restrict the pool to the 40 or 60 known days nearest to the target day in forecast daily minimum temperature; `final_tail` reads the outer quantiles from an exponential fitted beyond the pool's 10th and 90th percentiles; `final_nn40_tail` does both.
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `final` is the recipe's interval (regime-conditional errors over a year, adaptive level per regime); `final_nn40` and `final_nn60` restrict the pool to the 40 or 60 known days nearest to the target day in forecast daily minimum temperature; `final_tail` reads the outer quantiles from an exponential fitted beyond the pool's 10th and 90th percentiles; `final_nn40_tail` does both.
 
 ## All BAs, weighted by mean demand
 

@@ -15,7 +15,15 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-from ..features import EXTREME_COLUMNS, FEATURE_COLUMNS, rows_for_days, target_temperature, training_days
+from ..features import (
+    EXTRA_LOAD_COLUMNS,
+    EXTRA_TEMP_COLUMNS,
+    EXTREME_COLUMNS,
+    FEATURE_COLUMNS,
+    rows_for_days,
+    target_temperature,
+    training_days,
+)
 from ..information_set import InformationSet
 from ..sky import IRRADIANCE_COLUMNS, PV_COLUMNS, SKY_COLUMNS
 from .base import ForecastError
@@ -25,7 +33,12 @@ class Boosting:
     def __init__(self, train_days: int = 730, refit_days: int = 7, max_iter: int = 400, learning_rate: float = 0.05,
                  max_leaf_nodes: int = 31, min_train_days: int = 120, seed: int = 0, stations: bool = True,
                  special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None,
-                 extremes: bool = False, sky: bool = False):
+                 extremes: bool = False, sky: bool = False, extra: tuple[str, ...] = (), min_samples_leaf: int = 20,
+                 l2: float = 0.0, target: str = "level"):
+        self.extra = tuple(extra)             # optional feature blocks: "load" (EXTRA_LOAD_COLUMNS), "temp" (EXTRA_TEMP_COLUMNS)
+        self.min_samples_leaf = min_samples_leaf
+        self.l2 = l2
+        self.target = target                  # "level": the load in MW; "ratio": the load divided by the last known 24 h mean
         self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS)
         self.sky = sky                        # sun, cloud cover and, with Loader(pv=True), the PV capacity terms; needs Loader(sky=True)
         self.train_days = train_days
@@ -63,6 +76,10 @@ class Boosting:
         cols += [c for c in rows.columns if c.startswith("t_K")]
         if self.extremes:
             cols += EXTREME_COLUMNS
+        if "load" in self.extra:
+            cols += EXTRA_LOAD_COLUMNS
+        if "temp" in self.extra:
+            cols += EXTRA_TEMP_COLUMNS
         if self.sky and "sun" in rows.columns:
             cols += [c for c in SKY_COLUMNS + PV_COLUMNS + IRRADIANCE_COLUMNS if c in rows.columns]
         return cols
@@ -89,10 +106,16 @@ class Boosting:
         if len(rows) < 24 * self.min_train_days:
             raise ForecastError(f"only {len(rows) // 24} days of history to fit on")
         self.columns = self._columns(rows)
+        y = rows["y"].to_numpy(dtype=float)
+        if self.target == "ratio":
+            base = rows["l_mean24"].to_numpy(dtype=float)
+            keep = np.isfinite(base) & (base > 0)
+            rows, y = rows[keep], y[keep] / base[keep]
         self.model = HistGradientBoostingRegressor(
             max_iter=self.max_iter, learning_rate=self.learning_rate, max_leaf_nodes=self.max_leaf_nodes,
+            min_samples_leaf=self.min_samples_leaf, l2_regularization=self.l2,
             early_stopping=True, validation_fraction=0.1, n_iter_no_change=20, random_state=self.seed,
-        ).fit(rows[self.columns].to_numpy(dtype=float), rows["y"].to_numpy(dtype=float))
+        ).fit(rows[self.columns].to_numpy(dtype=float), y)
         self.fitted_on = info.day
         self.fitted_ba = info.ba
 
@@ -104,4 +127,10 @@ class Boosting:
         rows = rows_for_days(info.load_history, target_temperature(info), [info.day], self._station_frames(info, target=True),
                              labels=self.day_labels(info, target=True), sky=info.sky if self.sky else None)
         x = rows[self.columns].to_numpy(dtype=float)
-        return self.model.predict(x)
+        pred = self.model.predict(x)
+        if self.target == "ratio":
+            base = rows["l_mean24"].to_numpy(dtype=float)
+            if not np.isfinite(base).all() or (base <= 0).any():
+                raise ForecastError("no known 24 h mean to scale the ratio target")
+            pred = pred * base
+        return pred

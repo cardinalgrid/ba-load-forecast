@@ -3,7 +3,15 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from ba_load_forecast.features import EXTREME_COLUMNS, FEATURE_COLUMNS, rows_for_days, target_temperature, training_days
+from ba_load_forecast.features import (
+    EXTRA_LOAD_COLUMNS,
+    EXTRA_TEMP_COLUMNS,
+    EXTREME_COLUMNS,
+    FEATURE_COLUMNS,
+    rows_for_days,
+    target_temperature,
+    training_days,
+)
 from tests.conftest import make_info
 
 
@@ -18,7 +26,7 @@ def test_rows_are_causal_and_aligned():
     load, temp = series()
     d = date(2024, 1, 20)
     rows = rows_for_days(load, temp, [d])
-    assert list(rows.columns) == [*FEATURE_COLUMNS, *EXTREME_COLUMNS, "y"]
+    assert list(rows.columns) == [*FEATURE_COLUMNS, *EXTREME_COLUMNS, *EXTRA_LOAD_COLUMNS, *EXTRA_TEMP_COLUMNS, "y"]
     assert len(rows) == 24
     r = rows.iloc[5]                                  # 2024-01-20 05:00
     assert r["y"] == load["2024-01-20 05:00"]

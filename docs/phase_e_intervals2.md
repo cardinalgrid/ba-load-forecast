@@ -1,6 +1,6 @@
 # Phase E: regime-conditional errors with an adaptive level
 
-Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `ens_bc_regime` reads the 5th and 95th percentiles of the corrected ensemble's errors on the known days of the same temperature regime over the last year; `ens_bc_adaptive` reads them on the last 120 days at a level that adapts to the coverage achieved (adaptive conformal inference); `ens_bc_regime_aci` combines the two (regime pool, one adaptive level); `ens_bc_regime_aci2` tracks one adaptive level per regime.
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `ens_bc_regime` reads the 5th and 95th percentiles of the corrected ensemble's errors on the known days of the same temperature regime over the last year; `ens_bc_adaptive` reads them on the last 120 days at a level that adapts to the coverage achieved (adaptive conformal inference); `ens_bc_regime_aci` combines the two (regime pool, one adaptive level); `ens_bc_regime_aci2` tracks one adaptive level per regime.
 
 ## All BAs, weighted by mean demand
 

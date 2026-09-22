@@ -1,6 +1,6 @@
 # Phase E: linear PV terms in the additive model
 
-BAs with large solar behind the load: CISO, ISNE, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `additive_ml_pv` is the additive model with two linear terms per hour: the installed PV capacity times the sun's elevation, and the same times the forecast cloud fraction (zero before December 2020); `ens_pv2` and `ens_pv2_bc_regime` pair it with the sky boosting, next to the same ensemble built on the additive model without those terms (`ens_sky`, `ens_sky_bc_regime`).
+BAs with large solar behind the load: CISO, ISNE, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `additive_ml_pv` is the additive model with two linear terms per hour: the installed PV capacity times the sun's elevation, and the same times the forecast cloud fraction (zero before December 2020); `ens_pv2` and `ens_pv2_bc_regime` pair it with the sky boosting, next to the same ensemble built on the additive model without those terms (`ens_sky`, `ens_sky_bc_regime`).
 
 ## All BAs, weighted by mean demand
 

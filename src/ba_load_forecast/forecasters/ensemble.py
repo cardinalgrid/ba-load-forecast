@@ -21,8 +21,8 @@ from .base import Forecaster, ForecastError
 class Ensemble:
     def __init__(self, members: list[Forecaster], weighting: str = "mean", window_days: int = 30,
                  min_days: int = 5, name: str | None = None):
-        if weighting not in ("mean", "recent"):
-            raise ValueError("weighting must be 'mean' or 'recent'")
+        if weighting not in ("mean", "recent", "hourly"):
+            raise ValueError("weighting must be 'mean', 'recent' or 'hourly'")
         self.members = list(members)
         self.weighting = weighting
         self.window_days = window_days
@@ -47,6 +47,30 @@ class Ensemble:
                 if name in errors:
                     errors[name].append(float(np.mean(np.abs(p[ok] - actual[ok]) / actual[ok])))
         return {n: float(np.mean(e)) for n, e in errors.items() if len(e) >= self.min_days}
+
+    def hourly_weights(self, info: InformationSet, available: list[str]) -> dict[str, np.ndarray]:
+        """One weight per member and hour of the day, from the members' MAPE at that hour over the window."""
+        first = info.day - timedelta(days=self.window_days + 2)
+        errs: dict[str, list[np.ndarray]] = {n: [] for n in available}
+        for d, preds in self._stored.items():
+            if d < first or d > info.day - timedelta(days=2):
+                continue
+            hours = pd.date_range(pd.Timestamp(d), periods=24, freq="h")
+            actual = info.load_history.reindex(hours).to_numpy(dtype=float)
+            ok = np.isfinite(actual) & (actual > 0)
+            if ok.sum() < 20:
+                continue
+            for n in available:
+                if n in preds:
+                    e = np.full(24, np.nan)
+                    e[ok] = np.abs(preds[n][ok] - actual[ok]) / actual[ok]
+                    errs[n].append(e)
+        if any(len(v) < self.min_days for v in errs.values()):
+            return {n: np.full(24, 1.0 / len(available)) for n in available}
+        mape = {n: np.nanmean(np.vstack(v), axis=0) for n, v in errs.items()}
+        raw = {n: 1.0 / np.maximum(m, 1e-6) for n, m in mape.items()}
+        total = sum(raw.values())
+        return {n: v / total for n, v in raw.items()}
 
     def weights(self, info: InformationSet, available: list[str]) -> dict[str, float]:
         if self.weighting == "mean" or len(available) == 1:
@@ -73,6 +97,10 @@ class Ensemble:
         cutoff = info.day - timedelta(days=self.window_days + 40)
         for d in [d for d in self._stored if d < cutoff]:
             del self._stored[d]
+        if self.weighting == "hourly" and len(preds) > 1:
+            wh = self.hourly_weights(info, list(preds))
+            self.last_weights = {n: float(np.mean(v)) for n, v in wh.items()}
+            return sum(wh[n] * p for n, p in preds.items())
         w = self.weights(info, list(preds))
         self.last_weights = w
         return sum(w[n] * p for n, p in preds.items())
