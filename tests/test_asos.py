@@ -61,7 +61,7 @@ def test_station_temperature_fills_only_the_gap(tmp_path, monkeypatch):
     obs = pd.DataFrame({"valid_utc": utc - pd.Timedelta(minutes=6), "temp_f": np.arange(48, dtype=float)})
     f = tmp_path / "KPHL.csv"
     obs.to_csv(f, index=False)
-    s = m.station_temperature_f("724080", "13739", "PJM", 2025, tmp_path, tmp_path, asos_file=f)
+    s = m.station_temperature_f("724080", "13739", "PJM", 2025, tmp_path, tmp_path, supplement_file=f)
     assert len(s) == 48
     np.testing.assert_allclose(s.to_numpy(), np.arange(48, dtype=float))
     assert m.station_temperature_f("724080", "13739", "PJM", 2025, tmp_path, tmp_path).empty

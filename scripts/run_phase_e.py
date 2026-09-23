@@ -91,7 +91,7 @@ def log(msg: str) -> None:
 
 def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0) -> Loader:
     return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
-                  temp_bias_days=temp_bias_days, asos_dir=a.asos_dir)
+                  temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir)
 
 
 def corrected_ensemble():
@@ -323,8 +323,9 @@ def main(argv=None) -> int:
     ap.add_argument("--tidy", type=Path, default=ROOT.parent / "ba-forecast-scorecard" / "data" / "tidy")
     ap.add_argument("--isd-dir", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
     ap.add_argument("--hrrr", type=Path, default=ROOT / "data" / "hrrr")
-    ap.add_argument("--asos-dir", type=Path, default=ROOT / "data" / "asos",
-                    help="ASOS supplement (scripts/fetch_asos.py) for the hours the ISD archive does not cover")
+    ap.add_argument("--supplement-dir", type=Path, default=ROOT / "data" / "ghcnh",
+                    help="observed temperature for the hours the ISD archive does not cover: data/ghcnh (scripts/fetch_ghcnh.py, "
+                         "NOAA) or data/asos (scripts/fetch_asos.py, Iowa Environmental Mesonet)")
     ap.add_argument("--out", type=Path, default=Path.home() / "ba-load-forecast-runs" / "phase_e")
     ap.add_argument("--results", type=Path, default=ROOT / "results" / "phase_e")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "phase_e.md")

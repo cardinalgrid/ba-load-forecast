@@ -100,12 +100,16 @@ def read_asos(path: Path) -> pd.Series:
     return hourly_from_observations(pd.read_csv(path, parse_dates=["valid_utc"]))
 
 
-def asos_path(icao: str, asos_dir: Path | None) -> Path | None:
-    if asos_dir is None:
+def supplement_path(icao: str, supplement_dir: Path | None) -> Path | None:
+    """The station's supplement file (``<ICAO>.csv`` from ``fetch_ghcnh`` or ``fetch_asos``) when it exists."""
+    if supplement_dir is None:
         return None
-    p = Path(asos_dir) / f"{icao}.csv"
+    p = Path(supplement_dir) / f"{icao}.csv"
     return p if p.exists() else None
 
 
+asos_path = supplement_path
+
+
 __all__ = ["FIRST_MISSING_ISD", "IEM_URL", "asos_path", "fetch_asos", "hourly_from_observations", "iem_id", "iem_request",
-           "parse_iem", "read_asos"]
+           "parse_iem", "read_asos", "supplement_path"]
