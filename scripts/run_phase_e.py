@@ -191,24 +191,35 @@ FINAL3 = dict(                 # what phase G adds to the recipe (set from the f
 )
 
 
+FINAL3B = dict(FINAL3, boosting=dict(max_iter=800, learning_rate=0.03, max_leaf_nodes=63), temp_bias_days=30)
+
+
+def final3b_models(ba: str | None) -> list:
+    """``final3`` plus the deeper boosting and the temperature-bias correction (tested as a variant)."""
+    return _final3_models(ba, FINAL3B, "final3b")
+
+
 def final3_models(ba: str | None) -> list:
-    """The phase G recipe: the phase F recipe with the options of ``FINAL3``."""
+    return _final3_models(ba, FINAL3, "final3")
+
+
+def _final3_models(ba: str | None, c: dict, tag: str) -> list:
+    """The phase G recipe: the phase F recipe with the options of ``c`` (``FINAL3`` or ``FINAL3B``)."""
     from ba_load_forecast.forecasters.recency import RecencyRegression
 
-    c = FINAL3
     solar = ba in PV_BAS
     add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
-                               **c["additive"], name="final3_additive"))
+                               **c["additive"], name=f"{tag}_additive"))
     boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
-                          target="ratio" if c["ratio"] else "level", **c["boosting"], name="final3_boosting"))
+                          target="ratio" if c["ratio"] else "level", **c["boosting"], name=f"{tag}_boosting"))
     members = [add, boo]
     if c["third_member"]:
         rec = RecencyRegression(train_days=c["train_days"])
-        rec.name = "final3_recency"
+        rec.name = f"{tag}_recency"
         members.append(Cached(rec))
-    ens = Cached(Ensemble(members, weighting=c["weighting"], name="final3_ensemble"))
+    ens = Cached(Ensemble(members, weighting=c["weighting"], name=f"{tag}_ensemble"))
     return [*members, ens,
-            AdaptiveIntervals(ens, **FINAL_INTERVAL, nearest=c["nearest"], peak="quantile", peak_quantile=0.60, name="final3")]
+            AdaptiveIntervals(ens, **FINAL_INTERVAL, nearest=c["nearest"], peak="quantile", peak_quantile=0.60, name=tag)]
 
 
 def final_models(ba: str | None) -> list:
@@ -246,7 +257,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final2": final2_models, "frozen": final2_models,      # frozen: the same recipe, on other days
     "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
-    "final3": final3_models, "frozen3": final3_models,
+    "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models,
     "tbias": final2_models,
 }
 
@@ -329,7 +340,8 @@ def main(argv=None) -> int:
                 solar = group in PER_BA_GROUPS and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
-                            temp_bias_days=30 if group == "tbias" else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0)
+                            temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
+                            else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0)
                 if not stations_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -478,7 +490,11 @@ def main(argv=None) -> int:
                    "The phase F recipe with the HRRR 2 m temperature path of every station moved by the median of the forecast's own "
                    "error at that local hour over the last 30 known days (forecast as seen at the cut-off against the airport observation). "
                    "Compare with `docs/phase_g_protocol.md` (same recipe, no correction).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias)):
+    final3b = report({"final3b"}, a.results.parent / "phase_g_final_b", a.doc.parent / "phase_g_final_b.md",
+                     "Phase G: the recipe with the deeper boosting and the temperature-bias correction", g_common +
+                     "`final3b` is `final3` with the boosting at 800 iterations, rate 0.03 and 63 leaves, and the HRRR temperature path "
+                     "corrected by its own recent bias per local hour (30 known days). Compare with `docs/phase_g_final.md`.")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b)):
         log("no rows to report")
         return 1
     if waiting:
