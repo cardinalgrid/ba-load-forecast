@@ -1,6 +1,6 @@
 # Phase G: feature blocks
 
-Development BAs: BPAT, CISO, DUK, ERCO, FPL, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). `*_xload` adds the load two and three weeks back and the mean of the same weekday last week; `*_xtemp` adds yesterday's extremes, the heating and cooling degree-hours of the previous 72 hours, the day's range and its temperature at 07:00 and 17:00; `boosting_xsun` gives every BA the sun's elevation; `*_xall` combines them.
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). `*_xload` adds the load two and three weeks back and the mean of the same weekday last week; `*_xtemp` adds yesterday's extremes, the heating and cooling degree-hours of the previous 72 hours, the day's range and its temperature at 07:00 and 17:00; `boosting_xsun` gives every BA the sun's elevation; `*_xall` combines them.
 
 ## All BAs, weighted by mean demand
 
@@ -8,16 +8,16 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 
 | index | mape | mape_median | peak_err_pct | peak_under_pct | abs_peak_hour_err | win_mape | win_peak_under | worst_peak_under_pct | n_days | n_bas |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DF | 2.71 | 2.40 | 0.35 | -1.09 | 0.94 | 0.00 | 0.00 | -47.43 | 7308 | 10.00 |
-| boosting_xall | 2.90 | 2.56 | -1.03 | -2.09 | 1.48 | 0.44 | 0.24 | -52.42 | 7308 | 10.00 |
-| boosting_xtemp | 2.92 | 2.57 | -1.00 | -2.08 | 1.45 | 0.45 | 0.24 | -52.47 | 7308 | 10.00 |
-| boosting_xload | 2.94 | 2.60 | -0.99 | -2.10 | 1.47 | 0.44 | 0.25 | -52.24 | 7308 | 10.00 |
-| boosting_xsun | 2.97 | 2.62 | -0.99 | -2.11 | 1.53 | 0.43 | 0.25 | -51.98 | 7308 | 10.00 |
-| final_boosting | 2.97 | 2.62 | -0.99 | -2.11 | 1.53 | 0.43 | 0.25 | -51.98 | 7308 | 10.00 |
-| additive_xall | 2.97 | 2.61 | -1.32 | -2.32 | 1.35 | 0.45 | 0.23 | -49.89 | 7308 | 10.00 |
-| additive_xtemp | 3.00 | 2.62 | -1.39 | -2.38 | 1.40 | 0.44 | 0.23 | -50.04 | 7308 | 10.00 |
-| additive_xload | 3.07 | 2.70 | -1.39 | -2.39 | 1.45 | 0.43 | 0.22 | -50.73 | 7308 | 10.00 |
-| final_additive | 3.08 | 2.71 | -1.47 | -2.44 | 1.45 | 0.43 | 0.22 | -50.91 | 7308 | 10.00 |
+| DF | 2.69 | 2.40 | 0.36 | -1.06 | 0.91 | 0.00 | 0.00 | -47.43 | 8056 | 11.00 |
+| boosting_xall | 2.93 | 2.59 | -1.02 | -2.09 | 1.45 | 0.43 | 0.24 | -52.42 | 8056 | 11.00 |
+| boosting_xtemp | 2.95 | 2.60 | -0.99 | -2.08 | 1.42 | 0.44 | 0.24 | -52.47 | 8056 | 11.00 |
+| boosting_xload | 2.97 | 2.62 | -0.99 | -2.10 | 1.44 | 0.43 | 0.24 | -52.24 | 8056 | 11.00 |
+| boosting_xsun | 3.00 | 2.64 | -0.98 | -2.11 | 1.49 | 0.43 | 0.24 | -51.98 | 8056 | 11.00 |
+| final_boosting | 3.00 | 2.64 | -0.98 | -2.11 | 1.49 | 0.43 | 0.24 | -51.98 | 8056 | 11.00 |
+| additive_xall | 3.00 | 2.64 | -1.31 | -2.32 | 1.32 | 0.44 | 0.23 | -49.89 | 8056 | 11.00 |
+| additive_xtemp | 3.03 | 2.65 | -1.38 | -2.38 | 1.37 | 0.43 | 0.22 | -50.04 | 8056 | 11.00 |
+| additive_xload | 3.10 | 2.72 | -1.38 | -2.39 | 1.41 | 0.42 | 0.22 | -50.73 | 8056 | 11.00 |
+| final_additive | 3.11 | 2.74 | -1.45 | -2.45 | 1.41 | 0.42 | 0.22 | -50.91 | 8056 | 11.00 |
 
 ## By BA
 
@@ -28,6 +28,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | DF | DUK | 2.84 | 2.51 | -0.05 | -1.47 | 1.17 | -13.32 |  |  | 746 | 12143.29 |
 | DF | ERCO | 2.62 | 2.11 | 0.51 | -1.11 | 0.81 | -14.36 |  |  | 742 | 46834.59 |
 | DF | FPL | 3.89 | 3.59 | -3.66 | -4.04 | 1.17 | -47.43 |  |  | 665 | 15346.05 |
+| DF | ISNE | 2.36 | 2.31 | 0.50 | -0.48 | 0.34 | -6.96 |  |  | 748 | 13403.92 |
 | DF | MISO | 2.65 | 2.31 | 2.16 | -0.19 | 0.98 | -6.70 |  |  | 738 | 73700.16 |
 | DF | NYIS | 2.67 | 2.51 | -2.49 | -2.67 | 0.40 | -12.87 |  |  | 748 | 17415.28 |
 | DF | PJM | 2.46 | 2.23 | -0.59 | -1.27 | 1.05 | -8.98 |  |  | 734 | 92076.14 |
@@ -38,6 +39,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xall | DUK | 3.52 | 3.15 | -0.58 | -2.30 | 1.39 | -14.98 | 0.35 | 0.26 | 746 | 12143.29 |
 | additive_xall | ERCO | 3.44 | 3.00 | -2.09 | -2.90 | 1.04 | -15.86 | 0.32 | 0.16 | 742 | 46834.59 |
 | additive_xall | FPL | 6.20 | 5.85 | -6.52 | -7.04 | 1.14 | -49.89 | 0.27 | 0.26 | 665 | 15346.05 |
+| additive_xall | ISNE | 3.71 | 3.31 | -1.05 | -2.38 | 0.53 | -19.32 | 0.24 | 0.16 | 748 | 13403.92 |
 | additive_xall | MISO | 2.34 | 2.09 | -1.21 | -1.84 | 1.60 | -8.30 | 0.55 | 0.05 | 738 | 73700.16 |
 | additive_xall | NYIS | 2.60 | 2.28 | -0.83 | -1.97 | 0.56 | -15.30 | 0.55 | 0.60 | 748 | 17415.28 |
 | additive_xall | PJM | 2.65 | 2.30 | -0.44 | -1.63 | 1.64 | -12.14 | 0.47 | 0.39 | 734 | 92076.14 |
@@ -48,6 +50,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xload | DUK | 3.58 | 3.19 | -0.61 | -2.35 | 1.35 | -14.69 | 0.36 | 0.25 | 746 | 12143.29 |
 | additive_xload | ERCO | 3.57 | 3.13 | -2.18 | -3.01 | 1.11 | -16.75 | 0.31 | 0.16 | 742 | 46834.59 |
 | additive_xload | FPL | 6.37 | 5.77 | -6.55 | -7.12 | 1.10 | -50.73 | 0.26 | 0.26 | 665 | 15346.05 |
+| additive_xload | ISNE | 3.82 | 3.39 | -1.04 | -2.41 | 0.54 | -20.75 | 0.20 | 0.17 | 748 | 13403.92 |
 | additive_xload | MISO | 2.43 | 2.19 | -1.28 | -1.90 | 1.82 | -8.66 | 0.53 | 0.05 | 738 | 73700.16 |
 | additive_xload | NYIS | 2.70 | 2.32 | -0.72 | -1.94 | 0.59 | -13.89 | 0.53 | 0.61 | 748 | 17415.28 |
 | additive_xload | PJM | 2.78 | 2.40 | -0.61 | -1.77 | 1.73 | -12.68 | 0.44 | 0.37 | 734 | 92076.14 |
@@ -58,6 +61,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xtemp | DUK | 3.52 | 3.08 | -0.64 | -2.32 | 1.42 | -14.55 | 0.36 | 0.27 | 746 | 12143.29 |
 | additive_xtemp | ERCO | 3.44 | 2.99 | -2.15 | -2.94 | 1.06 | -15.53 | 0.31 | 0.16 | 742 | 46834.59 |
 | additive_xtemp | FPL | 6.14 | 5.70 | -6.39 | -6.90 | 1.09 | -50.04 | 0.28 | 0.27 | 665 | 15346.05 |
+| additive_xtemp | ISNE | 3.77 | 3.41 | -1.10 | -2.46 | 0.54 | -19.72 | 0.23 | 0.16 | 748 | 13403.92 |
 | additive_xtemp | MISO | 2.37 | 2.11 | -1.35 | -1.94 | 1.76 | -9.47 | 0.54 | 0.05 | 738 | 73700.16 |
 | additive_xtemp | NYIS | 2.64 | 2.28 | -0.88 | -2.06 | 0.55 | -15.69 | 0.54 | 0.60 | 748 | 17415.28 |
 | additive_xtemp | PJM | 2.68 | 2.37 | -0.51 | -1.69 | 1.73 | -11.80 | 0.45 | 0.39 | 734 | 92076.14 |
@@ -68,6 +72,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xall | DUK | 3.48 | 3.01 | -0.52 | -2.25 | 1.50 | -17.80 | 0.34 | 0.27 | 746 | 12143.29 |
 | boosting_xall | ERCO | 3.05 | 2.59 | -2.33 | -2.99 | 1.30 | -20.78 | 0.36 | 0.17 | 742 | 46834.59 |
 | boosting_xall | FPL | 6.27 | 5.94 | -6.68 | -7.03 | 1.32 | -52.42 | 0.20 | 0.26 | 665 | 15346.05 |
+| boosting_xall | ISNE | 3.69 | 3.30 | -0.71 | -2.02 | 0.55 | -18.20 | 0.24 | 0.18 | 748 | 13403.92 |
 | boosting_xall | MISO | 2.33 | 2.02 | -0.55 | -1.44 | 1.70 | -10.28 | 0.55 | 0.05 | 738 | 73700.16 |
 | boosting_xall | NYIS | 2.68 | 2.35 | -0.38 | -1.51 | 0.79 | -12.12 | 0.51 | 0.69 | 748 | 17415.28 |
 | boosting_xall | PJM | 2.74 | 2.49 | 0.07 | -1.39 | 1.78 | -12.01 | 0.42 | 0.42 | 734 | 92076.14 |
@@ -78,6 +83,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xload | DUK | 3.55 | 3.15 | -0.49 | -2.27 | 1.44 | -16.27 | 0.34 | 0.26 | 746 | 12143.29 |
 | boosting_xload | ERCO | 3.13 | 2.69 | -2.28 | -3.00 | 1.38 | -20.67 | 0.35 | 0.17 | 742 | 46834.59 |
 | boosting_xload | FPL | 6.33 | 5.99 | -6.78 | -7.13 | 1.32 | -52.24 | 0.18 | 0.27 | 665 | 15346.05 |
+| boosting_xload | ISNE | 3.66 | 3.27 | -0.85 | -2.08 | 0.57 | -20.95 | 0.26 | 0.16 | 748 | 13403.92 |
 | boosting_xload | MISO | 2.35 | 2.06 | -0.52 | -1.46 | 1.61 | -9.78 | 0.55 | 0.06 | 738 | 73700.16 |
 | boosting_xload | NYIS | 2.68 | 2.38 | -0.44 | -1.56 | 0.74 | -14.66 | 0.51 | 0.67 | 748 | 17415.28 |
 | boosting_xload | PJM | 2.79 | 2.49 | 0.12 | -1.39 | 1.72 | -12.65 | 0.42 | 0.42 | 734 | 92076.14 |
@@ -88,6 +94,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xsun | DUK | 3.57 | 3.12 | -0.42 | -2.27 | 1.49 | -16.82 | 0.33 | 0.27 | 746 | 12143.29 |
 | boosting_xsun | ERCO | 3.14 | 2.73 | -2.28 | -2.99 | 1.30 | -15.00 | 0.35 | 0.18 | 742 | 46834.59 |
 | boosting_xsun | FPL | 6.33 | 5.95 | -6.77 | -7.11 | 1.37 | -51.98 | 0.19 | 0.26 | 665 | 15346.05 |
+| boosting_xsun | ISNE | 3.66 | 3.33 | -0.80 | -2.06 | 0.60 | -21.43 | 0.25 | 0.16 | 748 | 13403.92 |
 | boosting_xsun | MISO | 2.41 | 2.07 | -0.51 | -1.44 | 1.81 | -11.84 | 0.54 | 0.06 | 738 | 73700.16 |
 | boosting_xsun | NYIS | 2.70 | 2.40 | -0.48 | -1.61 | 0.75 | -14.02 | 0.51 | 0.66 | 748 | 17415.28 |
 | boosting_xsun | PJM | 2.82 | 2.52 | 0.12 | -1.44 | 1.84 | -11.75 | 0.42 | 0.42 | 734 | 92076.14 |
@@ -98,6 +105,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xtemp | DUK | 3.49 | 3.03 | -0.51 | -2.25 | 1.43 | -17.27 | 0.38 | 0.27 | 746 | 12143.29 |
 | boosting_xtemp | ERCO | 3.05 | 2.60 | -2.30 | -2.95 | 1.35 | -15.86 | 0.36 | 0.18 | 742 | 46834.59 |
 | boosting_xtemp | FPL | 6.28 | 5.95 | -6.66 | -7.01 | 1.29 | -52.47 | 0.18 | 0.27 | 665 | 15346.05 |
+| boosting_xtemp | ISNE | 3.67 | 3.25 | -0.71 | -2.01 | 0.58 | -21.78 | 0.26 | 0.16 | 748 | 13403.92 |
 | boosting_xtemp | MISO | 2.38 | 2.08 | -0.53 | -1.45 | 1.70 | -9.96 | 0.56 | 0.05 | 738 | 73700.16 |
 | boosting_xtemp | NYIS | 2.67 | 2.33 | -0.39 | -1.54 | 0.74 | -12.68 | 0.51 | 0.66 | 748 | 17415.28 |
 | boosting_xtemp | PJM | 2.73 | 2.47 | 0.10 | -1.39 | 1.64 | -11.49 | 0.43 | 0.41 | 734 | 92076.14 |
@@ -108,6 +116,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | final_additive | DUK | 3.56 | 3.15 | -0.71 | -2.39 | 1.42 | -14.75 | 0.34 | 0.27 | 746 | 12143.29 |
 | final_additive | ERCO | 3.57 | 3.14 | -2.24 | -3.05 | 1.11 | -16.37 | 0.30 | 0.15 | 742 | 46834.59 |
 | final_additive | FPL | 6.22 | 5.64 | -6.28 | -6.87 | 1.10 | -50.91 | 0.29 | 0.27 | 665 | 15346.05 |
+| final_additive | ISNE | 3.86 | 3.46 | -1.13 | -2.51 | 0.55 | -20.55 | 0.20 | 0.16 | 748 | 13403.92 |
 | final_additive | MISO | 2.44 | 2.18 | -1.43 | -1.99 | 1.83 | -9.48 | 0.54 | 0.05 | 738 | 73700.16 |
 | final_additive | NYIS | 2.72 | 2.37 | -0.87 | -2.09 | 0.60 | -15.67 | 0.51 | 0.59 | 748 | 17415.28 |
 | final_additive | PJM | 2.81 | 2.47 | -0.68 | -1.84 | 1.77 | -12.10 | 0.42 | 0.37 | 734 | 92076.14 |
@@ -118,6 +127,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | final_boosting | DUK | 3.57 | 3.12 | -0.42 | -2.27 | 1.49 | -16.82 | 0.33 | 0.27 | 746 | 12143.29 |
 | final_boosting | ERCO | 3.14 | 2.73 | -2.28 | -2.99 | 1.30 | -15.00 | 0.35 | 0.18 | 742 | 46834.59 |
 | final_boosting | FPL | 6.33 | 5.95 | -6.77 | -7.11 | 1.37 | -51.98 | 0.19 | 0.26 | 665 | 15346.05 |
+| final_boosting | ISNE | 3.66 | 3.33 | -0.80 | -2.06 | 0.60 | -21.43 | 0.25 | 0.16 | 748 | 13403.92 |
 | final_boosting | MISO | 2.41 | 2.07 | -0.51 | -1.44 | 1.81 | -11.84 | 0.54 | 0.06 | 738 | 73700.16 |
 | final_boosting | NYIS | 2.70 | 2.40 | -0.48 | -1.61 | 0.75 | -14.02 | 0.51 | 0.66 | 748 | 17415.28 |
 | final_boosting | PJM | 2.82 | 2.52 | 0.12 | -1.44 | 1.84 | -11.75 | 0.42 | 0.42 | 734 | 92076.14 |
@@ -133,6 +143,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | DF | DUK | uri | 4.88 | -3.81 | -4.48 | -10.25 | 6 |
 | DF | ERCO | uri | 3.82 | 0.80 | -0.84 | -1.69 | 2 |
 | DF | FPL | uri | 5.37 | -5.97 | -6.56 | -14.35 | 6 |
+| DF | ISNE | uri | 1.48 | -0.30 | -0.58 | -1.97 | 6 |
 | DF | MISO | uri | 4.05 | 0.76 | -1.69 | -4.70 | 5 |
 | DF | NYIS | uri | 2.78 | -2.59 | -2.59 | -4.66 | 6 |
 | DF | PJM | uri | 1.80 | -0.17 | -0.23 | -0.76 | 6 |
@@ -143,6 +154,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xall | DUK | uri | 3.49 | -1.84 | -1.91 | -6.46 | 6 |
 | additive_xall | ERCO | uri | 4.34 | -4.90 | -4.90 | -7.68 | 2 |
 | additive_xall | FPL | uri | 10.53 | -15.09 | -15.09 | -18.04 | 6 |
+| additive_xall | ISNE | uri | 2.98 | 1.99 | -0.20 | -1.20 | 6 |
 | additive_xall | MISO | uri | 3.67 | -2.41 | -3.04 | -6.36 | 5 |
 | additive_xall | NYIS | uri | 2.66 | 3.01 | 0.00 | 0.00 | 6 |
 | additive_xall | PJM | uri | 3.14 | 3.01 | -0.41 | -2.47 | 6 |
@@ -153,6 +165,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xload | DUK | uri | 3.45 | -2.22 | -2.22 | -6.93 | 6 |
 | additive_xload | ERCO | uri | 4.89 | -5.83 | -5.83 | -8.07 | 2 |
 | additive_xload | FPL | uri | 10.18 | -14.15 | -14.15 | -17.19 | 6 |
+| additive_xload | ISNE | uri | 2.79 | 1.69 | -0.26 | -1.58 | 6 |
 | additive_xload | MISO | uri | 3.81 | -3.11 | -3.48 | -6.98 | 5 |
 | additive_xload | NYIS | uri | 2.51 | 2.56 | 0.00 | 0.00 | 6 |
 | additive_xload | PJM | uri | 3.11 | 2.58 | -0.37 | -2.24 | 6 |
@@ -163,6 +176,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xtemp | DUK | uri | 3.46 | -2.33 | -2.35 | -7.06 | 6 |
 | additive_xtemp | ERCO | uri | 4.17 | -4.61 | -4.61 | -7.57 | 2 |
 | additive_xtemp | FPL | uri | 10.78 | -15.51 | -15.51 | -18.47 | 6 |
+| additive_xtemp | ISNE | uri | 2.69 | 1.79 | -0.19 | -1.14 | 6 |
 | additive_xtemp | MISO | uri | 3.39 | -1.58 | -2.30 | -4.60 | 5 |
 | additive_xtemp | NYIS | uri | 2.33 | 2.45 | 0.00 | 0.00 | 6 |
 | additive_xtemp | PJM | uri | 3.00 | 2.79 | -0.47 | -2.80 | 6 |
@@ -173,6 +187,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xall | DUK | uri | 3.73 | -2.45 | -2.62 | -5.37 | 6 |
 | boosting_xall | ERCO | uri | 8.42 | -13.34 | -13.34 | -14.88 | 2 |
 | boosting_xall | FPL | uri | 8.95 | -10.96 | -10.96 | -13.77 | 6 |
+| boosting_xall | ISNE | uri | 3.75 | 2.24 | -0.56 | -2.76 | 6 |
 | boosting_xall | MISO | uri | 3.11 | -2.80 | -2.94 | -5.79 | 5 |
 | boosting_xall | NYIS | uri | 2.63 | 0.87 | -0.61 | -3.20 | 6 |
 | boosting_xall | PJM | uri | 2.04 | -0.72 | -0.98 | -1.97 | 6 |
@@ -183,6 +198,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xload | DUK | uri | 3.57 | -2.86 | -2.93 | -4.81 | 6 |
 | boosting_xload | ERCO | uri | 8.79 | -13.01 | -13.01 | -14.64 | 2 |
 | boosting_xload | FPL | uri | 9.26 | -11.06 | -11.06 | -14.67 | 6 |
+| boosting_xload | ISNE | uri | 3.81 | 2.12 | -0.32 | -1.65 | 6 |
 | boosting_xload | MISO | uri | 3.02 | -3.17 | -3.17 | -5.44 | 5 |
 | boosting_xload | NYIS | uri | 2.58 | 0.98 | -0.81 | -2.49 | 6 |
 | boosting_xload | PJM | uri | 2.04 | -1.19 | -1.40 | -3.32 | 6 |
@@ -193,6 +209,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xsun | DUK | uri | 3.53 | -2.86 | -2.86 | -4.45 | 6 |
 | boosting_xsun | ERCO | uri | 8.12 | -12.91 | -12.91 | -15.00 | 2 |
 | boosting_xsun | FPL | uri | 9.40 | -11.00 | -11.00 | -15.39 | 6 |
+| boosting_xsun | ISNE | uri | 3.32 | 1.07 | -0.73 | -3.06 | 6 |
 | boosting_xsun | MISO | uri | 3.37 | -4.08 | -4.08 | -7.61 | 5 |
 | boosting_xsun | NYIS | uri | 2.22 | 0.80 | -0.76 | -2.94 | 6 |
 | boosting_xsun | PJM | uri | 1.98 | -1.08 | -1.17 | -3.87 | 6 |
@@ -203,6 +220,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xtemp | DUK | uri | 3.60 | -2.52 | -2.58 | -5.65 | 6 |
 | boosting_xtemp | ERCO | uri | 7.36 | -12.56 | -12.56 | -14.77 | 2 |
 | boosting_xtemp | FPL | uri | 9.05 | -10.93 | -10.93 | -13.65 | 6 |
+| boosting_xtemp | ISNE | uri | 3.46 | 0.98 | -0.82 | -3.31 | 6 |
 | boosting_xtemp | MISO | uri | 3.06 | -3.26 | -3.31 | -6.50 | 5 |
 | boosting_xtemp | NYIS | uri | 2.36 | 1.14 | -0.42 | -2.50 | 6 |
 | boosting_xtemp | PJM | uri | 1.86 | -0.63 | -1.04 | -3.39 | 6 |
@@ -213,6 +231,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | final_additive | DUK | uri | 3.45 | -2.72 | -2.72 | -7.63 | 6 |
 | final_additive | ERCO | uri | 4.97 | -5.56 | -5.56 | -8.11 | 2 |
 | final_additive | FPL | uri | 10.40 | -14.61 | -14.61 | -18.21 | 6 |
+| final_additive | ISNE | uri | 2.56 | 1.52 | -0.29 | -1.49 | 6 |
 | final_additive | MISO | uri | 3.53 | -2.28 | -2.76 | -5.27 | 5 |
 | final_additive | NYIS | uri | 2.24 | 2.05 | -0.04 | -0.13 | 6 |
 | final_additive | PJM | uri | 2.94 | 2.28 | -0.43 | -2.57 | 6 |
@@ -223,6 +242,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | final_boosting | DUK | uri | 3.53 | -2.86 | -2.86 | -4.45 | 6 |
 | final_boosting | ERCO | uri | 8.12 | -12.91 | -12.91 | -15.00 | 2 |
 | final_boosting | FPL | uri | 9.40 | -11.00 | -11.00 | -15.39 | 6 |
+| final_boosting | ISNE | uri | 3.32 | 1.07 | -0.73 | -3.06 | 6 |
 | final_boosting | MISO | uri | 3.37 | -4.08 | -4.08 | -7.61 | 5 |
 | final_boosting | NYIS | uri | 2.22 | 0.80 | -0.76 | -2.94 | 6 |
 | final_boosting | PJM | uri | 1.98 | -1.08 | -1.17 | -3.87 | 6 |
@@ -233,6 +253,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | DF | DUK | elliott | 3.97 | -3.57 | -3.57 | -10.55 | 4 |
 | DF | ERCO | elliott | 6.90 | -5.44 | -6.59 | -11.44 | 5 |
 | DF | FPL | elliott | 6.78 | -5.10 | -5.10 | -8.18 | 5 |
+| DF | ISNE | elliott | 3.18 | 3.19 | 0.00 | 0.00 | 5 |
 | DF | MISO | elliott | 4.82 | 0.77 | -1.22 | -2.84 | 5 |
 | DF | NYIS | elliott | 3.80 | -3.38 | -3.40 | -6.33 | 5 |
 | DF | PJM | elliott | 3.51 | -3.99 | -3.99 | -7.05 | 5 |
@@ -243,6 +264,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xall | DUK | elliott | 4.58 | -3.41 | -3.41 | -5.07 | 4 |
 | additive_xall | ERCO | elliott | 7.48 | -5.62 | -6.17 | -14.01 | 5 |
 | additive_xall | FPL | elliott | 10.32 | -0.39 | -5.39 | -13.75 | 5 |
+| additive_xall | ISNE | elliott | 3.84 | 2.32 | -0.91 | -2.27 | 5 |
 | additive_xall | MISO | elliott | 3.36 | -3.29 | -3.60 | -7.71 | 5 |
 | additive_xall | NYIS | elliott | 3.13 | -0.97 | -2.04 | -4.49 | 5 |
 | additive_xall | PJM | elliott | 3.53 | -0.16 | -0.93 | -4.57 | 5 |
@@ -253,6 +275,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xload | DUK | elliott | 4.26 | -3.35 | -3.35 | -4.89 | 4 |
 | additive_xload | ERCO | elliott | 7.84 | -5.90 | -6.66 | -13.03 | 5 |
 | additive_xload | FPL | elliott | 11.54 | -2.60 | -7.60 | -18.90 | 5 |
+| additive_xload | ISNE | elliott | 4.13 | 1.59 | -0.79 | -2.23 | 5 |
 | additive_xload | MISO | elliott | 3.46 | -3.43 | -3.68 | -6.87 | 5 |
 | additive_xload | NYIS | elliott | 3.45 | -2.17 | -2.47 | -5.12 | 5 |
 | additive_xload | PJM | elliott | 3.79 | -1.37 | -1.98 | -8.99 | 5 |
@@ -263,6 +286,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | additive_xtemp | DUK | elliott | 4.63 | -2.45 | -2.47 | -5.20 | 4 |
 | additive_xtemp | ERCO | elliott | 7.46 | -4.85 | -5.56 | -13.79 | 5 |
 | additive_xtemp | FPL | elliott | 10.90 | 0.44 | -5.46 | -14.64 | 5 |
+| additive_xtemp | ISNE | elliott | 3.71 | 2.50 | -0.73 | -2.33 | 5 |
 | additive_xtemp | MISO | elliott | 3.32 | -2.99 | -3.43 | -6.61 | 5 |
 | additive_xtemp | NYIS | elliott | 3.02 | -0.76 | -1.77 | -4.35 | 5 |
 | additive_xtemp | PJM | elliott | 3.60 | -0.12 | -0.90 | -4.52 | 5 |
@@ -273,6 +297,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xall | DUK | elliott | 4.71 | -2.60 | -2.60 | -5.62 | 4 |
 | boosting_xall | ERCO | elliott | 6.96 | -9.54 | -9.70 | -20.78 | 5 |
 | boosting_xall | FPL | elliott | 8.83 | -15.37 | -15.37 | -19.13 | 5 |
+| boosting_xall | ISNE | elliott | 3.89 | 3.39 | -0.45 | -2.23 | 5 |
 | boosting_xall | MISO | elliott | 3.66 | -1.07 | -2.19 | -3.48 | 5 |
 | boosting_xall | NYIS | elliott | 3.11 | 0.19 | -0.87 | -2.78 | 5 |
 | boosting_xall | PJM | elliott | 5.27 | -2.75 | -3.77 | -7.24 | 5 |
@@ -283,6 +308,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xload | DUK | elliott | 4.64 | -3.33 | -3.33 | -6.47 | 4 |
 | boosting_xload | ERCO | elliott | 7.17 | -7.37 | -8.35 | -20.67 | 5 |
 | boosting_xload | FPL | elliott | 9.74 | -15.77 | -15.77 | -22.71 | 5 |
+| boosting_xload | ISNE | elliott | 3.38 | 2.62 | -0.30 | -1.52 | 5 |
 | boosting_xload | MISO | elliott | 3.30 | -1.53 | -2.45 | -4.59 | 5 |
 | boosting_xload | NYIS | elliott | 2.87 | -0.76 | -1.65 | -3.86 | 5 |
 | boosting_xload | PJM | elliott | 5.09 | -2.53 | -3.43 | -6.72 | 5 |
@@ -293,6 +319,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xsun | DUK | elliott | 4.01 | -3.40 | -3.40 | -7.00 | 4 |
 | boosting_xsun | ERCO | elliott | 6.33 | -3.53 | -5.16 | -12.62 | 5 |
 | boosting_xsun | FPL | elliott | 9.68 | -16.11 | -16.11 | -23.65 | 5 |
+| boosting_xsun | ISNE | elliott | 3.32 | 2.41 | -0.31 | -1.57 | 5 |
 | boosting_xsun | MISO | elliott | 3.89 | -0.76 | -2.13 | -3.77 | 5 |
 | boosting_xsun | NYIS | elliott | 2.84 | -0.19 | -1.30 | -3.59 | 5 |
 | boosting_xsun | PJM | elliott | 5.20 | -1.79 | -3.00 | -5.99 | 5 |
@@ -303,6 +330,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | boosting_xtemp | DUK | elliott | 4.65 | -3.11 | -3.11 | -6.79 | 4 |
 | boosting_xtemp | ERCO | elliott | 6.07 | -7.54 | -7.68 | -15.86 | 5 |
 | boosting_xtemp | FPL | elliott | 8.72 | -14.70 | -14.70 | -19.58 | 5 |
+| boosting_xtemp | ISNE | elliott | 3.51 | 3.16 | -0.31 | -1.16 | 5 |
 | boosting_xtemp | MISO | elliott | 3.99 | -0.24 | -1.76 | -3.39 | 5 |
 | boosting_xtemp | NYIS | elliott | 3.03 | 0.01 | -1.04 | -4.08 | 5 |
 | boosting_xtemp | PJM | elliott | 5.38 | -1.56 | -2.95 | -5.92 | 5 |
@@ -313,6 +341,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | final_additive | DUK | elliott | 4.00 | -2.64 | -2.64 | -5.19 | 4 |
 | final_additive | ERCO | elliott | 7.85 | -5.09 | -6.05 | -12.58 | 5 |
 | final_additive | FPL | elliott | 11.83 | -1.71 | -7.55 | -19.18 | 5 |
+| final_additive | ISNE | elliott | 3.99 | 1.75 | -0.62 | -2.38 | 5 |
 | final_additive | MISO | elliott | 3.43 | -3.19 | -3.55 | -6.50 | 5 |
 | final_additive | NYIS | elliott | 3.27 | -1.91 | -2.37 | -3.71 | 5 |
 | final_additive | PJM | elliott | 3.70 | -2.01 | -2.64 | -6.50 | 5 |
@@ -323,6 +352,7 @@ Mean over BA-days of: hourly MAPE (%), and its median, error at the hour of the 
 | final_boosting | DUK | elliott | 4.01 | -3.40 | -3.40 | -7.00 | 4 |
 | final_boosting | ERCO | elliott | 6.33 | -3.53 | -5.16 | -12.62 | 5 |
 | final_boosting | FPL | elliott | 9.68 | -16.11 | -16.11 | -23.65 | 5 |
+| final_boosting | ISNE | elliott | 3.32 | 2.41 | -0.31 | -1.57 | 5 |
 | final_boosting | MISO | elliott | 3.89 | -0.76 | -2.13 | -3.77 | 5 |
 | final_boosting | NYIS | elliott | 2.84 | -0.19 | -1.30 | -3.59 | 5 |
 | final_boosting | PJM | elliott | 5.20 | -1.79 | -3.00 | -5.99 | 5 |
@@ -335,26 +365,26 @@ The same metrics on the special days of `calendar_us` (holidays, Super Bowl Sund
 
 | index | model | days | mape | peak_err_pct | peak_under_pct | win_mape | n_days |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 10 | DF | eve | 3.45 | 0.42 | -1.49 |  | 240 |
-| 11 | additive_xall | eve | 3.66 | -0.16 | -2.10 | 0.46 | 240 |
-| 14 | boosting_xall | eve | 3.73 | -0.56 | -2.26 | 0.41 | 240 |
-| 12 | additive_xload | eve | 3.75 | -0.45 | -2.26 | 0.42 | 240 |
-| 13 | additive_xtemp | eve | 3.76 | -0.07 | -2.11 | 0.46 | 240 |
-| 17 | boosting_xtemp | eve | 3.77 | -0.51 | -2.28 | 0.42 | 240 |
-| 15 | boosting_xload | eve | 3.77 | -0.48 | -2.27 | 0.42 | 240 |
-| 16 | boosting_xsun | eve | 3.80 | -0.38 | -2.23 | 0.42 | 240 |
-| 19 | final_boosting | eve | 3.80 | -0.38 | -2.23 | 0.42 | 240 |
-| 18 | final_additive | eve | 3.81 | -0.39 | -2.29 | 0.42 | 240 |
-| 1 | additive_xall | special | 3.68 | -1.82 | -3.04 | 0.50 | 242 |
-| 2 | additive_xload | special | 3.75 | -1.98 | -3.12 | 0.49 | 242 |
-| 3 | additive_xtemp | special | 3.76 | -1.71 | -3.00 | 0.50 | 242 |
-| 8 | final_additive | special | 3.81 | -1.85 | -3.08 | 0.48 | 242 |
-| 5 | boosting_xload | special | 3.82 | -1.73 | -2.93 | 0.48 | 242 |
-| 4 | boosting_xall | special | 3.83 | -1.78 | -2.95 | 0.50 | 242 |
-| 0 | DF | special | 3.85 | -0.11 | -1.85 |  | 242 |
-| 6 | boosting_xsun | special | 3.90 | -1.63 | -2.93 | 0.45 | 242 |
-| 9 | final_boosting | special | 3.90 | -1.63 | -2.93 | 0.45 | 242 |
-| 7 | boosting_xtemp | special | 3.90 | -1.73 | -2.96 | 0.48 | 242 |
+| 10 | DF | eve | 3.36 | 0.49 | -1.42 |  | 265 |
+| 11 | additive_xall | eve | 3.67 | 0.09 | -2.01 | 0.43 | 265 |
+| 13 | additive_xtemp | eve | 3.76 | 0.18 | -2.02 | 0.44 | 265 |
+| 12 | additive_xload | eve | 3.77 | -0.17 | -2.17 | 0.40 | 265 |
+| 14 | boosting_xall | eve | 3.79 | -0.22 | -2.14 | 0.39 | 265 |
+| 15 | boosting_xload | eve | 3.82 | -0.16 | -2.16 | 0.40 | 265 |
+| 18 | final_additive | eve | 3.83 | -0.12 | -2.20 | 0.40 | 265 |
+| 16 | boosting_xsun | eve | 3.87 | -0.07 | -2.12 | 0.40 | 265 |
+| 19 | final_boosting | eve | 3.87 | -0.07 | -2.12 | 0.40 | 265 |
+| 17 | boosting_xtemp | eve | 3.87 | -0.14 | -2.16 | 0.39 | 265 |
+| 1 | additive_xall | special | 3.70 | -1.79 | -3.04 | 0.48 | 267 |
+| 0 | DF | special | 3.71 | -0.12 | -1.77 |  | 267 |
+| 2 | additive_xload | special | 3.78 | -1.96 | -3.14 | 0.46 | 267 |
+| 3 | additive_xtemp | special | 3.78 | -1.68 | -3.01 | 0.48 | 267 |
+| 8 | final_additive | special | 3.85 | -1.83 | -3.10 | 0.46 | 267 |
+| 4 | boosting_xall | special | 3.89 | -1.72 | -2.94 | 0.47 | 267 |
+| 5 | boosting_xload | special | 3.89 | -1.68 | -2.93 | 0.45 | 267 |
+| 6 | boosting_xsun | special | 3.94 | -1.62 | -2.95 | 0.42 | 267 |
+| 9 | final_boosting | special | 3.94 | -1.62 | -2.95 | 0.42 | 267 |
+| 7 | boosting_xtemp | special | 3.95 | -1.70 | -2.96 | 0.44 | 267 |
 
 ## Documented load-shed days (left out of every table above)
 
@@ -392,56 +422,56 @@ On these BA-days the load that occurred is the load served under firm load shed,
 | 22876 | ERCO | 2021-02-18 | boosting_xtemp | 4.15 | -8.51 | -8.51 |
 | 22870 | ERCO | 2021-02-18 | final_additive | 13.46 | 12.91 | 0.00 |
 | 22871 | ERCO | 2021-02-18 | final_boosting | 3.58 | -2.96 | -2.96 |
-| 36969 | MISO | 2021-02-16 | DF | 7.05 | 10.44 | 0.00 |
-| 36964 | MISO | 2021-02-16 | additive_xall | 2.33 | 2.19 | 0.00 |
-| 36962 | MISO | 2021-02-16 | additive_xload | 2.16 | 1.93 | 0.00 |
-| 36963 | MISO | 2021-02-16 | additive_xtemp | 2.58 | 2.31 | 0.00 |
-| 36968 | MISO | 2021-02-16 | boosting_xall | 2.22 | 0.36 | 0.00 |
-| 36965 | MISO | 2021-02-16 | boosting_xload | 1.99 | -0.79 | -0.79 |
-| 36967 | MISO | 2021-02-16 | boosting_xsun | 2.11 | 0.99 | 0.00 |
-| 36966 | MISO | 2021-02-16 | boosting_xtemp | 2.65 | 1.84 | 0.00 |
-| 36960 | MISO | 2021-02-16 | final_additive | 2.38 | 1.99 | 0.00 |
-| 36961 | MISO | 2021-02-16 | final_boosting | 2.11 | 0.99 | 0.00 |
-| 59169 | SWPP | 2021-02-15 | DF | 4.31 | 3.41 | 0.00 |
-| 59164 | SWPP | 2021-02-15 | additive_xall | 2.38 | 1.40 | 0.00 |
-| 59162 | SWPP | 2021-02-15 | additive_xload | 2.31 | 1.02 | 0.00 |
-| 59163 | SWPP | 2021-02-15 | additive_xtemp | 2.77 | 1.43 | 0.00 |
-| 59168 | SWPP | 2021-02-15 | boosting_xall | 6.26 | -8.32 | -8.32 |
-| 59165 | SWPP | 2021-02-15 | boosting_xload | 6.27 | -8.52 | -8.52 |
-| 59167 | SWPP | 2021-02-15 | boosting_xsun | 5.58 | -7.79 | -7.79 |
-| 59166 | SWPP | 2021-02-15 | boosting_xtemp | 6.09 | -8.25 | -8.25 |
-| 59160 | SWPP | 2021-02-15 | final_additive | 2.66 | 1.09 | 0.00 |
-| 59161 | SWPP | 2021-02-15 | final_boosting | 5.58 | -7.79 | -7.79 |
-| 59179 | SWPP | 2021-02-16 | DF | 10.57 | 6.93 | 0.00 |
-| 59174 | SWPP | 2021-02-16 | additive_xall | 7.58 | 3.67 | 0.00 |
-| 59172 | SWPP | 2021-02-16 | additive_xload | 7.54 | 3.32 | 0.00 |
-| 59173 | SWPP | 2021-02-16 | additive_xtemp | 8.04 | 3.60 | 0.00 |
-| 59178 | SWPP | 2021-02-16 | boosting_xall | 3.17 | -5.46 | -5.46 |
-| 59175 | SWPP | 2021-02-16 | boosting_xload | 3.36 | -5.76 | -5.76 |
-| 59177 | SWPP | 2021-02-16 | boosting_xsun | 3.72 | -6.44 | -6.44 |
-| 59176 | SWPP | 2021-02-16 | boosting_xtemp | 3.40 | -6.73 | -6.73 |
-| 59170 | SWPP | 2021-02-16 | final_additive | 8.09 | 3.29 | 0.00 |
-| 59171 | SWPP | 2021-02-16 | final_boosting | 3.72 | -6.44 | -6.44 |
-| 73079 | TVA | 2022-12-23 | DF | 3.74 | -6.27 | -6.27 |
-| 73074 | TVA | 2022-12-23 | additive_xall | 7.72 | -3.74 | -3.74 |
-| 73072 | TVA | 2022-12-23 | additive_xload | 6.91 | -4.39 | -4.39 |
-| 73073 | TVA | 2022-12-23 | additive_xtemp | 6.87 | -1.82 | -1.82 |
-| 73078 | TVA | 2022-12-23 | boosting_xall | 15.15 | -15.60 | -15.60 |
-| 73075 | TVA | 2022-12-23 | boosting_xload | 15.35 | -16.72 | -16.72 |
-| 73077 | TVA | 2022-12-23 | boosting_xsun | 13.98 | -15.00 | -15.00 |
-| 73076 | TVA | 2022-12-23 | boosting_xtemp | 14.10 | -15.46 | -15.46 |
-| 73070 | TVA | 2022-12-23 | final_additive | 6.61 | -5.25 | -5.25 |
-| 73071 | TVA | 2022-12-23 | final_boosting | 13.98 | -15.00 | -15.00 |
-| 73089 | TVA | 2022-12-24 | DF | 3.88 | -8.57 | -8.57 |
-| 73084 | TVA | 2022-12-24 | additive_xall | 3.92 | -9.05 | -9.05 |
-| 73082 | TVA | 2022-12-24 | additive_xload | 3.73 | -9.11 | -9.11 |
-| 73083 | TVA | 2022-12-24 | additive_xtemp | 3.81 | -8.56 | -8.56 |
-| 73088 | TVA | 2022-12-24 | boosting_xall | 6.59 | -15.23 | -15.23 |
-| 73085 | TVA | 2022-12-24 | boosting_xload | 7.02 | -15.81 | -15.81 |
-| 73087 | TVA | 2022-12-24 | boosting_xsun | 6.04 | -12.78 | -12.78 |
-| 73086 | TVA | 2022-12-24 | boosting_xtemp | 6.60 | -13.52 | -13.52 |
-| 73080 | TVA | 2022-12-24 | final_additive | 3.65 | -8.48 | -8.48 |
-| 73081 | TVA | 2022-12-24 | final_boosting | 6.04 | -12.78 | -12.78 |
+| 44449 | MISO | 2021-02-16 | DF | 7.05 | 10.44 | 0.00 |
+| 44444 | MISO | 2021-02-16 | additive_xall | 2.33 | 2.19 | 0.00 |
+| 44442 | MISO | 2021-02-16 | additive_xload | 2.16 | 1.93 | 0.00 |
+| 44443 | MISO | 2021-02-16 | additive_xtemp | 2.58 | 2.31 | 0.00 |
+| 44448 | MISO | 2021-02-16 | boosting_xall | 2.22 | 0.36 | 0.00 |
+| 44445 | MISO | 2021-02-16 | boosting_xload | 1.99 | -0.79 | -0.79 |
+| 44447 | MISO | 2021-02-16 | boosting_xsun | 2.11 | 0.99 | 0.00 |
+| 44446 | MISO | 2021-02-16 | boosting_xtemp | 2.65 | 1.84 | 0.00 |
+| 44440 | MISO | 2021-02-16 | final_additive | 2.38 | 1.99 | 0.00 |
+| 44441 | MISO | 2021-02-16 | final_boosting | 2.11 | 0.99 | 0.00 |
+| 66649 | SWPP | 2021-02-15 | DF | 4.31 | 3.41 | 0.00 |
+| 66644 | SWPP | 2021-02-15 | additive_xall | 2.38 | 1.40 | 0.00 |
+| 66642 | SWPP | 2021-02-15 | additive_xload | 2.31 | 1.02 | 0.00 |
+| 66643 | SWPP | 2021-02-15 | additive_xtemp | 2.77 | 1.43 | 0.00 |
+| 66648 | SWPP | 2021-02-15 | boosting_xall | 6.26 | -8.32 | -8.32 |
+| 66645 | SWPP | 2021-02-15 | boosting_xload | 6.27 | -8.52 | -8.52 |
+| 66647 | SWPP | 2021-02-15 | boosting_xsun | 5.58 | -7.79 | -7.79 |
+| 66646 | SWPP | 2021-02-15 | boosting_xtemp | 6.09 | -8.25 | -8.25 |
+| 66640 | SWPP | 2021-02-15 | final_additive | 2.66 | 1.09 | 0.00 |
+| 66641 | SWPP | 2021-02-15 | final_boosting | 5.58 | -7.79 | -7.79 |
+| 66659 | SWPP | 2021-02-16 | DF | 10.57 | 6.93 | 0.00 |
+| 66654 | SWPP | 2021-02-16 | additive_xall | 7.58 | 3.67 | 0.00 |
+| 66652 | SWPP | 2021-02-16 | additive_xload | 7.54 | 3.32 | 0.00 |
+| 66653 | SWPP | 2021-02-16 | additive_xtemp | 8.04 | 3.60 | 0.00 |
+| 66658 | SWPP | 2021-02-16 | boosting_xall | 3.17 | -5.46 | -5.46 |
+| 66655 | SWPP | 2021-02-16 | boosting_xload | 3.36 | -5.76 | -5.76 |
+| 66657 | SWPP | 2021-02-16 | boosting_xsun | 3.72 | -6.44 | -6.44 |
+| 66656 | SWPP | 2021-02-16 | boosting_xtemp | 3.40 | -6.73 | -6.73 |
+| 66650 | SWPP | 2021-02-16 | final_additive | 8.09 | 3.29 | 0.00 |
+| 66651 | SWPP | 2021-02-16 | final_boosting | 3.72 | -6.44 | -6.44 |
+| 80559 | TVA | 2022-12-23 | DF | 3.74 | -6.27 | -6.27 |
+| 80554 | TVA | 2022-12-23 | additive_xall | 7.72 | -3.74 | -3.74 |
+| 80552 | TVA | 2022-12-23 | additive_xload | 6.91 | -4.39 | -4.39 |
+| 80553 | TVA | 2022-12-23 | additive_xtemp | 6.87 | -1.82 | -1.82 |
+| 80558 | TVA | 2022-12-23 | boosting_xall | 15.15 | -15.60 | -15.60 |
+| 80555 | TVA | 2022-12-23 | boosting_xload | 15.35 | -16.72 | -16.72 |
+| 80557 | TVA | 2022-12-23 | boosting_xsun | 13.98 | -15.00 | -15.00 |
+| 80556 | TVA | 2022-12-23 | boosting_xtemp | 14.10 | -15.46 | -15.46 |
+| 80550 | TVA | 2022-12-23 | final_additive | 6.61 | -5.25 | -5.25 |
+| 80551 | TVA | 2022-12-23 | final_boosting | 13.98 | -15.00 | -15.00 |
+| 80569 | TVA | 2022-12-24 | DF | 3.88 | -8.57 | -8.57 |
+| 80564 | TVA | 2022-12-24 | additive_xall | 3.92 | -9.05 | -9.05 |
+| 80562 | TVA | 2022-12-24 | additive_xload | 3.73 | -9.11 | -9.11 |
+| 80563 | TVA | 2022-12-24 | additive_xtemp | 3.81 | -8.56 | -8.56 |
+| 80568 | TVA | 2022-12-24 | boosting_xall | 6.59 | -15.23 | -15.23 |
+| 80565 | TVA | 2022-12-24 | boosting_xload | 7.02 | -15.81 | -15.81 |
+| 80567 | TVA | 2022-12-24 | boosting_xsun | 6.04 | -12.78 | -12.78 |
+| 80566 | TVA | 2022-12-24 | boosting_xtemp | 6.60 | -13.52 | -13.52 |
+| 80560 | TVA | 2022-12-24 | final_additive | 3.65 | -8.48 | -8.48 |
+| 80561 | TVA | 2022-12-24 | final_boosting | 6.04 | -12.78 | -12.78 |
 
 ## Diebold-Mariano against the BA's forecast (daily MAPE)
 
@@ -454,6 +484,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | additive_xall | DUK | mape | 9.584 | 0.000 | 746 |
 | additive_xall | ERCO | mape | 10.610 | 0.000 | 742 |
 | additive_xall | FPL | mape | 17.818 | 0.000 | 665 |
+| additive_xall | ISNE | mape | 19.452 | 0.000 | 748 |
 | additive_xall | MISO | mape | -4.388 | 0.000 | 738 |
 | additive_xall | NYIS | mape | -1.084 | 0.278 | 748 |
 | additive_xall | PJM | mape | 3.267 | 0.001 | 734 |
@@ -464,6 +495,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | additive_xload | DUK | mape | 10.259 | 0.000 | 746 |
 | additive_xload | ERCO | mape | 11.963 | 0.000 | 742 |
 | additive_xload | FPL | mape | 17.814 | 0.000 | 665 |
+| additive_xload | ISNE | mape | 20.754 | 0.000 | 748 |
 | additive_xload | MISO | mape | -3.172 | 0.002 | 738 |
 | additive_xload | NYIS | mape | 0.446 | 0.656 | 748 |
 | additive_xload | PJM | mape | 5.370 | 0.000 | 734 |
@@ -474,6 +506,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | additive_xtemp | DUK | mape | 9.520 | 0.000 | 746 |
 | additive_xtemp | ERCO | mape | 10.524 | 0.000 | 742 |
 | additive_xtemp | FPL | mape | 17.463 | 0.000 | 665 |
+| additive_xtemp | ISNE | mape | 19.903 | 0.000 | 748 |
 | additive_xtemp | MISO | mape | -3.895 | 0.000 | 738 |
 | additive_xtemp | NYIS | mape | -0.387 | 0.699 | 748 |
 | additive_xtemp | PJM | mape | 3.899 | 0.000 | 734 |
@@ -484,6 +517,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | boosting_xall | DUK | mape | 9.118 | 0.000 | 746 |
 | boosting_xall | ERCO | mape | 5.927 | 0.000 | 742 |
 | boosting_xall | FPL | mape | 20.726 | 0.000 | 665 |
+| boosting_xall | ISNE | mape | 19.485 | 0.000 | 748 |
 | boosting_xall | MISO | mape | -4.766 | 0.000 | 738 |
 | boosting_xall | NYIS | mape | 0.149 | 0.882 | 748 |
 | boosting_xall | PJM | mape | 4.850 | 0.000 | 734 |
@@ -494,6 +528,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | boosting_xload | DUK | mape | 9.985 | 0.000 | 746 |
 | boosting_xload | ERCO | mape | 6.740 | 0.000 | 742 |
 | boosting_xload | FPL | mape | 20.837 | 0.000 | 665 |
+| boosting_xload | ISNE | mape | 19.139 | 0.000 | 748 |
 | boosting_xload | MISO | mape | -4.422 | 0.000 | 738 |
 | boosting_xload | NYIS | mape | 0.166 | 0.868 | 748 |
 | boosting_xload | PJM | mape | 5.717 | 0.000 | 734 |
@@ -504,6 +539,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | boosting_xsun | DUK | mape | 10.195 | 0.000 | 746 |
 | boosting_xsun | ERCO | mape | 6.806 | 0.000 | 742 |
 | boosting_xsun | FPL | mape | 20.956 | 0.000 | 665 |
+| boosting_xsun | ISNE | mape | 18.918 | 0.000 | 748 |
 | boosting_xsun | MISO | mape | -3.538 | 0.000 | 738 |
 | boosting_xsun | NYIS | mape | 0.493 | 0.622 | 748 |
 | boosting_xsun | PJM | mape | 6.019 | 0.000 | 734 |
@@ -514,6 +550,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | boosting_xtemp | DUK | mape | 9.116 | 0.000 | 746 |
 | boosting_xtemp | ERCO | mape | 5.846 | 0.000 | 742 |
 | boosting_xtemp | FPL | mape | 20.572 | 0.000 | 665 |
+| boosting_xtemp | ISNE | mape | 18.865 | 0.000 | 748 |
 | boosting_xtemp | MISO | mape | -3.999 | 0.000 | 738 |
 | boosting_xtemp | NYIS | mape | 0.104 | 0.917 | 748 |
 | boosting_xtemp | PJM | mape | 4.787 | 0.000 | 734 |
@@ -524,6 +561,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | final_additive | DUK | mape | 10.073 | 0.000 | 746 |
 | final_additive | ERCO | mape | 11.907 | 0.000 | 742 |
 | final_additive | FPL | mape | 17.131 | 0.000 | 665 |
+| final_additive | ISNE | mape | 21.067 | 0.000 | 748 |
 | final_additive | MISO | mape | -2.864 | 0.004 | 738 |
 | final_additive | NYIS | mape | 0.793 | 0.428 | 748 |
 | final_additive | PJM | mape | 5.791 | 0.000 | 734 |
@@ -534,6 +572,7 @@ Negative statistics favour the model; p-values from the normal approximation.
 | final_boosting | DUK | mape | 10.195 | 0.000 | 746 |
 | final_boosting | ERCO | mape | 6.806 | 0.000 | 742 |
 | final_boosting | FPL | mape | 20.956 | 0.000 | 665 |
+| final_boosting | ISNE | mape | 18.918 | 0.000 | 748 |
 | final_boosting | MISO | mape | -3.538 | 0.000 | 738 |
 | final_boosting | NYIS | mape | 0.493 | 0.622 | 748 |
 | final_boosting | PJM | mape | 6.019 | 0.000 | 734 |
@@ -547,12 +586,12 @@ Fraction of BA-days each model produced a scorable forecast for.
 | model | scored_fraction |
 | --- | --- |
 | DF | 0.991 |
-| additive_xall | 0.963 |
-| additive_xload | 0.963 |
-| additive_xtemp | 0.975 |
+| additive_xall | 0.965 |
+| additive_xload | 0.965 |
+| additive_xtemp | 0.976 |
 | boosting_xall | 0.987 |
 | boosting_xload | 0.987 |
 | boosting_xsun | 0.987 |
 | boosting_xtemp | 0.987 |
-| final_additive | 0.975 |
+| final_additive | 0.976 |
 | final_boosting | 0.987 |
