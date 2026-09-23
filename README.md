@@ -215,6 +215,10 @@ are beaten in three years the recipe never saw; the forecasters are not.
 
 After the frozen run the evaluation gained three data rules: a day with a reporting fault in the published forecast (missing, zero, or more than 50 % off the outcome at any hour) or a spike in the outcome (an hour more than 40 % off its neighbours) is left out for everyone, and the documented hour-label offsets of the published series are applied on reading (PJM's forecast one hour early from February 2019, CAISO's demand one hour late from 14 June 2022, both checked against the operators' own published data). The recipe barely moves (2.54 %); the benchmark improves to 2.69 % (PJM 2.45 %, CAISO 2.38 %). Under these rules the recipe is ahead by 0.15 point on the development period, better on 53 % of the days, ahead at PJM, SPP, MISO and NYISO, level at FPL, behind at the other six. This is the evaluation used from here on.
 
+## Phase G: more features, a third member, and a second look at 2023 to 2025
+
+Phase G kept two of the many things it tried (`docs/methods.md`, section 8e): more load memory and the thermal history of the previous days as features of both members, and the recency regression as a third member of the ensemble. The recipe after phase G (`final3`) reaches **2.46 %** on the development period against 2.54 % for the phase F recipe and 2.69 % for `DF` under protocol v2, better at all eleven BAs (`docs/phase_g_final.md`), and **2.46 % against 2.80 %** on 2023 to 2025 (`docs/frozen_evaluation_v2.md`; a second look, since the phase F recipe had already been scored there), ahead at PJM, SPP, MISO and CAISO and behind at the other seven, level with the published forecasts in 2023 and ahead in 2024 and 2025 as they worsen. Against `DF` with its own hourly bias removed (2.04 %) the recipe is ahead at SPP only.
+
 ## Layout
 
 | Module | Responsibility |
