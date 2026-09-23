@@ -44,9 +44,11 @@ def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Pa
 
     With ``asos_file`` (``asos.fetch_asos`` output for the station), the hours the ISD file does not cover are
     filled from it: the NOAA archive stops on 27 August 2025 (``asos.FIRST_MISSING_ISD``)."""
-    p = fetch_isd_lite(usaf, wban, year, isd_dir)
     s = load_series_local(tidy_dir, ba, year)
-    if s.empty or (p is None and asos_file is None):
+    if s.empty:                                   # no load for the year: no observation is fetched either
+        return pd.Series(dtype=float)
+    p = fetch_isd_lite(usaf, wban, year, isd_dir)
+    if p is None and asos_file is None:
         return pd.Series(dtype=float)
     off = utc_offset(tidy_dir, ba, year).reindex(s.index)
     off = off.fillna(off.median())
