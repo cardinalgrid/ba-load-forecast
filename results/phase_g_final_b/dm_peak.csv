@@ -1,0 +1,6 @@
+,model,ba,metric,dm_stat,p_value,n_days
+0,final3b,PJM,peak_err_pct,6.9636850603885225,3.314852166773438e-12,734
+1,final3b_additive,PJM,peak_err_pct,10.940486084207558,7.380314326612243e-28,734
+2,final3b_boosting,PJM,peak_err_pct,8.646506528560165,5.310000317031998e-18,734
+3,final3b_ensemble,PJM,peak_err_pct,9.22833171250117,2.748796183599329e-20,734
+4,final3b_recency,PJM,peak_err_pct,13.919171432197581,4.844879761073457e-44,734
