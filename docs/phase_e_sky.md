@@ -1,6 +1,6 @@
 # Phase E: the sun and the forecast cloud cover as features
 
-BAs where behind-the-meter solar matters: CISO, FPL, ISNE, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `boosting_ml_sky` is the boosting with the cosine of the solar zenith angle, the HRRR total cloud cover as seen at each day's cut-off (available from December 2020) and their product; `ens_sky` and `ens_sky_bc_regime` are the ensemble and the corrected ensemble built on it, next to the same models without those features.
+BAs where behind-the-meter solar matters: CISO, FPL, ISNE, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `boosting_ml_sky` is the boosting with the cosine of the solar zenith angle, the HRRR total cloud cover as seen at each day's cut-off (available from December 2020) and their product; `ens_sky` and `ens_sky_bc_regime` are the ensemble and the corrected ensemble built on it, next to the same models without those features.
 
 ## All BAs, weighted by mean demand
 

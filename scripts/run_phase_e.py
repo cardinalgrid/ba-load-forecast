@@ -255,6 +255,7 @@ def sky_members(add):
 PER_BA_GROUPS = {          # groups whose members depend on the BA (solar features at ISO-NE and CAISO)
     "final": final_models, "intervals3": intervals3_models, "peak": peak_models, "irradiance": irradiance_models,
     "final2": final2_models, "frozen": final2_models,      # frozen: the same recipe, on other days
+    "frozen2": final2_models,                            # frozen2: the phase F recipe on 2023-2025 under protocol v2
     "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
     "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models,
@@ -494,7 +495,12 @@ def main(argv=None) -> int:
                      "Phase G: the recipe with the deeper boosting and the temperature-bias correction", g_common +
                      "`final3b` is `final3` with the boosting at 800 iterations, rate 0.03 and 63 leaves, and the HRRR temperature path "
                      "corrected by its own recent bias per local hour (30 known days). Compare with `docs/phase_g_final.md`.")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b)):
+    frozen2 = report({"frozen2"}, a.results.parent / "frozen2_2023_2025", a.doc.parent / "frozen_evaluation_final2_v2.md",
+                     "The phase F recipe on 2023 to 2025 under protocol v2",
+                     "Development BAs: " + common +
+                     "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
+                     "(same days, same rules).")
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2)):
         log("no rows to report")
         return 1
     if waiting:

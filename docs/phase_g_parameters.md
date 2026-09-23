@@ -1,6 +1,6 @@
 # Phase G: parameters
 
-Development BAs: BPAT, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). Boosting: `deep` 800 iterations at rate 0.03 with 63 leaves; `shallow` 300 iterations, 15 leaves, 50 samples per leaf; `l2` regularisation 1.0; `refit3` refitted every 3 days; `7y` trained on 2555 days. Additive: 8 and 10 knots; 90 validation days; a penalty grid from 0.001 to 1000; 2555 training days.
+Development BAs: BPAT, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). Boosting: `deep` 800 iterations at rate 0.03 with 63 leaves; `shallow` 300 iterations, 15 leaves, 50 samples per leaf; `l2` regularisation 1.0; `refit3` refitted every 3 days; `7y` trained on 2555 days. Additive: 8 and 10 knots; 90 validation days; a penalty grid from 0.001 to 1000; 2555 training days.
 
 ## All BAs, weighted by mean demand
 
