@@ -61,3 +61,17 @@ def test_recency_regression_refuses_without_weather_or_history():
     info = make_info(date(2022, 2, 20), load, temp, np.full(24, 50.0))
     with pytest.raises(ForecastError, match="history"):
         RecencyRegression().predict(info)
+
+
+def test_recency_regression_refuses_when_the_hours_before_the_day_have_no_temperature():
+    load, temp = world(days=60)
+    d = date(2022, 2, 20)
+    path_idx = pd.date_range(pd.Timestamp(d) - pd.Timedelta(hours=15), periods=39, freq="h")
+    path = temp.reindex(path_idx).to_numpy()
+    info = make_info(d, load, temp, path)
+    model = RecencyRegression(train_days=50, min_train_days=30)
+    assert np.isfinite(model.predict(info)).all()
+    short = path.copy()
+    short[:15] = np.nan                                                        # the forecast path only starts at 00:00 of the day
+    with pytest.raises(ForecastError, match="hours before the day"):
+        model.predict(make_info(d, load, temp, short))

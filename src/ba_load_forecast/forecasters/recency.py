@@ -98,4 +98,6 @@ class RecencyRegression:
         temp = temp.interpolate(limit=6, limit_area="inside")     # short gaps in the observations before the cut-off
         ts = pd.DatetimeIndex(info.timestamps)
         x = design(ts, temp, np.full(24, info.day_type), self.lags, self.moving_avgs, self.degree)
+        if not np.isfinite(x).all():
+            raise ForecastError("missing temperature in the hours before the day for the lags and moving averages")
         return x @ self.coef

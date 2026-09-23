@@ -39,6 +39,11 @@ def test_ensemble_mean_and_failing_member():
     np.testing.assert_allclose(ens.predict(info), 100.0)
     with pytest.raises(ForecastError, match="no member"):
         Ensemble([Const("a", 100, fail_on=d)]).predict(info)
+    gap = Const("c", np.nan)                                                   # a member that returns a gap instead of raising
+    np.testing.assert_allclose(Ensemble([Const("a", 100), gap]).predict(info), 100.0)
+    np.testing.assert_allclose(Ensemble([Const("a", 100), gap], weighting="hourly").predict(info), 100.0)
+    with pytest.raises(ForecastError, match="no member"):
+        Ensemble([gap]).predict(info)
 
 
 def test_ensemble_recent_weights_penalise_the_worse_member():

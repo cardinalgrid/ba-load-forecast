@@ -5,6 +5,8 @@ model, and the per-BA gaps, so that a decision on what enters the recipe reads f
     python scripts/compare_groups.py --groups phase_g_ensemble --reference final2 --metric peak_under_pct
 
 Reads ``results/<group>/by_model_ba.csv`` (per model and BA, with ``demand_mw`` and ``n_days``) and writes
+``days`` and ``days_ref``, the scored BA-days of the model and of the reference over the same BAs: a model that
+scored fewer days than the reference is not compared on the same footing, and the table says so. It also writes
 ``results/<group>/compare_<reference>.csv`` for each group plus a Markdown block on stdout. Only BAs present for
 both the model and the reference count; the weighted mean uses the BA's mean demand as weight.
 """
@@ -24,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def compare(by_ba: pd.DataFrame, reference: str, metric: str) -> pd.DataFrame:
-    ref = by_ba[by_ba["model"] == reference].set_index("ba")[[metric, "demand_mw"]]
+    ref = by_ba[by_ba["model"] == reference].set_index("ba")[[metric, "demand_mw", "n_days"]]
     rows = []
     for model, rows_of in by_ba.groupby("model"):
         g = rows_of.set_index("ba").join(ref, rsuffix="_ref", how="inner")
@@ -32,11 +34,14 @@ def compare(by_ba: pd.DataFrame, reference: str, metric: str) -> pd.DataFrame:
             continue
         w = g["demand_mw"].to_numpy(dtype=float)
         gap = g[metric] - g[f"{metric}_ref"]
-        row = {"model": model, "n_bas": len(g), f"{metric}_weighted": float(np.average(g[metric], weights=w)),
+        row = {"model": model, "n_bas": len(g), "days": int(g["n_days"].sum()), "days_ref": int(g["n_days_ref"].sum()),
+               f"{metric}_weighted": float(np.average(g[metric], weights=w)),
                "gap_weighted": float(np.average(gap, weights=w)), "bas_better": int((gap < -0.005).sum()),
                "bas_worse": int((gap > 0.005).sum())}
         row.update({f"gap_{ba}": float(v) for ba, v in gap.items()})
         rows.append(row)
+    if not rows:
+        raise ValueError(f"reference model {reference!r} is not in the report")
     return pd.DataFrame(rows).set_index("model").sort_values("gap_weighted")
 
 

@@ -1,7 +1,7 @@
 """Ensembles: the mean of several forecasters, simple or weighted by their recent error.
 
-The members are called on the same blind information set; a member that cannot forecast a day is left
-out of that day's mean. With ``weighting="recent"`` each member's weight is the inverse of its MAPE over
+The members are called on the same blind information set; a member that cannot forecast a day, or returns a
+forecast with a missing hour, is left out of that day's mean. With ``weighting="recent"`` each member's weight is the inverse of its MAPE over
 the last ``window_days`` days whose load is already known at the cut-off (day D-2 and before), measured
 on the forecasts the ensemble itself stored for those days; a member without such a record gets the
 mean weight of the others. Nothing of the target day is used.
@@ -88,9 +88,11 @@ class Ensemble:
         preds: dict[str, np.ndarray] = {}
         for m in self.members:
             try:
-                preds[m.name] = np.asarray(m.predict(info), dtype=float)
+                p = np.asarray(m.predict(info), dtype=float)
             except ForecastError:
                 continue
+            if p.shape == (24,) and np.isfinite(p).all():        # a member that returns a gap is left out like one that raised
+                preds[m.name] = p
         if not preds:
             raise ForecastError("no member could forecast")
         self._stored[info.day] = preds
