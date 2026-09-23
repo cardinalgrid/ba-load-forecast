@@ -1,6 +1,6 @@
 # Phase G: the temperature forecast corrected by its own recent bias
 
-Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). The phase F recipe with the HRRR 2 m temperature path of every station moved by the median of the forecast's own error at that local hour over the last 30 known days (forecast as seen at the cut-off against the airport observation). Compare with `docs/phase_g_protocol.md` (same recipe, no correction).
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). The phase F recipe with the HRRR 2 m temperature path of every station moved by the median of the forecast's own error at that local hour over the last 30 known days (forecast as seen at the cut-off against the airport observation). Compare with `docs/phase_g_protocol.md` (same recipe, no correction).
 
 ## All BAs, weighted by mean demand
 

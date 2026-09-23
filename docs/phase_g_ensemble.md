@@ -1,6 +1,6 @@
 # Phase G: ensemble and correction
 
-Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). `ens_hourly` weights the members per hour of the day; `ens_three` adds the recency regression; `ens_ratio` uses a boosting trained on the load divided by the last known 24 h mean; `final2_*` are the corrected versions with the recipe's correction; `final2_nn30` and `final2_nn50` change the size of the nearest-temperature pool.
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. Protocol v2 (`docs/phase_g_protocol.md`). `ens_hourly` weights the members per hour of the day; `ens_three` adds the recency regression; `ens_ratio` uses a boosting trained on the load divided by the last known 24 h mean; `final2_*` are the corrected versions with the recipe's correction; `final2_nn30` and `final2_nn50` change the size of the nearest-temperature pool.
 
 ## All BAs, weighted by mean demand
 

@@ -1,6 +1,6 @@
 # Phase F: the recipe in one run
 
-Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. One run of the recipe after phase F: the phase E members (additive model with special days and, at ISO-NE and CAISO, the PV terms; boosting with the sky features there), their ensemble by recent error, the median correction and the 90 % band read from the 40 known days of the same regime nearest in forecast minimum temperature, at an adaptive level per regime, and the point read at the 60th percentile around the forecast peak.
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. One run of the recipe after phase F: the phase E members (additive model with special days and, at ISO-NE and CAISO, the PV terms; boosting with the sky features there), their ensemble by recent error, the median correction and the 90 % band read from the 40 known days of the same regime nearest in forecast minimum temperature, at an adaptive level per regime, and the point read at the 60th percentile around the forecast peak.
 
 ## All BAs, weighted by mean demand
 

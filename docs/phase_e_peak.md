@@ -1,6 +1,6 @@
 # Phase E: the under-forecast at the daily peak
 
-Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `final` is the recipe; `final_peak_lift` replaces the hourly median correction, at the hours within 3 % of the forecast maximum, by the median of the errors measured at the actual peak hour of the pool days; `final_peak_q55` and `final_peak_q60` read the point at the 55th or 60th percentile of the errors at those hours instead of the median. The 90 % band moves with the point.
+Development BAs: BPAT, CISO, DUK, ERCO, FPL, ISNE, MISO, NYIS, PJM, SWPP, TVA, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `final` is the recipe; `final_peak_lift` replaces the hourly median correction, at the hours within 3 % of the forecast maximum, by the median of the errors measured at the actual peak hour of the pool days; `final_peak_q55` and `final_peak_q60` read the point at the 55th or 60th percentile of the errors at those hours instead of the median. The 90 % band moves with the point.
 
 ## All BAs, weighted by mean demand
 
