@@ -33,8 +33,8 @@ the grid cell nearest each BA's representative station (35 stations, none more t
 Runs reach 48 h from 2 December 2020, which sets the start of the evaluation period. Observed temperature
 (NOAA ISD-Lite) is used for training and for two reference runs only: perfect weather (a ceiling) and
 persistence (the last observed temperature at the same hour, a floor). It never enters a forecast. NOAA's ISD
-archive ends on 27 August 2025; from that day the observations come from the ASOS/METAR archive of the Iowa
-Environmental Mesonet for the same airports (`docs/methods.md`, section 2).
+archive ends on 27 August 2025; from that day the observations come from its successor, NOAA's GHCNh, for the
+same airports (`docs/methods.md`, section 2).
 
 **Comparison.** Every forecast is scored against `DF` for the same BA and day, under the same cut-off.
 
@@ -262,7 +262,7 @@ EIA-930 hourly demand and day-ahead forecast (tidy files from
 [ba-forecast-scorecard](https://github.com/cardinalgrid/ba-forecast-scorecard)); NOAA ISD-Lite hourly
 observations; HRRR forecasts from the [AWS Open Data archive](https://registry.opendata.aws/noaa-hrrr-pds/)
 in Zarr (`hrrrzarr`, maintained by the University of Utah); from 27 August 2025, when the ISD archive stops,
-hourly observations from the ASOS/METAR archive of the Iowa Environmental Mesonet. The station assignment per BA is the one of
+hourly observations from NOAA's GHCNh (its successor). The station assignment per BA is the one of
 Cardinal Grid Note 2 and of [grid-data-sentinel](https://github.com/cardinalgrid/grid-data-sentinel).
 
 ## Limitations
