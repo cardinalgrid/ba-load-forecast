@@ -12,6 +12,7 @@ and all 4560 rows matched the stored ones exactly.
 |---|---|---|---|
 | Hourly demand `D` and day-ahead forecast `DF` per BA, 2015 to 2026 | EIA-930 (form EIA-930 hourly operating data), tidied by [ba-forecast-scorecard](https://github.com/cardinalgrid/ba-forecast-scorecard) into half-year parquet files (`ba, region, date, hour, local_end, utc_end, forecast, demand, demand_adjusted, demand_imputed`) | `../ba-forecast-scorecard/data/tidy/` | The EIA revises its files; the scorecard repository records the download date of its tidy files. This study used the raw `demand` column, as Note 1 did. |
 | Hourly observed temperature, NOAA ISD-Lite, 2015 to 2025 | `https://www.ncei.noaa.gov/pub/data/noaa/isd-lite/<year>/<usaf>-<wban>-<year>.gz` and `isd-history.csv` | `../notes/03-daily-load-profiles/data/isd/` | Fetched on demand by `grid_sentinel.weather.fetch_isd_lite`; `scripts/fetch_isd.py` fetches every station of the multi-station table. NOAA occasionally revises a year's file. |
+| Hourly observed temperature after 27 August 2025 (the ISD archive stops there) | Iowa Environmental Mesonet ASOS download service, `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py` (routine hourly METAR, UTC, temperature in Fahrenheit) | `data/asos/<ICAO>.csv` | `python scripts/fetch_asos.py` (68 stations in one request, 1 August 2025 to 1 January 2026, about 1 min; the service limits the request rate). Used only where the ISD series is missing. |
 | HRRR 2 m temperature forecasts, runs 06 and 12 UTC, 2 December 2020 to 31 December 2025 | AWS Open Data `s3://hrrrzarr` (University of Utah's Zarr mirror of NOAA's HRRR), anonymous access | `data/hrrr/` (35 stations) and `data/hrrr_multi/` (28 extra stations) | Immutable archive. About 12 h and 80 GB of downloads per extraction; the result is 91 MB of parquet. |
 
 Station tables: `docs/stations_grid.csv` (one station per BA, the same assignment as Cardinal Grid
@@ -70,8 +71,10 @@ un_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and
 | 31. Frozen evaluation, 2023 to 2025 | three parallel processes of `python scripts/run_phase_e.py --groups frozen --start 2023-01-01 --end 2025-12-31 --bas <group>` (PJM MISO ERCO CISO; SWPP NYIS ISNE TVA; DUK BPAT FPL), then the same command with `--report-only` and all BAs | `%USERPROFILE%\ba-load-forecast-runs\phase_e\frozen_<BA>*.parquet`; `results/frozen_2023_2025/*.csv`, `docs/frozen_evaluation.md` | 1.5 h |
 | 32. Benchmark profile, 2023 to 2025 | `python scripts/df_profile.py --group frozen --model final2 --start 2023-01-01 --end 2025-12-31 --out results/df_profile_2023_2025 --doc docs/df_hourly_bias_2023_2025.md` | `docs/df_hourly_bias_2023_2025.md` | 3 min |
 | 33. Diagnostics, 2023 to 2025 | `python scripts/diagnose.py --group frozen --model final2 --out results/diagnostics_frozen --doc docs/diagnostics_frozen.md` | `docs/diagnostics_frozen.md` | 1 min |
+| 34. ASOS supplement for the end of 2025 | `python scripts/fetch_asos.py` | `data/asos/<ICAO>.csv` (68 stations) | 1 min |
+| 35. Frozen evaluation of the phase G recipe, protocol v2, 2023 to 2025 | as step 31 with `--groups frozen3` (and `--groups frozen2` for the phase F recipe under the same protocol), after step 34; then `--report-only` | `results/frozen3_2023_2025/`, `docs/frozen_evaluation_v2.md`; `results/frozen2_2023_2025/` | 5 h and 2.5 h |
 
-Tests: `pytest -q` (82 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (95 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 

@@ -30,6 +30,7 @@ from grid_sentinel.data import load_series_local, tidy_frame, utc_offset
 from grid_sentinel.stations import BA_STATION
 from grid_sentinel.weather import fetch_isd_lite, hourly_temperature_f, read_isd_lite
 
+from .asos import asos_path, read_asos
 from .cleaning import sentinel_clean
 from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hour, path_timestamps, run_for_day
 from .hrrr import load_station
@@ -37,17 +38,28 @@ from .sky import all_days, forecast_as_seen, pv_capacity, run_table, sky_frame
 from .stations_multi import BA_STATIONS_MULTI, station_table_for
 
 
-def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Path, isd_dir: Path) -> pd.Series:
-    """Temperature in Fahrenheit at one ISD station, indexed like the BA's load (local hour beginning)."""
+def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Path, isd_dir: Path,
+                          asos_file: Path | None = None) -> pd.Series:
+    """Temperature in Fahrenheit at one ISD station, indexed like the BA's load (local hour beginning).
+
+    With ``asos_file`` (``asos.fetch_asos`` output for the station), the hours the ISD file does not cover are
+    filled from it: the NOAA archive stops on 27 August 2025 (``asos.FIRST_MISSING_ISD``)."""
     p = fetch_isd_lite(usaf, wban, year, isd_dir)
     s = load_series_local(tidy_dir, ba, year)
-    if p is None or s.empty:
+    if s.empty or (p is None and asos_file is None):
         return pd.Series(dtype=float)
-    obs = read_isd_lite(p).drop_duplicates("utc").set_index("utc")["temp_c"].sort_index()
     off = utc_offset(tidy_dir, ba, year).reindex(s.index)
     off = off.fillna(off.median())
     utc = pd.DatetimeIndex(s.index + pd.to_timedelta(off.to_numpy(), unit="h")).tz_localize("UTC")
-    return pd.Series(obs.reindex(utc).to_numpy(dtype=float) * 9.0 / 5.0 + 32.0, index=s.index)
+    out = np.full(len(s), np.nan)
+    if p is not None:
+        obs = read_isd_lite(p).drop_duplicates("utc").set_index("utc")["temp_c"].sort_index()
+        out = obs.reindex(utc).to_numpy(dtype=float) * 9.0 / 5.0 + 32.0
+    if asos_file is not None:
+        sup = read_asos(asos_file).reindex(utc).to_numpy(dtype=float)
+        gap = np.isnan(out)
+        out[gap] = sup[gap]
+    return pd.Series(out, index=s.index)
 
 
 @dataclass
@@ -202,7 +214,8 @@ class Loader:
                  init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS, gross_guard: bool = True,
                  stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
-                 dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0):
+                 dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0,
+                 asos_dir: Path | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -212,6 +225,7 @@ class Loader:
         # temp_bias_days > 0: the HRRR temperature path of the target day is corrected by the median of the forecast's
         # own error per local hour over that many known days (forecast as seen at the cut-off against the observation)
         self.temp_bias_days = temp_bias_days
+        self.asos_dir = Path(asos_dir) if asos_dir is not None else None
         self._bias_tables: dict[tuple[str, str], pd.DataFrame] = {}
         # align_labels applies the documented hour-label offsets of the published series (docs/hour_label_offsets.csv)
         self.offsets = label_offsets() if align_labels else pd.DataFrame(columns=["ba", "column", "start", "end", "shift_hours"])
@@ -322,7 +336,8 @@ class Loader:
                 self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v}),
                                                         self.isd_dir).set_index("icao")
             st = self._station_table.loc[icao]
-            return station_temperature_f(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir)
+            return station_temperature_f(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir,
+                                         asos_file=asos_path(icao, self.asos_dir))
 
         return self._cached(("stemp", icao, ba, year), read)
 
@@ -363,7 +378,21 @@ class Loader:
         return self._cached(("offset", ba, year), lambda: utc_offset(self.tidy_dir, ba, year))
 
     def temperature(self, ba: str, year: int) -> pd.Series:
-        return self._cached(("temp", ba, year), lambda: hourly_temperature_f(ba, year, self.tidy_dir, self.isd_dir))
+        def read():
+            s = hourly_temperature_f(ba, year, self.tidy_dir, self.isd_dir)
+            f = asos_path(BA_STATION[ba], self.asos_dir) if ba in BA_STATION else None
+            if f is None or s.empty or not s.isna().any():
+                return s
+            off = utc_offset(self.tidy_dir, ba, year).reindex(s.index)
+            off = off.fillna(off.median())
+            utc = pd.DatetimeIndex(s.index + pd.to_timedelta(off.to_numpy(), unit="h")).tz_localize("UTC")
+            sup = read_asos(f).reindex(utc).to_numpy(dtype=float)
+            v = s.to_numpy(dtype=float).copy()
+            gap = np.isnan(v)
+            v[gap] = sup[gap]
+            return pd.Series(v, index=s.index)
+
+        return self._cached(("temp", ba, year), read)
 
     def hrrr(self, icao: str) -> pd.DataFrame:
         if icao not in self._hrrr:
