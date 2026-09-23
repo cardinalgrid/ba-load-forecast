@@ -1,6 +1,6 @@
 # Phase F: forecast irradiance as a feature
 
-BAs with large solar behind the load: CISO, ISNE, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `*_irr` models receive the HRRR forecast surface short-wave flux as seen at each day's cut-off (GRIB2 archive, from December 2020): the boosting as a column, the additive model as the installed PV capacity times the flux, in place of the capacity times the cloud fraction. `final_nn40` and `final_nn40_irr` are the corrected ensembles with the nearest-temperature pool, without and with it.
+BAs with large solar behind the load: CISO, ISNE, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `*_irr` models receive the HRRR forecast surface short-wave flux as seen at each day's cut-off (GRIB2 archive, from December 2020): the boosting as a column, the additive model as the installed PV capacity times the flux, in place of the capacity times the cloud fraction. `final_nn40` and `final_nn40_irr` are the corrected ensembles with the nearest-temperature pool, without and with it.
 
 ## All BAs, weighted by mean demand
 

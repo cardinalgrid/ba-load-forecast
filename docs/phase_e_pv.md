@@ -1,6 +1,6 @@
 # Phase E: the installed PV capacity as a feature
 
-BAs with large solar behind the load: CISO, ISNE, 2020-12-02 to 2022-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `boosting_ml_pv` is the sky boosting with three more columns: the installed PV capacity of the month (MW, from Forms EIA-861M and EIA-860M), that capacity times the sun's elevation, and the same times one minus the forecast cloud fraction; `ens_pv` and `ens_pv_bc_regime` are the ensemble and the corrected ensemble built on it. Compare with `docs/phase_e_sky.md` (same BAs and days, without the capacity terms).
+BAs with large solar behind the load: CISO, ISNE, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, HRRR temperature at several stations per BA, six years of training. Only BA-days on which every model produced a forecast are counted; documented load-shed days are left out. `boosting_ml_pv` is the sky boosting with three more columns: the installed PV capacity of the month (MW, from Forms EIA-861M and EIA-860M), that capacity times the sun's elevation, and the same times one minus the forecast cloud fraction; `ens_pv` and `ens_pv_bc_regime` are the ensemble and the corrected ensemble built on it. Compare with `docs/phase_e_sky.md` (same BAs and days, without the capacity terms).
 
 ## All BAs, weighted by mean demand
 
