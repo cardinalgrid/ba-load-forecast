@@ -39,17 +39,18 @@ from .stations_multi import BA_STATIONS_MULTI, station_table_for
 
 
 def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Path, isd_dir: Path,
-                          supplement_file: Path | None = None) -> pd.Series:
+                          supplement_file: Path | list[Path] | None = None) -> pd.Series:
     """Temperature in Fahrenheit at one ISD station, indexed like the BA's load (local hour beginning).
 
-    With ``supplement_file`` (``scripts/fetch_ghcnh.py`` or ``scripts/fetch_asos.py`` output for the station), the
-    hours the ISD file does not cover are filled from it: the ISD archive stops on 27 August 2025
-    (``asos.FIRST_MISSING_ISD``)."""
+    With ``supplement_file`` (``scripts/fetch_ghcnh.py`` or ``scripts/fetch_asos.py`` output for the station, one file
+    or a list applied in order), the hours the ISD file does not cover are filled from it: the ISD archive stops on
+    27 August 2025 (``asos.FIRST_MISSING_ISD``). A later file only fills what the earlier ones left missing."""
     s = load_series_local(tidy_dir, ba, year)
     if s.empty:                                   # no load for the year: no observation is fetched either
         return pd.Series(dtype=float)
     p = fetch_isd_lite(usaf, wban, year, isd_dir)
-    if p is None and supplement_file is None:
+    files = [] if supplement_file is None else ([supplement_file] if isinstance(supplement_file, Path) else list(supplement_file))
+    if p is None and not files:
         return pd.Series(dtype=float)
     off = utc_offset(tidy_dir, ba, year).reindex(s.index)
     off = off.fillna(off.median())
@@ -58,8 +59,8 @@ def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Pa
     if p is not None:
         obs = read_isd_lite(p).drop_duplicates("utc").set_index("utc")["temp_c"].sort_index()
         out = obs.reindex(utc).to_numpy(dtype=float) * 9.0 / 5.0 + 32.0
-    if supplement_file is not None:
-        sup = read_asos(supplement_file).reindex(utc).to_numpy(dtype=float)
+    for f in files:
+        sup = read_asos(f).reindex(utc).to_numpy(dtype=float)
         gap = np.isnan(out)
         out[gap] = sup[gap]
     return pd.Series(out, index=s.index)
@@ -218,7 +219,7 @@ class Loader:
                  stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
                  dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0,
-                 supplement_dir: Path | None = None):
+                 supplement_dir: Path | list[Path] | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -228,7 +229,8 @@ class Loader:
         # temp_bias_days > 0: the HRRR temperature path of the target day is corrected by the median of the forecast's
         # own error per local hour over that many known days (forecast as seen at the cut-off against the observation)
         self.temp_bias_days = temp_bias_days
-        self.supplement_dir = Path(supplement_dir) if supplement_dir is not None else None
+        dirs = [] if supplement_dir is None else ([supplement_dir] if isinstance(supplement_dir, (str, Path)) else list(supplement_dir))
+        self.supplement_dirs = [Path(d) for d in dirs]
         self._bias_tables: dict[tuple[str, str], pd.DataFrame] = {}
         # align_labels applies the documented hour-label offsets of the published series (docs/hour_label_offsets.csv)
         self.offsets = label_offsets() if align_labels else pd.DataFrame(columns=["ba", "column", "start", "end", "shift_hours"])
@@ -340,7 +342,7 @@ class Loader:
                                                         self.isd_dir).set_index("icao")
             st = self._station_table.loc[icao]
             return station_temperature_f(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir,
-                                         supplement_file=supplement_path(icao, self.supplement_dir))
+                                         supplement_file=[f for f in (supplement_path(icao, d) for d in self.supplement_dirs) if f])
 
         return self._cached(("stemp", icao, ba, year), read)
 
@@ -383,16 +385,17 @@ class Loader:
     def temperature(self, ba: str, year: int) -> pd.Series:
         def read():
             s = hourly_temperature_f(ba, year, self.tidy_dir, self.isd_dir)
-            f = supplement_path(BA_STATION[ba], self.supplement_dir) if ba in BA_STATION else None
-            if f is None or s.empty or not s.isna().any():
+            files = [f for f in (supplement_path(BA_STATION[ba], d) for d in self.supplement_dirs) if f] if ba in BA_STATION else []
+            if not files or s.empty or not s.isna().any():
                 return s
             off = utc_offset(self.tidy_dir, ba, year).reindex(s.index)
             off = off.fillna(off.median())
             utc = pd.DatetimeIndex(s.index + pd.to_timedelta(off.to_numpy(), unit="h")).tz_localize("UTC")
-            sup = read_asos(f).reindex(utc).to_numpy(dtype=float)
             v = s.to_numpy(dtype=float).copy()
-            gap = np.isnan(v)
-            v[gap] = sup[gap]
+            for f in files:
+                sup = read_asos(f).reindex(utc).to_numpy(dtype=float)
+                gap = np.isnan(v)
+                v[gap] = sup[gap]
             return pd.Series(v, index=s.index)
 
         return self._cached(("temp", ba, year), read)

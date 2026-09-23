@@ -64,4 +64,16 @@ def test_station_temperature_fills_only_the_gap(tmp_path, monkeypatch):
     s = m.station_temperature_f("724080", "13739", "PJM", 2025, tmp_path, tmp_path, supplement_file=f)
     assert len(s) == 48
     np.testing.assert_allclose(s.to_numpy(), np.arange(48, dtype=float))
+    first = obs.iloc[:10].copy()                                              # a first supplement with a hole after 10 hours
+    f1 = tmp_path / "first" / "KPHL.csv"
+    f1.parent.mkdir()
+    first.to_csv(f1, index=False)
+    second = obs.copy()
+    second["temp_f"] = second["temp_f"] + 100.0
+    f2 = tmp_path / "second" / "KPHL.csv"
+    f2.parent.mkdir()
+    second.to_csv(f2, index=False)
+    layered = m.station_temperature_f("724080", "13739", "PJM", 2025, tmp_path, tmp_path, supplement_file=[f1, f2])
+    np.testing.assert_allclose(layered.to_numpy()[:10], np.arange(10, dtype=float))      # the first file wins
+    np.testing.assert_allclose(layered.to_numpy()[10:], np.arange(10, 48, dtype=float) + 100.0)  # the second fills the rest
     assert m.station_temperature_f("724080", "13739", "PJM", 2025, tmp_path, tmp_path).empty

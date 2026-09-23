@@ -323,9 +323,10 @@ def main(argv=None) -> int:
     ap.add_argument("--tidy", type=Path, default=ROOT.parent / "ba-forecast-scorecard" / "data" / "tidy")
     ap.add_argument("--isd-dir", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
     ap.add_argument("--hrrr", type=Path, default=ROOT / "data" / "hrrr")
-    ap.add_argument("--supplement-dir", type=Path, default=ROOT / "data" / "ghcnh",
-                    help="observed temperature for the hours the ISD archive does not cover: data/ghcnh (scripts/fetch_ghcnh.py, "
-                         "NOAA) or data/asos (scripts/fetch_asos.py, Iowa Environmental Mesonet)")
+    ap.add_argument("--supplement-dir", type=Path, nargs="+", default=[ROOT / "data" / "ghcnh", ROOT / "data" / "asos"],
+                    help="observed temperature for the hours the ISD archive does not cover, applied in order: data/ghcnh "
+                         "(scripts/fetch_ghcnh.py, NOAA) then data/asos (scripts/fetch_asos.py, Iowa Environmental Mesonet) for "
+                         "the hours GHCNh lacks")
     ap.add_argument("--out", type=Path, default=Path.home() / "ba-load-forecast-runs" / "phase_e")
     ap.add_argument("--results", type=Path, default=ROOT / "results" / "phase_e")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "phase_e.md")
