@@ -328,7 +328,8 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=Path.home() / "ba-load-forecast-runs" / "phase_e")
     ap.add_argument("--results", type=Path, default=ROOT / "results" / "phase_e")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "phase_e.md")
-    ap.add_argument("--report-only", action="store_true")
+    ap.add_argument("--report-only", action="store_true",
+                    help="rebuild the reports of the groups in --groups from the files already in --out (use the group's --start/--end)")
     a = ap.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
 
@@ -359,6 +360,8 @@ def main(argv=None) -> int:
                 log(f"{group} {ba}: {len(rows)} rows in {(time.time() - t0) / 60:.1f} min; mean MAPE {sc}")
 
     def report(prefixes, results, doc, title, intro):
+        if not set(prefixes) & set(a.groups):          # only the groups asked for: a report carries the period of the command line
+            return None
         files = sorted(p for p in a.out.glob("*.parquet")
                        if not p.name.endswith("_hourly.parquet") and p.name.split("_")[0] in prefixes)
         if not files:
