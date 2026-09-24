@@ -67,7 +67,7 @@ def heat_index_f(temp_f, rh) -> np.ndarray:
     hi = (-42.379 + 2.04901523 * t + 10.14333127 * r - 0.22475541 * t * r - 6.83783e-3 * t * t
           - 5.481717e-2 * r * r + 1.22874e-3 * t * t * r + 8.5282e-4 * t * r * r - 1.99e-6 * t * t * r * r)
     low = (r < 13) & (t >= 80) & (t <= 112)
-    hi = np.where(low, hi - ((13 - r) / 4) * np.sqrt((17 - np.abs(t - 95.0)) / 17), hi)
+    hi = np.where(low, hi - ((13 - r) / 4) * np.sqrt(np.clip((17 - np.abs(t - 95.0)) / 17, 0.0, None)), hi)
     high = (r > 85) & (t >= 80) & (t <= 87)
     hi = np.where(high, hi + ((r - 85) / 10) * ((87 - t) / 5), hi)
     return np.where(t >= 80.0, hi, t)

@@ -200,6 +200,7 @@ FINAL3 = dict(                 # what phase G adds to the recipe (set from the f
 
 FINAL3B = dict(FINAL3, boosting=dict(max_iter=800, learning_rate=0.03, max_leaf_nodes=63), temp_bias_days=30)
 HUMID = dict(FINAL3, extra_boosting=("load", "temp", "humidity", "wind"), apparent=True)   # phase H: humidity and wind
+HUMID_H = dict(FINAL3, extra_boosting=("load", "temp", "humidity"), apparent=True)          # phase H: humidity alone (no wind field)
 
 
 def final3b_models(ba: str | None) -> list:
@@ -209,6 +210,14 @@ def final3b_models(ba: str | None) -> list:
 
 def final3_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL3, "final3")
+
+
+def humid_h_models(ba: str | None) -> list:
+    """Phase H, humidity alone: the phase G recipe with the humidity block in the boosting and the apparent
+    temperature (heat index only, no wind field) in the additive model, plus the boosting with the block."""
+    solar = ba in PV_BAS
+    one = Cached(Boosting(train_days=FINAL3["train_days"], sky=solar, extra=("load", "temp", "humidity"), name="h_boosting"))
+    return [one, *_final3_models(ba, HUMID_H, "final3_h")]
 
 
 def humid_models(ba: str | None) -> list:
@@ -276,6 +285,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
     "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models, "humid": humid_models,
+    "humid_h": humid_h_models,
     "tbias": final2_models,
 }
 
@@ -365,7 +375,7 @@ def main(argv=None) -> int:
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group == "humid" else ())
+                            fields=WEATHER_FIELDS if group == "humid" else ("dewpoint_f",) if group == "humid_h" else ())
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -520,6 +530,11 @@ def main(argv=None) -> int:
                      "Phase G: the recipe with the deeper boosting and the temperature-bias correction", g_common +
                      "`final3b` is `final3` with the boosting at 800 iterations, rate 0.03 and 63 leaves, and the HRRR temperature path "
                      "corrected by its own recent bias per local hour (30 known days). Compare with `docs/phase_g_final.md`.")
+    humid_h = report({"humid_h"}, a.results.parent / "phase_h_humidity_only", a.doc.parent / "phase_h_humidity_only.md",
+                     "Phase H: humidity alone", g_common +
+                     "`final3_h` is the phase G recipe with the dew point, dew-point depression, relative humidity and heat index as "
+                     "features of the boosting and the heat index as the input of the additive model's smooth response (no wind "
+                     "field yet); `h_boosting` adds the block to the phase G boosting. Compare with `docs/phase_g_final.md` (same days).")
     humid = report({"humid"}, a.results.parent / "phase_h_humidity", a.doc.parent / "phase_h_humidity.md",
                    "Phase H: humidity and wind", g_common +
                    "`final3_hw` is the phase G recipe with the dew point, dew-point depression, relative humidity, heat index, wind "
@@ -532,7 +547,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h)):
         log("no rows to report")
         return 1
     if waiting:
