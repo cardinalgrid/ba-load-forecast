@@ -17,6 +17,7 @@ import io
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import requests
 
@@ -25,7 +26,8 @@ GHCNH_YEAR_URL = GHCNH_BASE + "/access/by-year/{year}/psv/GHCNh_{station}_{year}
 GHCNH_STATIONS_URL = GHCNH_BASE + "/doc/ghcnh-station-list.csv"
 METAR_REPORTS = ("FM15", "FM16")
 FAILED_QC = {"2", "3", "6", "7"}            # ISD quality codes: suspect or erroneous, own or other source
-COLUMNS = ["STATION", "DATE", "temperature", "temperature_Quality_Code", "temperature_Report_Type"]
+COLUMNS = ["STATION", "DATE", "temperature", "temperature_Quality_Code", "temperature_Report_Type",
+           "dew_point_temperature", "dew_point_temperature_Quality_Code", "wind_speed", "wind_speed_Quality_Code"]
 
 
 def station_ids(icaos: list[str], cache: Path) -> dict[str, str]:
@@ -43,14 +45,21 @@ def station_ids(icaos: list[str], cache: Path) -> dict[str, str]:
 
 
 def parse_ghcnh(text: str) -> pd.DataFrame:
-    """``valid_utc, temp_f`` from a GHCNh psv file: METAR reports (FM15, FM16) with a temperature (degrees Celsius
-    in the file) that did not fail quality control."""
+    """``valid_utc, temp_f, dewpoint_f, wind_ms`` from a GHCNh psv file: METAR reports (FM15, FM16) with a temperature
+    (degrees Celsius in the file) that did not fail quality control; dew point (Celsius) and wind (m/s) where they
+    passed too, NaN otherwise."""
     df = pd.read_csv(io.StringIO(text), sep="|", usecols=COLUMNS, dtype=str, low_memory=False)
     ok = df["temperature_Report_Type"].isin(METAR_REPORTS) & df["temperature"].notna()
     ok &= ~df["temperature_Quality_Code"].fillna("").isin(FAILED_QC)
     df = df[ok]
     temp_c = pd.to_numeric(df["temperature"], errors="coerce")
     out = pd.DataFrame({"valid_utc": pd.to_datetime(df["DATE"], utc=True), "temp_f": temp_c * 9.0 / 5.0 + 32.0})
+    dew = pd.to_numeric(df.get("dew_point_temperature"), errors="coerce")
+    dew_ok = ~df.get("dew_point_temperature_Quality_Code", pd.Series("", index=df.index)).fillna("").isin(FAILED_QC)
+    out["dewpoint_f"] = np.where(dew_ok, dew * 9.0 / 5.0 + 32.0, np.nan)
+    wind = pd.to_numeric(df.get("wind_speed"), errors="coerce")
+    wind_ok = ~df.get("wind_speed_Quality_Code", pd.Series("", index=df.index)).fillna("").isin(FAILED_QC)
+    out["wind_ms"] = np.where(wind_ok, wind, np.nan)                       # m/s in the file
     return out[out["temp_f"].notna()].sort_values("valid_utc").reset_index(drop=True)
 
 

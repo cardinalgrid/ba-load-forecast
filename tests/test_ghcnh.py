@@ -5,14 +5,14 @@ import pandas as pd
 from ba_load_forecast.asos import hourly_from_observations
 from ba_load_forecast.ghcnh import parse_ghcnh, station_ids
 
-HEADER = "STATION|Station_name|DATE|Year|Month|Day|Hour|Minute|LATITUDE|LONGITUDE|ELEVATION|temperature|temperature_Measurement_Code|temperature_Quality_Code|temperature_Report_Type|temperature_Source_Code|temperature_Source_Station_ID|dew_point_temperature"
+HEADER = "STATION|Station_name|DATE|Year|Month|Day|Hour|Minute|LATITUDE|LONGITUDE|ELEVATION|temperature|temperature_Measurement_Code|temperature_Quality_Code|temperature_Report_Type|temperature_Source_Code|temperature_Source_Station_ID|dew_point_temperature|dew_point_temperature_Quality_Code|wind_speed|wind_speed_Quality_Code"
 ROWS = [
-    "USW00013739|PHILA INTL AP|2025-09-01T00:54:00|2025|09|01|00|54|39.87|-75.23|2.1|20.0||1|FM15|223|ICAO-KPHL|10.0",
-    "USW00013739|PHILA INTL AP|2025-09-01T01:54:00|2025|09|01|01|54|39.87|-75.23|2.1|21.1||5|FM15|343|ICAO-KPHL|10.0",
-    "USW00013739|PHILA INTL AP|2025-09-01T02:20:00|2025|09|01|02|20|39.87|-75.23|2.1|19.0||1|FM16|223|ICAO-KPHL|10.0",
-    "USW00013739|PHILA INTL AP|2025-09-01T03:00:00|2025|09|01|03|00|39.87|-75.23|2.1|30.0||1|FM12|223|ICAO-KPHL|10.0",
-    "USW00013739|PHILA INTL AP|2025-09-01T03:54:00|2025|09|01|03|54|39.87|-75.23|2.1|99.0||3|FM15|223|ICAO-KPHL|10.0",
-    "USW00013739|PHILA INTL AP|2025-09-01T04:54:00|2025|09|01|04|54|39.87|-75.23|2.1|||1|FM15|223|ICAO-KPHL|10.0",
+    "USW00013739|PHILA INTL AP|2025-09-01T00:54:00|2025|09|01|00|54|39.87|-75.23|2.1|20.0||1|FM15|223|ICAO-KPHL|10.0|1|3.1|1",
+    "USW00013739|PHILA INTL AP|2025-09-01T01:54:00|2025|09|01|01|54|39.87|-75.23|2.1|21.1||5|FM15|343|ICAO-KPHL|10.0|3|4.0|1",
+    "USW00013739|PHILA INTL AP|2025-09-01T02:20:00|2025|09|01|02|20|39.87|-75.23|2.1|19.0||1|FM16|223|ICAO-KPHL|10.0|1||",
+    "USW00013739|PHILA INTL AP|2025-09-01T03:00:00|2025|09|01|03|00|39.87|-75.23|2.1|30.0||1|FM12|223|ICAO-KPHL|10.0|1|2.0|1",
+    "USW00013739|PHILA INTL AP|2025-09-01T03:54:00|2025|09|01|03|54|39.87|-75.23|2.1|99.0||3|FM15|223|ICAO-KPHL|10.0|1|2.0|1",
+    "USW00013739|PHILA INTL AP|2025-09-01T04:54:00|2025|09|01|04|54|39.87|-75.23|2.1|||1|FM15|223|ICAO-KPHL|10.0|1|2.0|1",
 ]
 
 
@@ -20,6 +20,10 @@ def test_parse_keeps_metar_reports_that_passed_qc_and_converts_to_fahrenheit():
     obs = parse_ghcnh("\n".join([HEADER, *ROWS]) + "\n")
     assert len(obs) == 3                                                       # synop, failed QC and empty rows dropped
     assert obs["temp_f"].iloc[0] == 68.0
+    assert obs["dewpoint_f"].iloc[0] == 50.0
+    assert obs["wind_ms"].iloc[0] == 3.1
+    assert np.isnan(obs["dewpoint_f"].iloc[1])                                # dew point that failed QC
+    assert np.isnan(obs["wind_ms"].iloc[2])                                   # no wind in the special
     assert abs(obs["temp_f"].iloc[1] - 69.98) < 0.01
     s = hourly_from_observations(obs)
     assert s[pd.Timestamp("2025-09-01 01:00", tz="UTC")] == 68.0             # 00:54 is the 01:00 value

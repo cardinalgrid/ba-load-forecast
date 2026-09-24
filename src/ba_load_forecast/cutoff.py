@@ -78,7 +78,7 @@ def path_timestamps(day: date) -> pd.DatetimeIndex:
     return pd.date_range(start, periods=PATH_HOURS, freq="h")
 
 
-def forecast_path(rows: pd.DataFrame, day: date, offset_h, init: tuple[date, int]) -> np.ndarray:
+def forecast_path(rows: pd.DataFrame, day: date, offset_h, init: tuple[date, int], column: str = "temp_f") -> np.ndarray:
     """Temperature in Fahrenheit from the run ``init`` for every local hour from 09:00 of D-1 to 23:00 of D.
 
     The hours before the target day are what the same run said about the rest of D-1, which a forecaster
@@ -91,7 +91,7 @@ def forecast_path(rows: pd.DataFrame, day: date, offset_h, init: tuple[date, int
     d, h = init
     init_ts = pd.Timestamp(datetime(d.year, d.month, d.day, h))
     run = rows[rows["init_utc"] == init_ts]
-    s = pd.Series(run["temp_f"].to_numpy(dtype=float), index=pd.DatetimeIndex(run["valid_utc"]))
+    s = pd.Series(run[column].to_numpy(dtype=float), index=pd.DatetimeIndex(run["valid_utc"]))
     s = s[~s.index.duplicated()]
     return s.reindex(valid).to_numpy(dtype=float)
 

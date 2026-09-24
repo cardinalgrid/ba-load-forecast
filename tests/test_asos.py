@@ -7,19 +7,25 @@ import pytest
 
 from ba_load_forecast.asos import hourly_from_observations, iem_request, parse_iem, read_asos
 
-IEM_TEXT = """station,valid,tmpf
-PHL,2025-09-01 00:54,70.00
-PHL,2025-09-01 01:54,70.00
-PHL,2025-09-01 02:20,68.00
-PHL,2025-09-01 02:54,69.00
-PHL,2025-09-01 03:54,M
-PHL,2025-09-01 04:54,66.00
+IEM_TEXT = """station,valid,tmpf,dwpf,sknt
+PHL,2025-09-01 00:54,70.00,60.00,10.00
+PHL,2025-09-01 01:54,70.00,M,5.00
+PHL,2025-09-01 02:20,68.00,58.00,M
+PHL,2025-09-01 02:54,69.00,59.00,4.00
+PHL,2025-09-01 03:54,M,50.00,3.00
+PHL,2025-09-01 04:54,66.00,55.00,0.00
 """
 
 
 def test_parse_and_nearest_hour_convention():
     obs = parse_iem(IEM_TEXT)
     assert len(obs) == 5                                                       # the M row is dropped
+    assert obs["dewpoint_f"].iloc[0] == 60.0
+    assert abs(obs["wind_ms"].iloc[0] - 5.14444) < 1e-3
+    assert np.isnan(obs["dewpoint_f"].iloc[1])
+    assert np.isnan(obs["wind_ms"].iloc[2])
+    d = hourly_from_observations(obs, "dewpoint_f")
+    assert d[pd.Timestamp("2025-09-01 02:00", tz="UTC")] == 58.0             # 01:54 has no dew point: 02:20 is used
     s = hourly_from_observations(obs)
     assert s.index.tz is not None
     assert s[pd.Timestamp("2025-09-01 01:00", tz="UTC")] == 70.0               # 00:54 is the 01:00 value
@@ -41,6 +47,7 @@ def test_read_asos_round_trip(tmp_path):
 def test_iem_request_drops_the_k_and_asks_for_routine_hourly_utc():
     q = iem_request("KPHL", date(2025, 8, 1), date(2026, 1, 1))
     assert q["station"] == "PHL"
+    assert q["data"] == ["tmpf", "dwpf", "sknt"]
     assert iem_request(["KPHL", "KORD"], date(2025, 8, 1), date(2026, 1, 1))["station"] == ["PHL", "ORD"]
     assert iem_request("KPBI", date(2025, 8, 1), date(2026, 1, 1))["station"] == "DJT"
     assert q["tz"] == "Etc/UTC"
