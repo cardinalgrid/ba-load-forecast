@@ -32,6 +32,7 @@ from ..features import (
 )
 from ..information_set import InformationSet
 from ..sky import IRRADIANCE_COLUMNS, PV_COLUMNS, SKY_COLUMNS
+from ..weather_extra import HUMIDITY_LINEAR, WEATHER_COLUMNS
 from .base import ForecastError
 
 SMOOTH = ("t", "t_ma24", "t_day_max", "t_day_min")
@@ -60,7 +61,7 @@ class AdditiveModel:
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
                  labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False,
                  extra: tuple[str, ...] = (), apparent: bool = False):
-        self.extra = tuple(extra)             # optional linear blocks: "load" (EXTRA_LOAD_COLUMNS), "temp" (EXTRA_TEMP_COLUMNS)
+        self.extra = tuple(extra)             # optional linear blocks: "load", "temp", "humidity" (HUMIDITY_LINEAR); the last needs Loader(fields=...)
         self.apparent = apparent              # the smooth response on the apparent temperature (heat index, wind chill); needs Loader(fields=...)
         self.pv = pv                          # linear PV terms (PV_LINEAR) from the sky frame; needs Loader(sky=True, pv=True)
         self.irradiance = irradiance          # with pv: capacity times the forecast irradiance instead of times the cloud fraction
@@ -103,7 +104,7 @@ class AdditiveModel:
         if self.pv:
             for c in (PV_IRRADIANCE if self.irradiance else PV_LINEAR):
                 cols.append(rows[c].to_numpy(dtype=float))
-        for block, names in (("load", EXTRA_LOAD_COLUMNS), ("temp", EXTRA_TEMP_COLUMNS)):
+        for block, names in (("load", EXTRA_LOAD_COLUMNS), ("temp", EXTRA_TEMP_COLUMNS), ("humidity", HUMIDITY_LINEAR)):
             if block in self.extra:
                 for c in names:
                     cols.append(rows[c].to_numpy(dtype=float))
@@ -125,12 +126,17 @@ class AdditiveModel:
         return np.linalg.solve(x.T @ x + pen, x.T @ y)
 
     def _rows(self, info: InformationSet, temp: pd.Series, days: list[date], target: bool) -> pd.DataFrame:
+        humidity = "humidity" in self.extra
+        if (self.apparent or humidity) and info.weather is None:
+            raise ForecastError('apparent=True or extra "humidity" needs Loader(fields=("dewpoint_f", ...)) and the HRRR extraction')
         if self.apparent:
-            if info.weather is None:
-                raise ForecastError('apparent=True needs Loader(fields=("dewpoint_f", "wind_ms")) and the HRRR extractions')
             temp = apparent_series(temp, info.weather)
         rows = rows_for_days(info.load_history, temp, days, labels=self.day_labels(info, target=target),
-                             sky=info.sky if self.pv else None)
+                             sky=info.sky if self.pv else None, weather=info.weather if humidity else None)
+        if humidity:                                            # linear terms: heat index above the temperature, relative humidity
+            rows["heat_excess"] = (rows["heat_index"] - rows["t"]).clip(lower=0.0).fillna(0.0)
+            rows["rh"] = rows["rh"].fillna(50.0)
+            rows = rows.drop(columns=[c for c in WEATHER_COLUMNS if c in rows.columns and c not in HUMIDITY_LINEAR])
         if self.pv:
             if "pv_clear" not in rows.columns:
                 raise ForecastError("pv=True needs Loader(sky=True, pv=True) and a capacity table for the BA")
@@ -144,7 +150,8 @@ class AdditiveModel:
         return rows
 
     def _extra_columns(self) -> list[str]:
-        return ([*EXTRA_LOAD_COLUMNS] if "load" in self.extra else []) + ([*EXTRA_TEMP_COLUMNS] if "temp" in self.extra else [])
+        return (([*EXTRA_LOAD_COLUMNS] if "load" in self.extra else []) + ([*EXTRA_TEMP_COLUMNS] if "temp" in self.extra else [])
+                + ([*HUMIDITY_LINEAR] if "humidity" in self.extra else []))
 
     # ---- fit / predict -------------------------------------------------------------------------------
     def needs_fit(self, info: InformationSet) -> bool:

@@ -30,6 +30,7 @@ ISD_LITE_FIELDS = {"temp_f": (4, "c"), "dewpoint_f": (5, "c"), "wind_ms": (8, "m
 WEATHER_FIELDS = ("dewpoint_f", "wind_ms")
 WEATHER_COLUMNS = ["dewpoint", "dpd", "rh", "heat_index", "wind", "wind_chill"]
 HUMIDITY_COLUMNS = ["dewpoint", "dpd", "rh", "heat_index"]
+HUMIDITY_LINEAR = ["heat_excess", "rh"]         # the additive model's linear humidity terms: heat index above the temperature, RH
 WIND_COLUMNS = ["wind", "wind_chill"]
 KNOT_MS = 0.514444
 
@@ -106,6 +107,6 @@ def weather_columns(temp_f: np.ndarray, dewpoint_f: np.ndarray, wind_ms: np.ndar
             "rh": rh, "heat_index": hi, "wind": np.asarray(wind_ms, dtype=float), "wind_chill": wind_chill_f(t, wind_ms)}
 
 
-__all__ = ["HUMIDITY_COLUMNS", "ISD_LITE_FIELDS", "KNOT_MS", "WEATHER_COLUMNS", "WEATHER_FIELDS", "WIND_COLUMNS",
+__all__ = ["HUMIDITY_COLUMNS", "HUMIDITY_LINEAR", "ISD_LITE_FIELDS", "KNOT_MS", "WEATHER_COLUMNS", "WEATHER_FIELDS", "WIND_COLUMNS",
            "apparent_temperature_f", "heat_index_f", "read_isd_lite_field", "relative_humidity", "weather_columns",
            "wind_chill_f"]

@@ -55,3 +55,10 @@ def test_models_use_the_weather_frame_and_refuse_without_it():
     assert np.isfinite(q).all()
     plain = AdditiveModel(train_days=300).predict(info)
     assert not np.allclose(q, plain)                                          # the apparent temperature changes the fit
+    lin = AdditiveModel(train_days=300, extra=("humidity",))
+    r = lin.predict(info)
+    assert r.shape == (24,)
+    assert np.isfinite(r).all()
+    assert not np.allclose(r, plain)                                          # the linear humidity terms change the fit
+    with pytest.raises(ForecastError, match="humidity"):
+        AdditiveModel(train_days=300, extra=("humidity",)).predict(perfect_weather_info(load, temp, date(2023, 1, 20)))
