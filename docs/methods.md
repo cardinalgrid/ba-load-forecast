@@ -148,7 +148,8 @@ ten BAs it changes the annual mean by 0.01 point.
 | The regression as a third ensemble member | 2.78 against 2.77 | not adopted |
 | History cleaned by grid-data-sentinel | 0.01 | kept as a control run |
 | A neural network | not implemented | deferred |
-| Wind speed and wind chill (phase H) | boosting alone better by 0.035; the corrected recipe worse by 0.008 and worse in winter | not adopted (section 8f) |
+| Wind speed and wind chill (phase H) | boosting alone better by 0.02; the corrected recipe worse by 0.007 and by 0.02 in winter | not adopted (section 8f) |
+| Humidity block in the boosting alone, additive model unchanged (phase H) | worse than with the apparent temperature by 0.03, by 0.08 in summer | not adopted (section 8f) |
 | Linear humidity terms in the additive model instead of the apparent temperature (phase H) | level over the year, worse by 0.04 in summer | not adopted (section 8f) |
 
 ## 8a. The recipe in one run
@@ -183,7 +184,7 @@ Phase H added the observed and forecast dew point and wind: observed from the sa
 | Additive model fitted on the apparent temperature (heat index only) instead of the temperature | 3.01 % to 3.00 % (0.02) | worse by 0.01 | 0.04 | 0.01 | 9 / 1 |
 | The recipe with both (`final3_h`) against the phase G recipe | **2.47 % to 2.40 % (0.07)** | 0.01 | **0.15** | 0.04 | **11 / 0** |
 
-Humidity is the largest single gain since the multi-station temperature (phase C), and it is a summer gain: 0.15 point in June to September at every BA, 0.01 in winter. Wind and wind chill (`docs/phase_h_humidity.md`) lift the boosting alone by 0.035 point but not the corrected recipe (worse by 0.008 on six BAs, and worse in winter because the wind chill in the additive model's smooth response hurts there); linear humidity terms in the additive model instead of the apparent temperature (`docs/phase_h_humidity_linear.md`) are level over the year and worse in summer; the humidity block in the boosting alone (`docs/phase_h_humidity_boosting.md`) is worse than with the apparent temperature in the additive model too. The recipe after phase H (`final4`) is therefore the phase G recipe with the humidity block in the boosting and the apparent temperature in the additive model, without wind; the wind extraction is documented as tested and not adopted.
+Humidity is the largest single gain since the multi-station temperature (phase C), and it is a summer gain: 0.15 point in June to September at every BA, 0.01 in winter. Wind and wind chill (`docs/phase_h_humidity.md`, `docs/phase_h_variants_by_season.md`) lift the boosting alone by 0.02 point (0.04 in winter) but not the corrected recipe (worse by 0.007, at seven of the eleven BAs, and worse by 0.02 in winter because the wind chill in the additive model's smooth response hurts there); linear humidity terms in the additive model instead of the apparent temperature (`docs/phase_h_humidity_linear.md`) are level over the year and worse in summer; the humidity block in the boosting alone (`docs/phase_h_humidity_boosting.md`) is worse than with the apparent temperature in the additive model too. The recipe after phase H (`final4`) is therefore the phase G recipe with the humidity block in the boosting and the apparent temperature in the additive model, without wind; the wind extraction is documented as tested and not adopted.
 
 ## 9. Limitations
 
