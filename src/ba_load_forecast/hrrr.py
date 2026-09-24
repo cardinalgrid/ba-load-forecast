@@ -63,9 +63,17 @@ def _same(v):
 # field name in the output -> (variable path inside a run, conversion). ``cloud_pct`` is the total cloud
 # cover of the whole atmosphere in percent. (The surface short-wave radiation arrays of the archive are
 # empty before 2025, so cloud cover is what describes the sky over the whole period.)
+def wind_speed_ms(u, v):
+    return np.hypot(np.asarray(u, dtype=float), np.asarray(v, dtype=float))
+
+
+# ``dewpoint_f`` is the 2 m dew point; ``wind_ms`` the 10 m wind speed, the modulus of the two components read
+# from the same run (a field whose variable is a tuple reads every variable and combines them).
 FIELDS = {
     "temp_f": ("2m_above_ground/TMP", kelvin_to_f),
     "cloud_pct": ("entire_atmosphere/TCDC", _same),
+    "dewpoint_f": ("2m_above_ground/DPT", kelvin_to_f),
+    "wind_ms": (("10m_above_ground/UGRD", "10m_above_ground/VGRD"), wind_speed_ms),
 }
 
 
@@ -101,38 +109,46 @@ def decode_chunk(raw: bytes, meta: dict) -> np.ndarray:
 
 def read_run(fs, day: date, init_hour: int, points: dict[str, GridPoint], bucket: str = BUCKET,
              log: Callable[[str], None] = print, field: str = "temp_f") -> dict[str, np.ndarray] | None:
-    """Temperature in Fahrenheit per lead (index 0 = lead 1 h) for every station, or None if the run is absent.
+    """The field per lead (index 0 = lead 1 h) for every station, or None if the run is absent.
 
     Every chunk needed is fetched in one concurrent request; a chunk the archive lacks gives NaN for its
     stations, a chunk that fails for any other reason is fetched again (``with_retries``).
     """
     variable, convert = FIELDS[field]
-    root = run_root(day, init_hour, bucket, variable)
-    meta = run_meta(fs, root, log)
-    if meta is None:
-        return None
-    if tuple(meta["chunks"][1:]) != (CHUNK, CHUNK):
-        raise ValueError(f"unexpected chunking {meta['chunks']} in {root}")
-    n_lead = meta["shape"][0]
+    variables = variable if isinstance(variable, tuple) else (variable,)
     keys = sorted({p.chunk_key for p in points.values()})
-    paths = [f"{root}/0.{k}" for k in keys]
+    per_variable = []
+    n_lead = None
+    for var in variables:
+        root = run_root(day, init_hour, bucket, var)
+        meta = run_meta(fs, root, log)
+        if meta is None:
+            return None
+        if tuple(meta["chunks"][1:]) != (CHUNK, CHUNK):
+            raise ValueError(f"unexpected chunking {meta['chunks']} in {root}")
+        n_lead = meta["shape"][0] if n_lead is None else min(n_lead, meta["shape"][0])
+        paths = [f"{root}/0.{k}" for k in keys]
 
-    def fetch():
-        got = fs.cat(paths, on_error="return")
-        bad = [q for q, r in got.items() if isinstance(r, Exception) and not isinstance(r, FileNotFoundError)]
-        if bad:
-            raise OSError(f"{len(bad)} chunk reads failed, e.g. {bad[0]}: {got[bad[0]]}")
-        return got
+        def fetch(paths=paths):
+            got = fs.cat(paths, on_error="return")
+            bad = [q for q, r in got.items() if isinstance(r, Exception) and not isinstance(r, FileNotFoundError)]
+            if bad:
+                raise OSError(f"{len(bad)} chunk reads failed, e.g. {bad[0]}: {got[bad[0]]}")
+            return got
 
-    raw = with_retries(fetch, f"{root} chunks", log)
-    blocks: dict[str, np.ndarray | None] = {}
-    for k in keys:
-        r = raw.get(f"{root}/0.{k}")
-        blocks[k] = None if r is None or isinstance(r, Exception) else decode_chunk(r, meta)[:n_lead]
+        raw = with_retries(fetch, f"{root} chunks", log)
+        blocks: dict[str, np.ndarray | None] = {}
+        for k in keys:
+            r = raw.get(f"{root}/0.{k}")
+            blocks[k] = None if r is None or isinstance(r, Exception) else decode_chunk(r, meta)
+        per_variable.append(blocks)
     out = {}
     for icao, p in points.items():
-        b = blocks[p.chunk_key]
-        out[icao] = np.full(n_lead, np.nan) if b is None else convert(b[:, p.in_chunk_y, p.in_chunk_x])
+        series = [bl[p.chunk_key] for bl in per_variable]
+        if any(b is None for b in series):
+            out[icao] = np.full(n_lead, np.nan)
+        else:
+            out[icao] = convert(*[b[:n_lead, p.in_chunk_y, p.in_chunk_x] for b in series])
     return out
 
 

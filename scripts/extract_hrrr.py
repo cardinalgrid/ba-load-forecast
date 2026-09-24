@@ -53,7 +53,7 @@ def main(argv=None) -> int:
     ap.add_argument("--stations", type=Path, default=ROOT / "docs" / "stations_grid.csv")
     ap.add_argument("--consolidate", action="store_true", help="gather the run files into one parquet per station")
     ap.add_argument("--no-resume", action="store_true")
-    ap.add_argument("--field", default="temp_f", choices=["temp_f", "cloud_pct"],
+    ap.add_argument("--field", default="temp_f", choices=["temp_f", "cloud_pct", "dewpoint_f", "wind_ms"],
                     help="what to extract: 2 m temperature (F) or total cloud cover (percent)")
     a = ap.parse_args(argv)
 
