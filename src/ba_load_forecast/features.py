@@ -23,6 +23,7 @@ import pandas as pd
 from grid_sentinel.calendar_us import day_types, special_days
 
 from .cutoff import CUTOFF_LOCAL_HOUR
+from .weather_extra import apparent_temperature_f, weather_columns
 
 EPOCH = pd.Timestamp("2015-01-01")
 LAGS = (1, 2, 3)
@@ -143,7 +144,8 @@ def calendar_features(ts: pd.DatetimeIndex) -> pd.DataFrame:
 
 
 def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: pd.DataFrame | None = None,
-                  labels: Mapping[date, int] | None = None, sky: pd.DataFrame | None = None) -> pd.DataFrame:
+                  labels: Mapping[date, int] | None = None, sky: pd.DataFrame | None = None,
+                  weather: pd.DataFrame | None = None) -> pd.DataFrame:
     """Feature rows for every hour of ``days`` with the target ``y`` (NaN where the load is unknown).
 
     ``stations``, when given, is an hourly frame with one temperature column per station; each becomes a
@@ -160,10 +162,25 @@ def rows_for_days(load: pd.Series, temp: pd.Series, days: list[date], stations: 
     if sky is not None:
         for c in sky.columns:                                # sun, cloud, their product; PV capacity terms when present
             out[c] = sky[c].reindex(ts).to_numpy(dtype=float)
+    if weather is not None:                                  # dew point and wind (observed, then the HRRR path) and what follows
+        dew = weather["dewpoint_f"].reindex(ts).to_numpy(dtype=float) if "dewpoint_f" in weather.columns else np.full(len(ts), np.nan)
+        wind = weather["wind_ms"].reindex(ts).to_numpy(dtype=float) if "wind_ms" in weather.columns else np.full(len(ts), np.nan)
+        for c, v in weather_columns(out["t"].to_numpy(dtype=float), dew, wind).items():
+            out[c] = v
     if labels is not None:
         out["cluster"] = [labels.get(d, -1) for d in ts.date]
     out["y"] = load.reindex(ts).to_numpy() if not load.empty else np.nan
     return out
+
+
+def apparent_series(temp: pd.Series, weather: pd.DataFrame | None) -> pd.Series:
+    """The temperature series replaced by the apparent temperature (heat index, wind chill) wherever the dew
+    point or the wind is known at that hour; the temperature itself elsewhere."""
+    if weather is None or temp.empty:
+        return temp
+    dew = weather["dewpoint_f"].reindex(temp.index).to_numpy(dtype=float) if "dewpoint_f" in weather.columns else np.full(len(temp), np.nan)
+    wind = weather["wind_ms"].reindex(temp.index).to_numpy(dtype=float) if "wind_ms" in weather.columns else np.full(len(temp), np.nan)
+    return pd.Series(apparent_temperature_f(temp.to_numpy(dtype=float), dew, wind), index=temp.index)
 
 
 def training_days(last: date, n_days: int) -> list[date]:

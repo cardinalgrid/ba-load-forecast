@@ -36,6 +36,7 @@ from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hou
 from .hrrr import load_station
 from .sky import all_days, forecast_as_seen, pv_capacity, run_table, sky_frame
 from .stations_multi import BA_STATIONS_MULTI, station_table_for
+from .weather_extra import read_isd_lite_field
 
 
 def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Path, isd_dir: Path,
@@ -66,6 +67,32 @@ def station_temperature_f(usaf: str, wban: str, ba: str, year: int, tidy_dir: Pa
     return pd.Series(out, index=s.index)
 
 
+def station_field(usaf: str, wban: str, ba: str, year: int, tidy_dir: Path, isd_dir: Path, field: str,
+                  supplement_file: Path | list[Path] | None = None) -> pd.Series:
+    """One observed field (``weather_extra.ISD_LITE_FIELDS``: ``temp_f``, ``dewpoint_f``, ``wind_ms``) at one ISD
+    station, indexed like the BA's load; the hours the ISD file lacks are filled from the supplements in order,
+    exactly as ``station_temperature_f`` does for the temperature."""
+    s = load_series_local(tidy_dir, ba, year)
+    if s.empty:
+        return pd.Series(dtype=float)
+    p = fetch_isd_lite(usaf, wban, year, isd_dir)
+    files = [] if supplement_file is None else ([supplement_file] if isinstance(supplement_file, Path) else list(supplement_file))
+    if p is None and not files:
+        return pd.Series(dtype=float)
+    off = utc_offset(tidy_dir, ba, year).reindex(s.index)
+    off = off.fillna(off.median())
+    utc = pd.DatetimeIndex(s.index + pd.to_timedelta(off.to_numpy(), unit="h")).tz_localize("UTC")
+    out = np.full(len(s), np.nan)
+    if p is not None:
+        obs = read_isd_lite_field(p, field)
+        out = obs[~obs.index.duplicated()].reindex(utc).to_numpy(dtype=float)
+    for f in files:
+        sup = read_asos(f, field).reindex(utc).to_numpy(dtype=float)
+        gap = np.isnan(out)
+        out[gap] = sup[gap]
+    return pd.Series(out, index=s.index)
+
+
 @dataclass
 class InformationSet:
     ba: str
@@ -90,6 +117,7 @@ class InformationSet:
     temp_history_stations_f: pd.DataFrame | None = None       # one column per station, aligned with load_history
     temp_forecast_path_stations_f: pd.DataFrame | None = None  # one column per station, indexed by path_timestamps
     sky: pd.DataFrame | None = None                            # sky.SKY_COLUMNS for the history and the target day
+    weather: pd.DataFrame | None = None                        # dewpoint_f, wind_ms: observed over the history, the HRRR path after
 
     @property
     def cutoff(self) -> datetime:
@@ -219,13 +247,18 @@ class Loader:
                  stations: str = "single", hrrr_dirs: list[Path] | None = None, cleaning: str = "gross",
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
                  dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0,
-                 supplement_dir: Path | list[Path] | None = None):
+                 supplement_dir: Path | list[Path] | None = None, fields: tuple[str, ...] = (),
+                 field_dirs: dict[str, Path] | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
         repairs the load history with grid-data-sentinel (``cleaning.sentinel_clean``, one year at a time, warmed
         up on the year before) before the gross-fault guard; the outcome is never cleaned."""
         self.cleaning = cleaning
+        # fields beyond the temperature ("dewpoint_f", "wind_ms"): observed like the temperature, forecast from the
+        # HRRR extraction in field_dirs (default: siblings of hrrr_dir named after the field)
+        self.fields = tuple(fields)
+        self.field_dirs = {k: Path(v) for k, v in (field_dirs or {}).items()}
         # temp_bias_days > 0: the HRRR temperature path of the target day is corrected by the median of the forecast's
         # own error per local hour over that many known days (forecast as seen at the cut-off against the observation)
         self.temp_bias_days = temp_bias_days
@@ -334,6 +367,44 @@ class Loader:
         if self.stations == "multi" and ba in BA_STATIONS_MULTI:
             return list(BA_STATIONS_MULTI[ba])
         return [BA_STATION[ba]]
+
+    def field_dir(self, field: str) -> Path:
+        return self.field_dirs.get(field, self.hrrr_dir.parent / {"dewpoint_f": "dewpoint", "wind_ms": "wind"}.get(field, field))
+
+    def field_rows(self, field: str, icao: str) -> pd.DataFrame:
+        return self._cached(("frows", field, icao), lambda: load_station(self.field_dir(field), icao))
+
+    def station_field_series(self, icao: str, ba: str, year: int, field: str) -> pd.Series:
+        def read():
+            if self._station_table is None:
+                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v}),
+                                                        self.isd_dir).set_index("icao")
+            st = self._station_table.loc[icao]
+            return station_field(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir, field,
+                                 supplement_file=[f for f in (supplement_path(icao, d) for d in self.supplement_dirs) if f])
+
+        return self._cached(("sfield", field, icao, ba, year), read)
+
+    def weather_frame(self, ba: str, start: date, day: date, history_index: pd.DatetimeIndex, path_ts: pd.DatetimeIndex,
+                      off_path: np.ndarray, run) -> pd.DataFrame | None:
+        """One column per field in ``self.fields``: the mean over the BA's stations of the observation over the
+        history and of the HRRR path from 09:00 of D-1 (NaN without a run)."""
+        if not self.fields:
+            return None
+        stations = self.stations_of(ba)
+        index = history_index.union(path_ts)
+        out = pd.DataFrame(index=index)
+        for fld in self.fields:
+            hist = pd.concat([self._years(ba, start, day, lambda b, y, i=icao, f=fld: self.station_field_series(i, b, y, f))
+                              .reindex(history_index) for icao in stations], axis=1).mean(axis=1, skipna=False)
+            paths = {}
+            for icao in stations:
+                rows = self.field_rows(fld, icao)
+                paths[icao] = (forecast_path(rows, day, off_path, run, column=fld) if run is not None and len(rows)
+                               else np.full(PATH_HOURS, np.nan))
+            path = pd.DataFrame(paths, index=path_ts).mean(axis=1, skipna=False)
+            out[fld] = pd.concat([hist, path]).reindex(index).to_numpy(dtype=float)
+        return out
 
     def station_temperature(self, icao: str, ba: str, year: int) -> pd.Series:
         def read():
@@ -472,6 +543,8 @@ class Loader:
             temp = pd.concat([self._years(ba, start, day, lambda b, y, i=icao: self.station_temperature(i, b, y)) for icao in stations],
                              axis=1).mean(axis=1)
 
+        weather = self.weather_frame(ba, start, day, history_index, path_ts, off_path, run)
+
         sky = None
         if self.sky:
             lat, lon = self.latlon(ba)
@@ -502,5 +575,5 @@ class Loader:
             actual_plausible=plausible(outcome.reindex(hours).to_numpy(dtype=float), reference),
             benchmark_plausible=forecast_plausible(fcst.reindex(hours).to_numpy(dtype=float), outcome.reindex(hours).to_numpy(dtype=float)),
             sky=sky, stations=stations, temp_history_stations_f=stations_hist,
-            temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None,
+            temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None, weather=weather,
         )

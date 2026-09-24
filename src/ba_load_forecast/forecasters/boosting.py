@@ -26,6 +26,7 @@ from ..features import (
 )
 from ..information_set import InformationSet
 from ..sky import IRRADIANCE_COLUMNS, PV_COLUMNS, SKY_COLUMNS
+from ..weather_extra import HUMIDITY_COLUMNS, WIND_COLUMNS
 from .base import ForecastError
 
 
@@ -35,7 +36,7 @@ class Boosting:
                  special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None,
                  extremes: bool = False, sky: bool = False, extra: tuple[str, ...] = (), min_samples_leaf: int = 20,
                  l2: float = 0.0, target: str = "level"):
-        self.extra = tuple(extra)             # optional feature blocks: "load" (EXTRA_LOAD_COLUMNS), "temp" (EXTRA_TEMP_COLUMNS)
+        self.extra = tuple(extra)             # optional feature blocks: "load", "temp", "humidity", "wind" (features / weather_extra)
         self.min_samples_leaf = min_samples_leaf
         self.l2 = l2
         self.target = target                  # "level": the load in MW; "ratio": the load divided by the last known 24 h mean
@@ -67,6 +68,13 @@ class Boosting:
         path = info.temp_forecast_path_stations_f
         return pd.concat([hist.loc[: path.index[0] - pd.Timedelta(hours=1)], path]).interpolate(limit=6, limit_area="inside")
 
+    def _weather(self, info: InformationSet) -> pd.DataFrame | None:
+        if not ({"humidity", "wind"} & set(self.extra)):
+            return None
+        if info.weather is None:
+            raise ForecastError('extra "humidity"/"wind" needs Loader(fields=("dewpoint_f", "wind_ms")) and the HRRR extractions')
+        return info.weather
+
     def _columns(self, rows: pd.DataFrame) -> list[str]:
         cols = [c for c in FEATURE_COLUMNS if c != "day_type" or self.label_column == "day_type"]
         if self.label_column != "day_type":
@@ -80,6 +88,10 @@ class Boosting:
             cols += EXTRA_LOAD_COLUMNS
         if "temp" in self.extra:
             cols += EXTRA_TEMP_COLUMNS
+        if "humidity" in self.extra:
+            cols += HUMIDITY_COLUMNS
+        if "wind" in self.extra:
+            cols += WIND_COLUMNS
         if self.sky and "sun" in rows.columns:
             cols += [c for c in SKY_COLUMNS + PV_COLUMNS + IRRADIANCE_COLUMNS if c in rows.columns]
         return cols
@@ -99,7 +111,7 @@ class Boosting:
     def fit(self, info: InformationSet) -> None:
         days = training_days(info.day - timedelta(days=2), self.train_days)
         rows = rows_for_days(info.load_history, info.temp_history_f, days, self._station_frames(info, target=False),
-                             labels=self.day_labels(info), sky=info.sky if self.sky else None)
+                             labels=self.day_labels(info), sky=info.sky if self.sky else None, weather=self._weather(info))
         rows = rows[rows["y"] > 0].dropna(subset=["y"])
         if self.label_column == "cluster":
             rows = rows[rows["cluster"] >= 0]
@@ -125,7 +137,8 @@ class Boosting:
         if self.needs_fit(info):
             self.fit(info)
         rows = rows_for_days(info.load_history, target_temperature(info), [info.day], self._station_frames(info, target=True),
-                             labels=self.day_labels(info, target=True), sky=info.sky if self.sky else None)
+                             labels=self.day_labels(info, target=True), sky=info.sky if self.sky else None,
+                             weather=self._weather(info))
         x = rows[self.columns].to_numpy(dtype=float)
         pred = self.model.predict(x)
         if self.target == "ratio":

@@ -75,6 +75,7 @@ from ba_load_forecast.forecasters.ensemble import Ensemble
 from ba_load_forecast.forecasters.quantiles import AdaptiveIntervals, EmpiricalIntervals
 from ba_load_forecast.information_set import Loader
 from ba_load_forecast.report import summarise, write_report
+from ba_load_forecast.weather_extra import WEATHER_FIELDS
 
 ROOT = Path(__file__).resolve().parents[1]
 DEV_BAS = ("PJM", "MISO", "ERCO", "CISO", "SWPP", "NYIS", "ISNE", "TVA", "DUK", "BPAT", "FPL")
@@ -89,9 +90,15 @@ def log(msg: str) -> None:
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}", flush=True)
 
 
-def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0) -> Loader:
+def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0,
+           fields: tuple[str, ...] = ()) -> Loader:
     return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
-                  temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir)
+                  temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields)
+
+
+def fields_ready(ld: Loader, ba: str) -> bool:
+    """Every station of the BA has a consolidated extraction of every field the loader was asked for."""
+    return all(len(ld.field_rows(f, icao)) for f in ld.fields for icao in ld.stations_of(ba))
 
 
 def corrected_ensemble():
@@ -192,6 +199,7 @@ FINAL3 = dict(                 # what phase G adds to the recipe (set from the f
 
 
 FINAL3B = dict(FINAL3, boosting=dict(max_iter=800, learning_rate=0.03, max_leaf_nodes=63), temp_bias_days=30)
+HUMID = dict(FINAL3, extra_boosting=("load", "temp", "humidity", "wind"), apparent=True)   # phase H: humidity and wind
 
 
 def final3b_models(ba: str | None) -> list:
@@ -203,13 +211,22 @@ def final3_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL3, "final3")
 
 
+def humid_models(ba: str | None) -> list:
+    """Phase H: the phase G recipe with the humidity and wind blocks in the boosting and the apparent temperature
+    in the additive model (``final3_hw``), plus the boosting with one block at a time to attribute the gain."""
+    solar = ba in PV_BAS
+    one = [Cached(Boosting(train_days=FINAL3["train_days"], sky=solar, extra=("load", "temp", block), name=f"{short}_boosting"))
+           for block, short in (("humidity", "h"), ("wind", "w"))]
+    return [*one, *_final3_models(ba, HUMID, "final3_hw")]
+
+
 def _final3_models(ba: str | None, c: dict, tag: str) -> list:
     """The phase G recipe: the phase F recipe with the options of ``c`` (``FINAL3`` or ``FINAL3B``)."""
     from ba_load_forecast.forecasters.recency import RecencyRegression
 
     solar = ba in PV_BAS
     add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
-                               **c["additive"], name=f"{tag}_additive"))
+                               apparent=c.get("apparent", False), **c["additive"], name=f"{tag}_additive"))
     boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
                           target="ratio" if c["ratio"] else "level", **c["boosting"], name=f"{tag}_boosting"))
     members = [add, boo]
@@ -258,7 +275,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "frozen2": final2_models,                            # frozen2: the phase F recipe on 2023-2025 under protocol v2
     "protocol": final2_models,                            # protocol: the same recipe, scored under protocol v2
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
-    "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models,
+    "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models, "humid": humid_models,
     "tbias": final2_models,
 }
 
@@ -347,8 +364,9 @@ def main(argv=None) -> int:
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
-                            else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0)
-                if not stations_ready(ld, ba):
+                            else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
+                            fields=WEATHER_FIELDS if group == "humid" else ())
+                if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
                     continue
@@ -502,12 +520,19 @@ def main(argv=None) -> int:
                      "Phase G: the recipe with the deeper boosting and the temperature-bias correction", g_common +
                      "`final3b` is `final3` with the boosting at 800 iterations, rate 0.03 and 63 leaves, and the HRRR temperature path "
                      "corrected by its own recent bias per local hour (30 known days). Compare with `docs/phase_g_final.md`.")
+    humid = report({"humid"}, a.results.parent / "phase_h_humidity", a.doc.parent / "phase_h_humidity.md",
+                   "Phase H: humidity and wind", g_common +
+                   "`final3_hw` is the phase G recipe with the dew point, dew-point depression, relative humidity, heat index, wind "
+                   "speed and wind chill (NWS formulas) as features of the boosting and the apparent temperature as the input of "
+                   "the additive model's smooth response; `h_boosting` and `w_boosting` add one block at a time to the phase G "
+                   "boosting. Observed dew point and wind from ISD-Lite and the supplements, forecasts from the HRRR archive. "
+                   "Compare with `docs/phase_g_final.md` (same days).")
     frozen2 = report({"frozen2"}, a.results.parent / "frozen2_2023_2025", a.doc.parent / "frozen_evaluation_final2_v2.md",
                      "The phase F recipe on 2023 to 2025 under protocol v2",
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid)):
         log("no rows to report")
         return 1
     if waiting:

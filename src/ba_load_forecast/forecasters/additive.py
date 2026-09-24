@@ -25,6 +25,7 @@ from ..features import (
     EXTRA_LOAD_COLUMNS,
     EXTRA_TEMP_COLUMNS,
     EXTREME_COLUMNS,
+    apparent_series,
     rows_for_days,
     target_temperature,
     training_days,
@@ -58,8 +59,9 @@ class AdditiveModel:
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
                  labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False,
-                 extra: tuple[str, ...] = ()):
+                 extra: tuple[str, ...] = (), apparent: bool = False):
         self.extra = tuple(extra)             # optional linear blocks: "load" (EXTRA_LOAD_COLUMNS), "temp" (EXTRA_TEMP_COLUMNS)
+        self.apparent = apparent              # the smooth response on the apparent temperature (heat index, wind chill); needs Loader(fields=...)
         self.pv = pv                          # linear PV terms (PV_LINEAR) from the sky frame; needs Loader(sky=True, pv=True)
         self.irradiance = irradiance          # with pv: capacity times the forecast irradiance instead of times the cloud fraction
         self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS) as linear regressors
@@ -123,6 +125,10 @@ class AdditiveModel:
         return np.linalg.solve(x.T @ x + pen, x.T @ y)
 
     def _rows(self, info: InformationSet, temp: pd.Series, days: list[date], target: bool) -> pd.DataFrame:
+        if self.apparent:
+            if info.weather is None:
+                raise ForecastError('apparent=True needs Loader(fields=("dewpoint_f", "wind_ms")) and the HRRR extractions')
+            temp = apparent_series(temp, info.weather)
         rows = rows_for_days(info.load_history, temp, days, labels=self.day_labels(info, target=target),
                              sky=info.sky if self.pv else None)
         if self.pv:
