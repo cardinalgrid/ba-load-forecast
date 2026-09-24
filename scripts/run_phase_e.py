@@ -60,6 +60,7 @@ of ``DF`` and the outcome. A BA whose station forecasts are not extracted yet is
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 import time
 from datetime import date
@@ -393,7 +394,8 @@ def main(argv=None) -> int:
         if not set(prefixes) & set(a.groups):          # only the groups asked for: a report carries the period of the command line
             return None
         files = sorted(p for p in a.out.glob("*.parquet")
-                       if not p.name.endswith("_hourly.parquet") and p.name.split("_")[0] in prefixes)
+                       if not p.name.endswith("_hourly.parquet")
+                       and any(re.fullmatch(re.escape(pre) + r"_[A-Z0-9]+\.parquet", p.name) for pre in prefixes))
         if not files:
             return None
         rows = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True).drop_duplicates(subset=["ba", "day", "model"])
