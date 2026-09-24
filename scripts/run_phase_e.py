@@ -204,6 +204,7 @@ HUMID = dict(FINAL3, extra_boosting=("load", "temp", "humidity", "wind"), appare
 HUMID_H = dict(FINAL3, extra_boosting=("load", "temp", "humidity"), apparent=True)          # phase H: humidity alone (no wind field)
 HUMID_L = dict(FINAL3, extra_boosting=("load", "temp", "humidity"), extra_additive=("load", "temp", "humidity"))  # phase H: linear terms
 HUMID_P = dict(FINAL3, extra_boosting=("load", "temp", "humidity"))                       # phase H: humidity in the boosting only
+FINAL4 = HUMID_H                                                                            # the recipe after phase H (= final3_h)
 
 
 def final3b_models(ba: str | None) -> list:
@@ -227,6 +228,12 @@ def humid_l_models(ba: str | None) -> list:
     """Phase H, idea A6b: the humidity block in the boosting and, in the additive model, the temperature spline kept
     with linear terms in the heat-index excess and the relative humidity (instead of the apparent temperature)."""
     return _final3_models(ba, HUMID_L, "final3_hl")
+
+
+def final4_models(ba: str | None) -> list:
+    """The recipe after phase H: the phase G recipe with the humidity block in the boosting and the apparent
+    temperature in the additive model (no wind); ``frozen4`` runs it on 2023 to 2025."""
+    return _final3_models(ba, FINAL4, "final4")
 
 
 def humid_p_models(ba: str | None) -> list:
@@ -300,6 +307,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
     "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models, "humid": humid_models,
     "humid_h": humid_h_models, "humid_l": humid_l_models, "humid_p": humid_p_models,
+    "final4": final4_models, "frozen4": final4_models,
     "tbias": final2_models,
 }
 
@@ -389,7 +397,7 @@ def main(argv=None) -> int:
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group == "humid" else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p") else ())
+                            fields=WEATHER_FIELDS if group == "humid" else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4") else ())
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -559,6 +567,13 @@ def main(argv=None) -> int:
                      "Phase H: humidity in the boosting only", g_common +
                      "`final3_hp` is the phase G recipe with the humidity block in the boosting and the additive model unchanged. "
                      "Compare with `docs/phase_h_humidity_only.md`, `docs/phase_h_humidity_linear.md` and `docs/phase_g_final.md` (same days).")
+    frozen4 = report({"frozen4"}, a.results.parent / "frozen4_2023_2025", a.doc.parent / "frozen_evaluation_v3.md",
+                     "Third look at 2023 to 2025: the recipe after phase H, under protocol v2",
+                     "Development BAs: " + common +
+                     "The recipe after phase H (`final4`: the phase G recipe with the humidity block in the boosting and the apparent "
+                     "temperature in the additive model) on 2023 to 2025 under protocol v2, with the observed-temperature supplement. "
+                     "A third look at these years: compare with `docs/frozen_evaluation_v2.md` (same days, same rules) and read the "
+                     "difference as an estimate.")
     humid = report({"humid"}, a.results.parent / "phase_h_humidity", a.doc.parent / "phase_h_humidity.md",
                    "Phase H: humidity and wind", g_common +
                    "`final3_hw` is the phase G recipe with the dew point, dew-point depression, relative humidity, heat index, wind "
@@ -571,7 +586,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4)):
         log("no rows to report")
         return 1
     if waiting:
