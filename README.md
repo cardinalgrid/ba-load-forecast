@@ -222,6 +222,10 @@ After the frozen run the evaluation gained three data rules: a day with a report
 
 Phase G kept two of the many things it tried (`docs/methods.md`, section 8e): more load memory and the thermal history of the previous days as features of both members, and the recency regression as a third member of the ensemble. The recipe after phase G (`final3`) reaches **2.46 %** on the development period against 2.54 % for the phase F recipe and 2.69 % for `DF` under protocol v2, better at all eleven BAs (`docs/phase_g_final.md`), and **2.44 % against 2.90 %** on 2023 to 2025 (`docs/frozen_evaluation_v2.md`; a second look, since the phase F recipe had already been scored there; 2.50 % for that recipe under the same rules, `docs/frozen_evaluation_final2_v2.md`), ahead at PJM, SPP, MISO and CAISO and behind at the other seven, ahead in each year with the gap widening in 2025 as the published forecasts worsen. Against `DF` with its own hourly bias removed (2.05 %) the recipe is ahead at SPP only.
 
+## Phase H: humidity, the largest summer gain
+
+Phase H added the dew point and the wind (observed from the same NOAA files as the temperature, forecast from the HRRR archive) and, from them, the relative humidity, the NWS heat index and wind chill and the apparent temperature (`docs/methods.md`, section 8f). The humidity block in the boosting and the apparent temperature in the additive model take the recipe from 2.47 % to **2.40 %** on the development period on the same days, better at all eleven BAs, with the gain in summer (0.15 point in June to September) and almost none in winter (`docs/phase_h_humidity_only.md`, `docs/phase_h_humidity_by_season.md`). Wind and wind chill helped the boosting alone but not the recipe and were not adopted. The recipe after phase H is `final4`.
+
 ## Layout
 
 | Module | Responsibility |
