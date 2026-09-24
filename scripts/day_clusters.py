@@ -21,6 +21,7 @@ from grid_sentinel.calendar_us import SATURDAY, SUNDAY, WORKDAY, day_types, spec
 from ba_load_forecast.clusters import LabelClassifier, crosstab, daily_shapes, fit_clusters
 from ba_load_forecast.forecasters.profile import COOLING, HEATING, MILD, regime
 from ba_load_forecast.information_set import Loader, gross_guard
+from ba_load_forecast.paths import DATA, ISD, TIDY
 from ba_load_forecast.report import load_shed_days, markdown_table
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -119,13 +120,13 @@ def main(argv=None) -> int:
     ap.add_argument("--bas", nargs="+", default=list(DEV_BAS))
     ap.add_argument("--start", type=date.fromisoformat, default=date(2018, 1, 1))
     ap.add_argument("--end", type=date.fromisoformat, default=date(2022, 12, 31))
-    ap.add_argument("--tidy", type=Path, default=ROOT.parent / "ba-forecast-scorecard" / "data" / "tidy")
-    ap.add_argument("--isd-dir", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
+    ap.add_argument("--tidy", type=Path, default=TIDY)
+    ap.add_argument("--isd-dir", type=Path, default=ISD)
     ap.add_argument("--out", type=Path, default=ROOT / "results" / "day_clusters")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "day_clusters.md")
     a = ap.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
-    loader = Loader(a.tidy, a.isd_dir, ROOT / "data" / "hrrr")
+    loader = Loader(a.tidy, a.isd_dir, DATA / "hrrr")
 
     lines = ["# Daily load shapes grouped by similarity", "",
              f"For each BA, every complete day from {a.start} to {a.end} (gross faults removed) is a shape: 24 hourly "

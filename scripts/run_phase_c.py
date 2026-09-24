@@ -34,6 +34,7 @@ from ba_load_forecast.forecasters.boosting import Boosting
 from ba_load_forecast.forecasters.recency import RecencyRegression
 from ba_load_forecast.forecasters.special import SeparateSpecialModel, ShapeLabels
 from ba_load_forecast.information_set import Loader
+from ba_load_forecast.paths import DATA, ISD, TIDY
 from ba_load_forecast.report import summarise, write_report
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,9 +82,9 @@ def main(argv=None) -> int:
     ap.add_argument("--bas", nargs="+", default=list(DEV_BAS))
     ap.add_argument("--start", type=date.fromisoformat, default=date(2020, 12, 2))
     ap.add_argument("--end", type=date.fromisoformat, default=date(2022, 12, 31))
-    ap.add_argument("--tidy", type=Path, default=ROOT.parent / "ba-forecast-scorecard" / "data" / "tidy")
-    ap.add_argument("--isd-dir", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
-    ap.add_argument("--hrrr", type=Path, default=ROOT / "data" / "hrrr")
+    ap.add_argument("--tidy", type=Path, default=TIDY)
+    ap.add_argument("--isd-dir", type=Path, default=ISD)
+    ap.add_argument("--hrrr", type=Path, default=DATA / "hrrr")
     ap.add_argument("--out", type=Path, default=Path.home() / "ba-load-forecast-runs" / "phase_c")
     ap.add_argument("--phase-b", type=Path, default=Path.home() / "ba-load-forecast-runs" / "phase_b")
     ap.add_argument("--results", type=Path, default=ROOT / "results" / "phase_c")

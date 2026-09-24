@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 
 from ba_load_forecast.information_set import Loader
+from ba_load_forecast.paths import TIDY
 from ba_load_forecast.report import load_shed_days, markdown_table
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,7 +80,7 @@ def main(argv=None) -> int:
     ap.add_argument("--window", type=int, default=60)
     ap.add_argument("--first-year", type=int, default=2016)
     ap.add_argument("--last-year", type=int, default=2025)
-    ap.add_argument("--tidy", type=Path, default=ROOT.parent / "ba-forecast-scorecard" / "data" / "tidy")
+    ap.add_argument("--tidy", type=Path, default=TIDY)
     ap.add_argument("--runs", type=Path, default=Path.home() / "ba-load-forecast-runs" / "phase_e")
     ap.add_argument("--group", default="intervals")
     ap.add_argument("--model", default="ens_bc_regime")

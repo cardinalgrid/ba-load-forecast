@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 from ba_load_forecast.asos import read_asos
+from ba_load_forecast.paths import DATA, ISD
 from ba_load_forecast.report import markdown_table
 from ba_load_forecast.stations_multi import BA_STATIONS_MULTI, station_table_for
 
@@ -45,9 +46,9 @@ def compare(a: pd.Series, b: pd.Series, start, end) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--ghcnh", type=Path, default=ROOT / "data" / "ghcnh")
-    ap.add_argument("--asos", type=Path, default=ROOT / "data" / "asos")
-    ap.add_argument("--isd", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
+    ap.add_argument("--ghcnh", type=Path, default=DATA / "ghcnh")
+    ap.add_argument("--asos", type=Path, default=DATA / "asos")
+    ap.add_argument("--isd", type=Path, default=ISD)
     ap.add_argument("--start", default="2025-08-27")
     ap.add_argument("--end", default="2025-12-31")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "supplement_check.md")

@@ -17,6 +17,7 @@ from pathlib import Path
 from grid_sentinel.stations import BA_STATION
 
 from ba_load_forecast.ghcnh import fetch_ghcnh, station_ids
+from ba_load_forecast.paths import DATA
 from ba_load_forecast.stations_multi import BA_STATIONS_MULTI
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +35,7 @@ def all_stations() -> list[str]:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--years", type=int, nargs="+", default=[2025])
-    ap.add_argument("--out", type=Path, default=ROOT / "data" / "ghcnh")
+    ap.add_argument("--out", type=Path, default=DATA / "ghcnh")
     ap.add_argument("--stations", nargs="*", default=None)
     ap.add_argument("--skip-existing", action="store_true")
     a = ap.parse_args(argv)

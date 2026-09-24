@@ -19,6 +19,7 @@ from pathlib import Path
 from grid_sentinel.stations import BA_STATION
 
 from ba_load_forecast.asos import fetch_asos
+from ba_load_forecast.paths import DATA
 from ba_load_forecast.stations_multi import BA_STATIONS_MULTI
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +38,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--start", type=date.fromisoformat, default=date(2025, 8, 1))
     ap.add_argument("--end", type=date.fromisoformat, default=date(2026, 1, 1))
-    ap.add_argument("--out", type=Path, default=ROOT / "data" / "asos")
+    ap.add_argument("--out", type=Path, default=DATA / "asos")
     ap.add_argument("--stations", nargs="*", default=None)
     ap.add_argument("--skip-existing", action="store_true")
     a = ap.parse_args(argv)

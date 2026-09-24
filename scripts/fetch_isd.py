@@ -15,6 +15,7 @@ from pathlib import Path
 
 from grid_sentinel.weather import fetch_isd_lite
 
+from ba_load_forecast.paths import ISD
 from ba_load_forecast.stations_multi import all_icaos, station_table_for
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,7 +27,7 @@ def log(msg: str) -> None:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--isd-dir", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
+    ap.add_argument("--isd-dir", type=Path, default=ISD)
     ap.add_argument("--years", type=int, nargs=2, default=[2015, 2025])
     ap.add_argument("--rounds", type=int, default=30)
     a = ap.parse_args(argv)

@@ -23,8 +23,10 @@ from pathlib import Path
 import openpyxl
 import pandas as pd
 
+from ba_load_forecast.paths import DATA
+
 ROOT = Path(__file__).resolve().parents[1]
-CACHE = ROOT / "data" / "pv"
+CACHE = DATA / "pv"
 OUT = ROOT / "docs" / "pv_capacity_monthly.csv"
 BA_STATES = {"ISNE": ("CT", "MA", "ME", "NH", "RI", "VT"), "CISO": ("CA",), "FPL": ("FL",)}
 NET_METERING = {

@@ -20,6 +20,7 @@ import pandas as pd
 from ba_load_forecast.hrrr import consolidate
 from ba_load_forecast.hrrr_grib import extract
 from ba_load_forecast.hrrr_grid import points_from_table
+from ba_load_forecast.paths import DATA
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -33,8 +34,8 @@ def main(argv=None) -> int:
     ap.add_argument("--start", type=date.fromisoformat, default=date(2020, 12, 2))
     ap.add_argument("--end", type=date.fromisoformat, default=date(2022, 12, 31))
     ap.add_argument("--init-hours", type=int, nargs="+", default=[12, 6])
-    ap.add_argument("--stations", type=Path, default=ROOT / "data" / "cloud" / "stations.csv")
-    ap.add_argument("--out", type=Path, default=ROOT / "data" / "dswrf")
+    ap.add_argument("--stations", type=Path, default=DATA / "cloud" / "stations.csv")
+    ap.add_argument("--out", type=Path, default=DATA / "dswrf")
     ap.add_argument("--consolidate", action="store_true")
     a = ap.parse_args(argv)
     if a.consolidate:

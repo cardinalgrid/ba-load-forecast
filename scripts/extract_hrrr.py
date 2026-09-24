@@ -21,6 +21,7 @@ import pandas as pd
 
 from ba_load_forecast.hrrr import consolidate, extract
 from ba_load_forecast.hrrr_grid import load_grid, points_from_table, station_grid_points
+from ba_load_forecast.paths import DATA, ISD
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -48,8 +49,8 @@ def main(argv=None) -> int:
     ap.add_argument("--start", type=date.fromisoformat)
     ap.add_argument("--end", type=date.fromisoformat)
     ap.add_argument("--init-hours", type=int, nargs="+", default=[12, 6])
-    ap.add_argument("--out", type=Path, default=ROOT / "data" / "hrrr")
-    ap.add_argument("--isd-dir", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
+    ap.add_argument("--out", type=Path, default=DATA / "hrrr")
+    ap.add_argument("--isd-dir", type=Path, default=ISD)
     ap.add_argument("--stations", type=Path, default=ROOT / "docs" / "stations_grid.csv")
     ap.add_argument("--consolidate", action="store_true", help="gather the run files into one parquet per station")
     ap.add_argument("--no-resume", action="store_true")

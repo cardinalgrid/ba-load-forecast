@@ -21,6 +21,7 @@ from grid_sentinel.stations import station_table
 from grid_sentinel.weather import fetch_isd_lite, read_isd_lite
 
 from ba_load_forecast.hrrr import COLUMNS
+from ba_load_forecast.paths import DATA, ISD
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -82,8 +83,8 @@ def summarize(g: pd.DataFrame) -> pd.Series:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--hrrr", type=Path, default=ROOT / "data" / "hrrr")
-    ap.add_argument("--isd-dir", type=Path, default=ROOT.parent / "notes" / "03-daily-load-profiles" / "data" / "isd")
+    ap.add_argument("--hrrr", type=Path, default=DATA / "hrrr")
+    ap.add_argument("--isd-dir", type=Path, default=ISD)
     ap.add_argument("--stations", type=Path, default=ROOT / "docs" / "stations_grid.csv")
     ap.add_argument("--years", type=int, nargs="+", default=[2024])
     ap.add_argument("--out", type=Path, default=ROOT / "results" / "hrrr_verification")
