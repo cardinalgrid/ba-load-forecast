@@ -1,0 +1,7 @@
+model,scored_fraction
+DF,0.9913875598086125
+final3_hp,0.9873205741626794
+final3_hp_additive,0.9645933014354067
+final3_hp_boosting,0.9873205741626794
+final3_hp_ensemble,0.9873205741626794
+final3_hp_recency,0.9873205741626794
