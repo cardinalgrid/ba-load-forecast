@@ -66,6 +66,10 @@ outcome at the 5th, 50th and 95th percentiles, the coverage and relative width o
 whether the actual peak fell inside it, over all days, the event days and the 30 coldest days of each
 BA by observed minimum temperature.
 
+## 4b. Band and tail, apart
+
+The 90 % band answers where the outcome falls on most hours; the tail answers how far it goes when it leaves the band, which the 40 nearest days cannot estimate on their own (two of them lie beyond the 95th percentile). `scripts/tail_analysis.py` (`docs/tail_analysis.md`) therefore judges the two apart on the scored hours of 2023 to 2025: the band by coverage, width and the exceedance rate per side; the tail by the mean excess beyond the bound in percent of the outcome, the worst case, and a generalized Pareto distribution fitted to the excesses of each side with all BAs and years pooled in relative units and then by temperature regime, from which the expected shortfall follows. The tail is also attributed to member disagreement (the top quarter of days by the relative spread of the three members). On 2023 to 2025 with `final4`: coverage 89.2 %, 5.8 % of the hours under the band and 5.0 % over it; mean excess 2.0 % of the outcome below and 1.7 % above, worst 41 % and 33 % (single days at Duke and FPL); Pareto shape 0.19 below and 0.15 above (a heavy but finite-mean tail); in the cold regime the outcome exceeds the upper bound on 7.6 % of the hours (the storm under-forecast) against 5.2 % under it. Days of member disagreement carry 29 % of the hours outside the band and 33 % of the excess, against a quarter by construction: the members signal the tail only weakly.
+
 ## 4a. The benchmark by hour of the day
 
 `scripts/df_profile.py` (`docs/df_hourly_bias.md`) profiles the BAs' own forecast (`DF`) against demand (`D`) by local hour, from the EIA-930 files alone. Three things follow for any comparison against `DF`.
