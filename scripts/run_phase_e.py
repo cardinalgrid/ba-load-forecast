@@ -93,9 +93,9 @@ def log(msg: str) -> None:
 
 
 def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0,
-           fields: tuple[str, ...] = ()) -> Loader:
+           fields: tuple[str, ...] = (), field_bias_days: int = 0) -> Loader:
     return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
-                  temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields)
+                  temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields, field_bias_days=field_bias_days)
 
 
 def fields_ready(ld: Loader, ba: str) -> bool:
@@ -206,6 +206,7 @@ HUMID_H = dict(FINAL3, extra_boosting=("load", "temp", "humidity"), apparent=Tru
 HUMID_L = dict(FINAL3, extra_boosting=("load", "temp", "humidity"), extra_additive=("load", "temp", "humidity"))  # phase H: linear terms
 HUMID_P = dict(FINAL3, extra_boosting=("load", "temp", "humidity"))                       # phase H: humidity in the boosting only
 FINAL4 = HUMID_H                                                                            # the recipe after phase H (= final3_h)
+FINAL4B = dict(FINAL4, field_bias_days=30)              # phase H, idea A16: the dew point path corrected by its own recent bias
 
 
 def final3b_models(ba: str | None) -> list:
@@ -235,6 +236,12 @@ def final4_models(ba: str | None) -> list:
     """The recipe after phase H: the phase G recipe with the humidity block in the boosting and the apparent
     temperature in the additive model (no wind); ``frozen4`` runs it on 2023 to 2025."""
     return _final3_models(ba, FINAL4, "final4")
+
+
+def humid_b_models(ba: str | None) -> list:
+    """Phase H, idea A16: ``final4`` with the HRRR dew point path corrected by the median of its own error per local
+    hour over the last 30 known days (the temperature correction of phase G applied to the dew point)."""
+    return _final3_models(ba, FINAL4B, "final4b")
 
 
 def humid_p_models(ba: str | None) -> list:
@@ -308,7 +315,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
     "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models, "humid": humid_models,
     "humid_h": humid_h_models, "humid_l": humid_l_models, "humid_p": humid_p_models,
-    "final4": final4_models, "frozen4": final4_models,
+    "final4": final4_models, "frozen4": final4_models, "humid_b": humid_b_models,
     "tbias": final2_models,
 }
 
@@ -398,7 +405,8 @@ def main(argv=None) -> int:
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group == "humid" else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4") else ())
+                            fields=WEATHER_FIELDS if group == "humid" else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0)
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -564,6 +572,11 @@ def main(argv=None) -> int:
                      "`final3_hl` is `final3_h` with the additive model keeping its temperature spline and adding linear terms in "
                      "the heat-index excess over the temperature and in the relative humidity, instead of fitting on the apparent "
                      "temperature. Compare with `docs/phase_h_humidity_only.md` and `docs/phase_g_final.md` (same days).")
+    humid_b = report({"humid_b"}, a.results.parent / "phase_h_dewpoint_bias", a.doc.parent / "phase_h_dewpoint_bias.md",
+                     "Phase H: the dew point path corrected by its own recent bias", g_common +
+                     "`final4b` is `final4` with the HRRR dew point of every station moved by the median of the forecast's own error at "
+                     "that local hour over the last 30 known days (forecast as seen at the cut-off against the airport observation), the "
+                     "temperature correction of phase G applied to the dew point. Compare with `docs/phase_h_humidity_only.md` (same days).")
     humid_p = report({"humid_p"}, a.results.parent / "phase_h_humidity_boosting", a.doc.parent / "phase_h_humidity_boosting.md",
                      "Phase H: humidity in the boosting only", g_common +
                      "`final3_hp` is the phase G recipe with the humidity block in the boosting and the additive model unchanged. "
@@ -587,7 +600,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b)):
         log("no rows to report")
         return 1
     if waiting:

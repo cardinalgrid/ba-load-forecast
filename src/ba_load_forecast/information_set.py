@@ -248,7 +248,7 @@ class Loader:
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
                  dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0,
                  supplement_dir: Path | list[Path] | None = None, fields: tuple[str, ...] = (),
-                 field_dirs: dict[str, Path] | None = None):
+                 field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -259,6 +259,9 @@ class Loader:
         # HRRR extraction in field_dirs (default: siblings of hrrr_dir named after the field)
         self.fields = tuple(fields)
         self.field_dirs = {k: Path(v) for k, v in (field_dirs or {}).items()}
+        # field_bias_days > 0: the HRRR path of every extra field is corrected by the median of its own error per
+        # local hour over that many known days, exactly as temp_bias_days does for the temperature
+        self.field_bias_days = field_bias_days
         # temp_bias_days > 0: the HRRR temperature path of the target day is corrected by the median of the forecast's
         # own error per local hour over that many known days (forecast as seen at the cut-off against the observation)
         self.temp_bias_days = temp_bias_days
@@ -349,6 +352,42 @@ class Loader:
                 cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.init_hours)
         return cache[key]
 
+    def field_seen_series(self, ba: str, icao: str, field: str) -> pd.Series | None:
+        """The forecast of ``field`` for every local hour by the run available at that day's cut-off, one station."""
+        cache: dict = self.__dict__.setdefault("_field_seen", {})
+        key = (ba, icao, field)
+        if key not in cache:
+            table = run_table(self.field_rows(field, icao), field)
+            if not table[0]:
+                cache[key] = None
+            else:
+                inits = sorted(table[0])
+                first, last = inits[0].date(), (inits[-1] + pd.Timedelta(days=2)).date()
+
+                def offset_of_day(d):
+                    off = self.offset(ba, d.year)
+                    if off.empty:
+                        return np.nan
+                    v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
+                    return float(off.median()) if np.isnan(v) else float(v)
+
+                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.init_hours)
+        return cache[key]
+
+    def field_hour_bias(self, ba: str, icao: str, field: str, day: date) -> np.ndarray:
+        """The recent bias of the forecast of ``field`` per local hour at one station, known at the cut-off."""
+        key = (ba, icao, field)
+        if key not in self._bias_tables:
+            seen = self.field_seen_series(ba, icao, field)
+            if seen is None:
+                self._bias_tables[key] = pd.DataFrame(columns=range(24))
+            else:
+                years = [y for y in range(seen.index.min().year, seen.index.max().year + 1)]
+                observed = pd.concat([self.station_field_series(icao, ba, y, field) for y in years])
+                observed = observed[~observed.index.duplicated()].sort_index()
+                self._bias_tables[key] = hourly_bias_table(observed, seen)
+        return rolling_hour_bias(self._bias_tables[key], day, self.field_bias_days)
+
     def hour_bias(self, ba: str, icao: str, day: date) -> np.ndarray:
         """The forecast's recent bias per local hour at one station, known at the cut-off of ``day``."""
         key = (ba, icao)
@@ -402,6 +441,8 @@ class Loader:
                 rows = self.field_rows(fld, icao)
                 paths[icao] = (forecast_path(rows, day, off_path, run, column=fld) if run is not None and len(rows)
                                else np.full(PATH_HOURS, np.nan))
+                if self.field_bias_days and run is not None and len(rows):
+                    paths[icao] = apply_hour_bias(paths[icao], path_ts, self.field_hour_bias(ba, icao, fld, day))
             path = pd.DataFrame(paths, index=path_ts).mean(axis=1, skipna=False)
             out[fld] = pd.concat([hist, path]).reindex(index).to_numpy(dtype=float)
         return out
