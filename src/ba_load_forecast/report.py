@@ -179,7 +179,9 @@ def quantile_table(rows: pd.DataFrame, cold_mornings: int = 30) -> pd.DataFrame:
         if sub.empty:
             continue
         g = sub.groupby("model")
-        t = g[["pinball_05", "pinball_50", "pinball_95", "coverage_90", "width_90", "peak_in_band"]].mean()
+        cols = [c for c in ("pinball_05", "pinball_50", "pinball_95", "coverage_90", "width_90", "peak_in_band", "winkler_90", "crps")
+                if c in sub.columns and sub[c].notna().any()]
+        t = g[cols].mean()
         t["n_days"] = g.size()
         t.insert(0, "days", label)
         parts.append(t.reset_index())

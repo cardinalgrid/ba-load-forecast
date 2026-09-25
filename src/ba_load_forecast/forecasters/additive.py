@@ -60,9 +60,10 @@ class AdditiveModel:
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
                  labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False,
-                 extra: tuple[str, ...] = (), apparent: bool = False):
+                 extra: tuple[str, ...] = (), apparent: bool = False, apparent_wind: bool = True):
         self.extra = tuple(extra)             # optional linear blocks: "load", "temp", "humidity" (HUMIDITY_LINEAR); the last needs Loader(fields=...)
         self.apparent = apparent              # the smooth response on the apparent temperature (heat index, wind chill); needs Loader(fields=...)
+        self.apparent_wind = apparent_wind    # False: the apparent temperature ignores the wind (heat index only) even when the wind is loaded
         self.pv = pv                          # linear PV terms (PV_LINEAR) from the sky frame; needs Loader(sky=True, pv=True)
         self.irradiance = irradiance          # with pv: capacity times the forecast irradiance instead of times the cloud fraction
         self.extremes = extremes              # explicit cold and heat terms (features.EXTREME_COLUMNS) as linear regressors
@@ -130,7 +131,8 @@ class AdditiveModel:
         if (self.apparent or humidity) and info.weather is None:
             raise ForecastError('apparent=True or extra "humidity" needs Loader(fields=("dewpoint_f", ...)) and the HRRR extraction')
         if self.apparent:
-            temp = apparent_series(temp, info.weather)
+            weather = info.weather if self.apparent_wind else info.weather.drop(columns=[c for c in ("wind_ms",) if c in info.weather.columns])
+            temp = apparent_series(temp, weather)
         rows = rows_for_days(info.load_history, temp, days, labels=self.day_labels(info, target=target),
                              sky=info.sky if self.pv else None, weather=info.weather if humidity else None)
         if humidity:                                            # linear terms: heat index above the temperature, relative humidity

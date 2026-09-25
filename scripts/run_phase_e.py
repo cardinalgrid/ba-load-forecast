@@ -207,6 +207,11 @@ HUMID_L = dict(FINAL3, extra_boosting=("load", "temp", "humidity"), extra_additi
 HUMID_P = dict(FINAL3, extra_boosting=("load", "temp", "humidity"))                       # phase H: humidity in the boosting only
 FINAL4 = HUMID_H                                                                            # the recipe after phase H (= final3_h)
 FINAL4B = dict(FINAL4, field_bias_days=30)              # phase H, idea A16: the dew point path corrected by its own recent bias
+EXTRA_LEVELS = (0.01, 0.02, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.98, 0.99)
+FINAL4Q = dict(FINAL4, intervals=dict(extra_levels=EXTRA_LEVELS))                                      # A17: 23 quantiles in all
+FINAL4R = dict(FINAL4Q, boosting=dict(loss="absolute_error"))                                           # A19: robust loss in the boosting
+FINAL4W = dict(FINAL4Q, extra_boosting=("load", "temp", "humidity", "wind"), apparent_wind=False)      # wind in the boosting only
+FINAL4P = dict(FINAL4Q, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70))            # A8: peak quantile 0.70 on the coldest decile
 
 
 def final3b_models(ba: str | None) -> list:
@@ -244,6 +249,15 @@ def humid_b_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL4B, "final4b")
 
 
+def events_models(ba: str | None) -> list:
+    """Ideas A17, A19, A8 and the wind in the boosting only, side by side: the phase H recipe with 23 quantiles
+    (`final4`), the same with a robust loss in the boosting (`final4r`), with the wind block in the boosting and the
+    apparent temperature without wind chill (`final4w`), and with the peak read at the 70th percentile on the
+    coldest decile of days (`final4p`)."""
+    return [*_final3_models(ba, FINAL4Q, "final4"), *_final3_models(ba, FINAL4R, "final4r"),
+            *_final3_models(ba, FINAL4W, "final4w"), *_final3_models(ba, FINAL4P, "final4p")]
+
+
 def humid_p_models(ba: str | None) -> list:
     """Phase H: the humidity block in the boosting only; the additive model as in phase G."""
     return _final3_models(ba, HUMID_P, "final3_hp")
@@ -264,7 +278,8 @@ def _final3_models(ba: str | None, c: dict, tag: str) -> list:
 
     solar = ba in PV_BAS
     add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
-                               apparent=c.get("apparent", False), **c["additive"], name=f"{tag}_additive"))
+                               apparent=c.get("apparent", False), apparent_wind=c.get("apparent_wind", True), **c["additive"],
+                               name=f"{tag}_additive"))
     boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
                           target="ratio" if c["ratio"] else "level", **c["boosting"], name=f"{tag}_boosting"))
     members = [add, boo]
@@ -274,7 +289,8 @@ def _final3_models(ba: str | None, c: dict, tag: str) -> list:
         members.append(Cached(rec))
     ens = Cached(Ensemble(members, weighting=c["weighting"], name=f"{tag}_ensemble"))
     return [*members, ens,
-            AdaptiveIntervals(ens, **FINAL_INTERVAL, nearest=c["nearest"], peak="quantile", peak_quantile=0.60, name=tag)]
+            AdaptiveIntervals(ens, **FINAL_INTERVAL, nearest=c["nearest"], peak="quantile", peak_quantile=0.60,
+                              **c.get("intervals", {}), name=tag)]
 
 
 def final_models(ba: str | None) -> list:
@@ -315,7 +331,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "feat": feat_models, "hp": hp_models, "ens2": ens2_models,
     "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models, "humid": humid_models,
     "humid_h": humid_h_models, "humid_l": humid_l_models, "humid_p": humid_p_models,
-    "final4": final4_models, "frozen4": final4_models, "humid_b": humid_b_models,
+    "final4": final4_models, "frozen4": final4_models, "humid_b": humid_b_models, "events": events_models,
     "tbias": final2_models,
 }
 
@@ -405,7 +421,7 @@ def main(argv=None) -> int:
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group == "humid" else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0)
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
@@ -572,6 +588,12 @@ def main(argv=None) -> int:
                      "`final3_hl` is `final3_h` with the additive model keeping its temperature spline and adding linear terms in "
                      "the heat-index excess over the temperature and in the relative humidity, instead of fitting on the apparent "
                      "temperature. Compare with `docs/phase_h_humidity_only.md` and `docs/phase_g_final.md` (same days).")
+    events = report({"events"}, a.results.parent / "phase_i_events", a.doc.parent / "phase_i_events.md",
+                    "Phase I: robust loss, wind in the boosting, cold-day peak quantile, 23 quantiles", g_common +
+                    "`final4` with 23 quantiles (CRPS, Winkler); `final4r` with the boosting fitted by absolute error; `final4w` with "
+                    "the wind block in the boosting and the apparent temperature without wind chill in the additive model; `final4p` "
+                    "reading the point at the 70th percentile around the peak on the coldest decile of days. Compare on the winter events "
+                    "and on the year.")
     humid_b = report({"humid_b"}, a.results.parent / "phase_h_dewpoint_bias", a.doc.parent / "phase_h_dewpoint_bias.md",
                      "Phase H: the dew point path corrected by its own recent bias", g_common +
                      "`final4b` is `final4` with the HRRR dew point of every station moved by the median of the forecast's own error at "
@@ -600,7 +622,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events)):
         log("no rows to report")
         return 1
     if waiting:

@@ -197,7 +197,8 @@ class AdaptiveIntervals(EmpiricalIntervals):
     def __init__(self, base: Forecaster, target: float = 0.10, gamma: float = 0.02, window_days: int = 120,
                  min_days: int = 20, name: str | None = None, by_regime: bool = False, alpha_by_regime: bool = False,
                  nearest: int | None = None, tail: bool = False, peak: str | None = None, peak_window: float = 0.97,
-                 peak_quantile: float = 0.55):
+                 peak_quantile: float = 0.55, peak_quantile_cold: float | None = None, cold_decile: float = 0.10,
+                 extra_levels: tuple[float, ...] = ()):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         self.target = target
@@ -208,6 +209,10 @@ class AdaptiveIntervals(EmpiricalIntervals):
         self.peak = peak                      # None, "lift" or "quantile" (see peak_adjust)
         self.peak_window = peak_window        # hours whose forecast is within this fraction of the forecast maximum
         self.peak_quantile = peak_quantile
+        self.peak_quantile_cold = peak_quantile_cold   # the peak quantile on the coldest days (forecast minimum in the bottom decile)
+        self.cold_decile = cold_decile
+        self.extra_levels = tuple(sorted(extra_levels))   # further quantiles issued next to the band (CRPS, tail analysis)
+        self.last_extra: tuple[date, np.ndarray] | None = None
         self.alphas: dict[int | None, float] = {}          # level per regime (key None: the single level)
         self._issued: dict[date, tuple[np.ndarray, np.ndarray]] = {}
         self._scored: set[date] = set()
@@ -266,6 +271,20 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 q[-1, h] = p[h] * (1.0 + q90 + high.mean() * np.log(0.10 / (1.0 - hi_level)))
         return np.sort(q, axis=0)
 
+    def is_cold_day(self, info: InformationSet) -> bool:
+        """The target day's forecast minimum is in the coldest ``cold_decile`` of the known days' minima."""
+        t = np.asarray(info.temp_forecast_f, dtype=float)
+        tmin = float(np.nanmin(t)) if np.isfinite(t).any() else np.nan
+        known = np.array([v for d, v in self._tmin.items() if d < info.day and np.isfinite(v)])
+        if not np.isfinite(tmin) or len(known) < 100:
+            return False
+        return bool(tmin <= np.quantile(known, self.cold_decile))
+
+    def peak_level(self, info: InformationSet) -> float:
+        if self.peak_quantile_cold is not None and self.is_cold_day(info):
+            return self.peak_quantile_cold
+        return self.peak_quantile
+
     def peak_adjust(self, info: InformationSet, p: np.ndarray, e: np.ndarray, q: np.ndarray, days: list[date]) -> np.ndarray:
         """Shift the band upward around the forecast peak.
 
@@ -291,10 +310,11 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 eh = eh[np.isfinite(eh)]
                 shift[h] = weight[h] * p[h] * (m_peak - float(np.median(eh)))
         elif self.peak == "quantile":
+            peak_q = self.peak_level(info)
             for h in range(24):
                 eh = e[:, h]
                 eh = eh[np.isfinite(eh)]
-                level = 0.5 + weight[h] * (self.peak_quantile - 0.5)
+                level = 0.5 + weight[h] * (peak_q - 0.5)
                 shift[h] = p[h] * (float(np.quantile(eh, level)) - float(np.median(eh)))
         return q + np.maximum(shift, 0.0)[None, :]
 
@@ -308,4 +328,9 @@ class AdaptiveIntervals(EmpiricalIntervals):
         if self.peak:
             q = self.peak_adjust(info, p, e, q, days)
         self._issued[info.day] = (q[0], q[-1])
+        if self.extra_levels:
+            qx = self.band(p, e, self.extra_levels)
+            if self.peak:
+                qx = qx + (q[1] - self.band(p, e, (0.5,))[0])[None, :]     # the same peak shift as the band
+            self.last_extra = (info.day, qx)
         return q

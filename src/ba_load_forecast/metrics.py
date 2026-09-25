@@ -11,7 +11,7 @@ import numpy as np
 MAX_MISSING_HOURS = 2
 
 FIELDS = ("mape", "peak_err_pct", "peak_under_pct", "peak_hour_err", "actual_peak", "actual_mean", "n_missing", "skipped")
-QUANTILE_FIELDS = ("pinball_05", "pinball_50", "pinball_95", "coverage_90", "width_90", "peak_in_band")
+QUANTILE_FIELDS = ("pinball_05", "pinball_50", "pinball_95", "coverage_90", "width_90", "peak_in_band", "winkler_90", "crps")
 
 
 def quantile_metrics(quantiles, actual, taus=(0.05, 0.5, 0.95)) -> dict:
@@ -36,7 +36,28 @@ def quantile_metrics(quantiles, actual, taus=(0.05, 0.5, 0.95)) -> dict:
     out["width_90"] = float(np.mean((hi[ok] - lo[ok]) / a[ok]) * 100.0)
     ph = int(np.nanargmax(a))
     out["peak_in_band"] = float(lo[ph] <= a[ph] <= hi[ph])
+    alpha = 1.0 - (taus[-1] - taus[0])
+    below = np.maximum(lo[ok] - a[ok], 0.0)
+    above = np.maximum(a[ok] - hi[ok], 0.0)
+    out["winkler_90"] = float(np.mean(((hi[ok] - lo[ok]) + (2.0 / alpha) * (below + above)) / a[ok]) * 100.0)
     return out
+
+
+def crps_from_quantiles(quantiles, levels, actual) -> float:
+    """CRPS approximated from a set of quantile forecasts: twice the mean pinball loss over the levels, in percent
+    of the actual (Gneiting and Raftery 2007; the approximation improves with the number of levels). NaN when
+    the day cannot be scored."""
+    q = np.asarray(quantiles, dtype=float)
+    a = np.asarray(actual, dtype=float)
+    lv = np.asarray(levels, dtype=float)
+    if q.shape != (len(lv), 24) or a.shape != (24,) or np.isnan(q).any():
+        return np.nan
+    ok = ~np.isnan(a) & (a > 0)
+    if ok.sum() < 24 - MAX_MISSING_HOURS:
+        return np.nan
+    diff = a[None, ok] - q[:, ok]
+    loss = np.maximum(lv[:, None] * diff, (lv[:, None] - 1.0) * diff)
+    return float(2.0 * np.mean(loss / a[None, ok]) * 100.0)
 
 
 def day_metrics(forecast, actual) -> dict:

@@ -17,7 +17,7 @@ import pandas as pd
 from .forecasters.base import Forecaster, ForecastError, blind_copy
 from .hrrr import days_between
 from .information_set import InformationSet, Loader
-from .metrics import FIELDS, QUANTILE_FIELDS, day_metrics, quantile_metrics
+from .metrics import FIELDS, QUANTILE_FIELDS, crps_from_quantiles, day_metrics, quantile_metrics
 
 BA_MODEL = "DF"
 COLUMNS = ["ba", "day", "model", *FIELDS, *QUANTILE_FIELDS, "temp_min_f", "day_type", "special_day", "run_init", "error"]
@@ -61,6 +61,12 @@ def score_day(info: InformationSet, forecasters: Sequence[Forecaster], hourly: l
                     q = np.asarray(fc.predict_quantiles(blind), dtype=float)
                     forecast = q[q.shape[0] // 2]
                     qm = quantile_metrics(q, actual)
+                    extra = getattr(fc, "last_extra", None)
+                    if extra is not None and extra[0] == info.day:
+                        levels = [*fc.extra_levels, 0.05, 0.5, 0.95]
+                        allq = np.vstack([extra[1], q])
+                        order = np.argsort(levels)
+                        qm["crps"] = crps_from_quantiles(allq[order], np.asarray(levels)[order], actual)
                 except ForecastError:
                     q = None
                     forecast = np.asarray(fc.predict(blind), dtype=float)
@@ -74,6 +80,10 @@ def score_day(info: InformationSet, forecasters: Sequence[Forecaster], hourly: l
             if q is not None:
                 hourly.append(hourly_row(info, f"{fc.name}_q05", q[0]))
                 hourly.append(hourly_row(info, f"{fc.name}_q95", q[-1]))
+                extra = getattr(fc, "last_extra", None)
+                if extra is not None and extra[0] == info.day:
+                    for level, row in zip(fc.extra_levels, extra[1], strict=True):
+                        hourly.append(hourly_row(info, f"{fc.name}_q{round(level * 100):02d}", row))
     rows.append({**common, "model": BA_MODEL, **day_metrics(info.ba_forecast, actual), **empty_q, "error": note})
     if hourly is not None:
         hourly.append(hourly_row(info, BA_MODEL, info.ba_forecast))
