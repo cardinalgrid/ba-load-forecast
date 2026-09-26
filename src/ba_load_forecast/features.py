@@ -183,6 +183,23 @@ def apparent_series(temp: pd.Series, weather: pd.DataFrame | None) -> pd.Series:
     return pd.Series(apparent_temperature_f(temp.to_numpy(dtype=float), dew, wind), index=temp.index)
 
 
+def cold_weights(rows_index: pd.DatetimeIndex, temp: pd.Series, alpha: float, decile: float = 0.10,
+                 scale_f: float = 10.0) -> np.ndarray:
+    """One weight per training row: 1 plus ``alpha`` for every ``scale_f`` degrees the row's day has its observed
+    minimum below the ``decile`` quantile of the daily minima of the training days (1 on every other day). Days
+    far into the cold tail count more, so that six years with few extreme days do not regress the fit to the
+    mean; the temperature is the observed history, known when the model is fitted."""
+    days = pd.DatetimeIndex(rows_index).normalize()
+    tmin = temp.groupby(temp.index.normalize()).min()
+    per_day = tmin.reindex(days.unique())
+    threshold = float(np.nanquantile(per_day.to_numpy(dtype=float), decile)) if per_day.notna().sum() else np.nan
+    row_tmin = per_day.reindex(days).to_numpy(dtype=float)
+    if not np.isfinite(threshold):
+        return np.ones(len(days))
+    excess = np.where(np.isfinite(row_tmin), np.maximum(0.0, threshold - row_tmin), 0.0)
+    return 1.0 + alpha * excess / scale_f
+
+
 def training_days(last: date, n_days: int) -> list[date]:
     """The ``n_days`` days ending at ``last`` (inclusive), oldest first."""
     return [last - timedelta(days=k) for k in range(n_days - 1, -1, -1)]

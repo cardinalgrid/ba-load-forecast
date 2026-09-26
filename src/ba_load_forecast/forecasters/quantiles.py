@@ -198,7 +198,8 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  min_days: int = 20, name: str | None = None, by_regime: bool = False, alpha_by_regime: bool = False,
                  nearest: int | None = None, tail: bool = False, peak: str | None = None, peak_window: float = 0.97,
                  peak_quantile: float = 0.55, peak_quantile_cold: float | None = None, cold_decile: float = 0.10,
-                 extra_levels: tuple[float, ...] = ()):
+                 extra_levels: tuple[float, ...] = (), peak_quantile_hot: float | None = None, hot_decile: float = 0.90,
+                 cold_by_max: bool = False):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         self.target = target
@@ -211,6 +212,10 @@ class AdaptiveIntervals(EmpiricalIntervals):
         self.peak_quantile = peak_quantile
         self.peak_quantile_cold = peak_quantile_cold   # the peak quantile on the coldest days (forecast minimum in the bottom decile)
         self.cold_decile = cold_decile
+        self.peak_quantile_hot = peak_quantile_hot     # the peak quantile on the hottest days (forecast maximum in the top decile)
+        self.hot_decile = hot_decile
+        self.cold_by_max = cold_by_max                 # a day is also cold when its forecast maximum is in the coldest decile of maxima
+        self._tmax: dict[date, float] = {}
         self.extra_levels = tuple(sorted(extra_levels))   # further quantiles issued next to the band (CRPS, tail analysis)
         self.last_extra: tuple[date, np.ndarray] | None = None
         self.alphas: dict[int | None, float] = {}          # level per regime (key None: the single level)
@@ -271,18 +276,37 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 q[-1, h] = p[h] * (1.0 + q90 + high.mean() * np.log(0.10 / (1.0 - hi_level)))
         return np.sort(q, axis=0)
 
-    def is_cold_day(self, info: InformationSet) -> bool:
-        """The target day's forecast minimum is in the coldest ``cold_decile`` of the known days' minima."""
+    def _known_extremes(self, info: InformationSet) -> tuple[float, float, np.ndarray, np.ndarray]:
         t = np.asarray(info.temp_forecast_f, dtype=float)
         tmin = float(np.nanmin(t)) if np.isfinite(t).any() else np.nan
-        known = np.array([v for d, v in self._tmin.items() if d < info.day and np.isfinite(v)])
-        if not np.isfinite(tmin) or len(known) < 100:
+        tmax = float(np.nanmax(t)) if np.isfinite(t).any() else np.nan
+        self._tmax.setdefault(info.day, tmax)
+        known_min = np.array([v for d, v in self._tmin.items() if d < info.day and np.isfinite(v)])
+        known_max = np.array([v for d, v in self._tmax.items() if d < info.day and np.isfinite(v)])
+        return tmin, tmax, known_min, known_max
+
+    def is_cold_day(self, info: InformationSet) -> bool:
+        """The target day's forecast minimum is in the coldest ``cold_decile`` of the known days' minima (or, with
+        ``cold_by_max``, its forecast maximum in the coldest decile of the known maxima: a day cold all through)."""
+        tmin, tmax, known_min, known_max = self._known_extremes(info)
+        if not np.isfinite(tmin) or len(known_min) < 100:
             return False
-        return bool(tmin <= np.quantile(known, self.cold_decile))
+        if tmin <= np.quantile(known_min, self.cold_decile):
+            return True
+        return bool(self.cold_by_max and len(known_max) >= 100 and tmax <= np.quantile(known_max, self.cold_decile))
+
+    def is_hot_day(self, info: InformationSet) -> bool:
+        """The target day's forecast maximum is in the hottest ``1 - hot_decile`` of the known days' maxima."""
+        _, tmax, _, known_max = self._known_extremes(info)
+        if not np.isfinite(tmax) or len(known_max) < 100:
+            return False
+        return bool(tmax >= np.quantile(known_max, self.hot_decile))
 
     def peak_level(self, info: InformationSet) -> float:
         if self.peak_quantile_cold is not None and self.is_cold_day(info):
             return self.peak_quantile_cold
+        if self.peak_quantile_hot is not None and self.is_hot_day(info):
+            return self.peak_quantile_hot
         return self.peak_quantile
 
     def peak_adjust(self, info: InformationSet, p: np.ndarray, e: np.ndarray, q: np.ndarray, days: list[date]) -> np.ndarray:

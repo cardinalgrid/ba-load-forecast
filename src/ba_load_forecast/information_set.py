@@ -32,7 +32,16 @@ from grid_sentinel.weather import fetch_isd_lite, hourly_temperature_f, read_isd
 
 from .asos import read_asos, supplement_path
 from .cleaning import sentinel_clean
-from .cutoff import DEFAULT_INIT_HOURS, PATH_HOURS, forecast_path, last_load_hour, path_timestamps, run_for_day
+from .cutoff import (
+    DEFAULT_INIT_HOURS,
+    PATH_HOURS,
+    blend_paths,
+    forecast_path,
+    last_load_hour,
+    path_timestamps,
+    previous_run,
+    run_for_day,
+)
 from .hrrr import load_station
 from .sky import all_days, forecast_as_seen, pv_capacity, run_table, sky_frame
 from .stations_multi import BA_STATIONS_MULTI, station_table_for
@@ -118,6 +127,7 @@ class InformationSet:
     temp_forecast_path_stations_f: pd.DataFrame | None = None  # one column per station, indexed by path_timestamps
     sky: pd.DataFrame | None = None                            # sky.SKY_COLUMNS for the history and the target day
     weather: pd.DataFrame | None = None                        # dewpoint_f, wind_ms: observed over the history, the HRRR path after
+    run_second: tuple[date, int] | None = None                 # with Loader(second_run=True): the older run blended into the paths
 
     @property
     def cutoff(self) -> datetime:
@@ -248,13 +258,16 @@ class Loader:
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
                  dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0,
                  supplement_dir: Path | list[Path] | None = None, fields: tuple[str, ...] = (),
-                 field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0):
+                 field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0, second_run: bool = False):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
         repairs the load history with grid-data-sentinel (``cleaning.sentinel_clean``, one year at a time, warmed
         up on the year before) before the gross-fault guard; the outcome is never cleaned."""
         self.cleaning = cleaning
+        # second_run=True: every forecast path (temperature and extra fields) is the mean of the cut-off run and the
+        # extracted run up to 6 h older where that run covers the hour (a lagged ensemble of two runs)
+        self.second_run = second_run
         # fields beyond the temperature ("dewpoint_f", "wind_ms"): observed like the temperature, forecast from the
         # HRRR extraction in field_dirs (default: siblings of hrrr_dir named after the field)
         self.fields = tuple(fields)
@@ -425,7 +438,7 @@ class Loader:
         return self._cached(("sfield", field, icao, ba, year), read)
 
     def weather_frame(self, ba: str, start: date, day: date, history_index: pd.DatetimeIndex, path_ts: pd.DatetimeIndex,
-                      off_path: np.ndarray, run) -> pd.DataFrame | None:
+                      off_path: np.ndarray, run, run2=None) -> pd.DataFrame | None:
         """One column per field in ``self.fields``: the mean over the BA's stations of the observation over the
         history and of the HRRR path from 09:00 of D-1 (NaN without a run)."""
         if not self.fields:
@@ -441,6 +454,8 @@ class Loader:
                 rows = self.field_rows(fld, icao)
                 paths[icao] = (forecast_path(rows, day, off_path, run, column=fld) if run is not None and len(rows)
                                else np.full(PATH_HOURS, np.nan))
+                if run2 is not None and len(rows):
+                    paths[icao] = blend_paths(paths[icao], forecast_path(rows, day, off_path, run2, column=fld))
                 if self.field_bias_days and run is not None and len(rows):
                     paths[icao] = apply_hour_bias(paths[icao], path_ts, self.field_hour_bias(ba, icao, fld, day))
             path = pd.DataFrame(paths, index=path_ts).mean(axis=1, skipna=False)
@@ -566,10 +581,13 @@ class Loader:
         off_path = np.where(np.isnan(off_path), fallback, off_path)
         if not np.isnan(off_cutoff):
             run = run_for_day(day, float(off_cutoff), self.init_hours)
+        run2 = previous_run(run, self.init_hours) if (self.second_run and run is not None) else None
         paths = {}
         for icao in stations:
             rows = self.hrrr(icao)
             paths[icao] = forecast_path(rows, day, off_path, run) if run is not None and len(rows) else np.full(PATH_HOURS, np.nan)
+            if run2 is not None and len(rows):
+                paths[icao] = blend_paths(paths[icao], forecast_path(rows, day, off_path, run2))
             if self.temp_bias_days and run is not None and len(rows):
                 paths[icao] = apply_hour_bias(paths[icao], path_ts, self.hour_bias(ba, icao, day))
         path_frame = pd.DataFrame(paths, index=path_ts)
@@ -584,7 +602,7 @@ class Loader:
             temp = pd.concat([self._years(ba, start, day, lambda b, y, i=icao: self.station_temperature(i, b, y)) for icao in stations],
                              axis=1).mean(axis=1)
 
-        weather = self.weather_frame(ba, start, day, history_index, path_ts, off_path, run)
+        weather = self.weather_frame(ba, start, day, history_index, path_ts, off_path, run, run2)
 
         sky = None
         if self.sky:
@@ -616,5 +634,5 @@ class Loader:
             actual_plausible=plausible(outcome.reindex(hours).to_numpy(dtype=float), reference),
             benchmark_plausible=forecast_plausible(fcst.reindex(hours).to_numpy(dtype=float), outcome.reindex(hours).to_numpy(dtype=float)),
             sky=sky, stations=stations, temp_history_stations_f=stations_hist,
-            temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None, weather=weather,
+            temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None, weather=weather, run_second=run2,
         )

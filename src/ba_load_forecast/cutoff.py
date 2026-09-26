@@ -55,6 +55,35 @@ def run_for_day(day: date, offset_h: float, init_hours: tuple[int, ...] = DEFAUL
     return d, h
 
 
+def previous_run(init: tuple[date, int], init_hours: tuple[int, ...] = DEFAULT_INIT_HOURS,
+                 max_gap_h: int = 6) -> tuple[date, int] | None:
+    """The extracted run initialised at most ``max_gap_h`` hours before ``init`` (None when there is none:
+    with the 12 and 06 UTC extraction, the 06 UTC run has no predecessor)."""
+    d, h = init
+    this = datetime(d.year, d.month, d.day, h)
+    best = None
+    for back in (0, 1):
+        dd = d - timedelta(days=back)
+        for hh in init_hours:
+            cand = datetime(dd.year, dd.month, dd.day, hh)
+            if cand < this and (this - cand) <= timedelta(hours=max_gap_h) and (best is None or cand > best[0]):
+                best = (cand, dd, hh)
+    return None if best is None else (best[1], best[2])
+
+
+def blend_paths(first: np.ndarray, second: np.ndarray | None) -> np.ndarray:
+    """The mean of two forecast paths where both are known, the first alone elsewhere (a lagged ensemble of
+    two runs; the older run does not reach the last hours of the path in some zones)."""
+    if second is None:
+        return first
+    a = np.asarray(first, dtype=float)
+    b = np.asarray(second, dtype=float)
+    both = np.isfinite(a) & np.isfinite(b)
+    out = a.copy()
+    out[both] = 0.5 * (a[both] + b[both])
+    return out
+
+
 def valid_utc_for_day(day: date, offset_h) -> np.ndarray:
     """UTC instants (hour beginning) of the 24 local hours of ``day``; ``offset_h`` is a scalar or one per hour."""
     off = np.broadcast_to(np.asarray(offset_h, dtype=float), (24,))

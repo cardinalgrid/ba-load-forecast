@@ -26,6 +26,7 @@ from ..features import (
     EXTRA_TEMP_COLUMNS,
     EXTREME_COLUMNS,
     apparent_series,
+    cold_weights,
     rows_for_days,
     target_temperature,
     training_days,
@@ -60,7 +61,8 @@ class AdditiveModel:
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
                  labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False,
-                 extra: tuple[str, ...] = (), apparent: bool = False, apparent_wind: bool = True):
+                 extra: tuple[str, ...] = (), apparent: bool = False, apparent_wind: bool = True, cold_weight: float = 0.0):
+        self.cold_weight = cold_weight        # > 0: training rows of cold days weighted by features.cold_weights (alpha)
         self.extra = tuple(extra)             # optional linear blocks: "load", "temp", "humidity" (HUMIDITY_LINEAR); the last needs Loader(fields=...)
         self.apparent = apparent              # the smooth response on the apparent temperature (heat index, wind chill); needs Loader(fields=...)
         self.apparent_wind = apparent_wind    # False: the apparent temperature ignores the wind (heat index only) even when the wind is loaded
@@ -120,11 +122,12 @@ class AdditiveModel:
         return (x - self.mean) / self.std
 
     @staticmethod
-    def _ridge(x: np.ndarray, y: np.ndarray, lam: float) -> np.ndarray:
+    def _ridge(x: np.ndarray, y: np.ndarray, lam: float, w: np.ndarray | None = None) -> np.ndarray:
         p = x.shape[1]
         pen = lam * np.eye(p)
         pen[0, 0] = 0.0
-        return np.linalg.solve(x.T @ x + pen, x.T @ y)
+        xw = x if w is None else x * w[:, None]
+        return np.linalg.solve(x.T @ xw + pen, xw.T @ y)
 
     def _rows(self, info: InformationSet, temp: pd.Series, days: list[date], target: bool) -> pd.DataFrame:
         humidity = "humidity" in self.extra
@@ -183,6 +186,7 @@ class AdditiveModel:
         x_all = self._standardise(self.design(rows), fit=True)
         y_all = rows["y"].to_numpy(dtype=float)
         hours = rows["hour"].to_numpy()
+        weights = cold_weights(rows.index, info.temp_history_f, self.cold_weight) if self.cold_weight > 0 else None
         day_of = pd.DatetimeIndex(rows.index).normalize()
         cut = day_of.max() - pd.Timedelta(days=self.val_days)
         train, val = np.asarray(day_of <= cut), np.asarray(day_of > cut)
@@ -191,13 +195,14 @@ class AdditiveModel:
             err = 0.0
             for h in range(24):
                 m = (hours == h)
-                b = self._ridge(x_all[m & train], y_all[m & train], lam)
+                b = self._ridge(x_all[m & train], y_all[m & train], lam, None if weights is None else weights[m & train])
                 pred = x_all[m & val] @ b
                 err += np.mean(np.abs(pred - y_all[m & val]) / y_all[m & val])
             if best is None or err < best[1]:
                 best = (lam, err)
         self.lam = best[0]
-        self.coef = {h: self._ridge(x_all[hours == h], y_all[hours == h], self.lam) for h in range(24)}
+        self.coef = {h: self._ridge(x_all[hours == h], y_all[hours == h], self.lam, None if weights is None else weights[hours == h])
+                     for h in range(24)}
         self.fitted_on = info.day
         self.fitted_ba = info.ba
 

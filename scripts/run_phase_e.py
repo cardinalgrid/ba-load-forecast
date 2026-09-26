@@ -93,9 +93,10 @@ def log(msg: str) -> None:
 
 
 def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0,
-           fields: tuple[str, ...] = (), field_bias_days: int = 0) -> Loader:
+           fields: tuple[str, ...] = (), field_bias_days: int = 0, second_run: bool = False) -> Loader:
     return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
-                  temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields, field_bias_days=field_bias_days)
+                  temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields, field_bias_days=field_bias_days,
+                  second_run=second_run)
 
 
 def fields_ready(ld: Loader, ba: str) -> bool:
@@ -212,7 +213,11 @@ FINAL4Q = dict(FINAL4, intervals=dict(extra_levels=EXTRA_LEVELS))               
 FINAL4R = dict(FINAL4Q, boosting=dict(loss="absolute_error"))                                           # A19: robust loss in the boosting
 FINAL4W = dict(FINAL4Q, extra_boosting=("load", "temp", "humidity", "wind"), apparent_wind=False)      # wind in the boosting only
 FINAL4P = dict(FINAL4Q, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70))            # A8: peak quantile 0.70 on the coldest decile
-FINAL5 = dict(FINAL4W, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70))             # candidate after phase I: wind in the boosting + cold-day peak quantile
+FINAL5 = dict(FINAL4W, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70))             # the recipe after phase I: wind in the boosting + cold-day peak quantile
+FINAL5A = dict(FINAL5, second_run=True)                                                                  # A20: the cut-off run and the run 6 h older averaged (Loader option)
+FINAL5B = dict(FINAL5, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70, cold_by_max=True,
+                                      peak_quantile_hot=0.70, hot_decile=0.90))                        # A8b: cold by the forecast maximum too, and the hottest decile
+FINAL5C = dict(FINAL5, cold_weight=2.0)                                                                  # A22: cold-day training weights in both fitted members
 
 
 def final3b_models(ba: str | None) -> list:
@@ -280,9 +285,10 @@ def _final3_models(ba: str | None, c: dict, tag: str) -> list:
     solar = ba in PV_BAS
     add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
                                apparent=c.get("apparent", False), apparent_wind=c.get("apparent_wind", True), **c["additive"],
-                               name=f"{tag}_additive"))
+                               cold_weight=c.get("cold_weight", 0.0), name=f"{tag}_additive"))
     boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
-                          target="ratio" if c["ratio"] else "level", **c["boosting"], name=f"{tag}_boosting"))
+                          target="ratio" if c["ratio"] else "level", **c["boosting"], cold_weight=c.get("cold_weight", 0.0),
+                          name=f"{tag}_boosting"))
     members = [add, boo]
     if c["third_member"]:
         rec = RecencyRegression(train_days=c["train_days"])
@@ -324,6 +330,20 @@ def sky_members(add):
     return boo_sky, ens_sky
 
 
+def extremes_models(ba: str | None) -> list:
+    """Phase J, ideas A8b and A22 next to the phase I recipe: `final5`; `final5b` with the peak quantile 0.70 also
+    when the forecast maximum is in the coldest decile or in the hottest decile; `final5c` with cold-day training
+    weights (1 plus 2 for every 10 F the day's observed minimum lies below the coldest decile of the training days)
+    in the additive and boosting members."""
+    return [*_final3_models(ba, FINAL5, "final5"), *_final3_models(ba, FINAL5B, "final5b"), *_final3_models(ba, FINAL5C, "final5c")]
+
+
+def extremes2_models(ba: str | None) -> list:
+    """Phase J, idea A20: the phase I recipe fed with the mean of the cut-off HRRR run and the run 6 h older
+    (`Loader(second_run=True)`; its own group because the loader option changes every model's input)."""
+    return _final3_models(ba, FINAL5A, "final5a")
+
+
 def final5_models(ba: str | None) -> list:
     """The candidate after phase I: `final4w` (wind block in the boosting, apparent temperature without wind chill)
     with the peak read at the 70th percentile on the coldest decile of days and 23 quantiles; ``frozen5`` runs it
@@ -340,7 +360,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models, "humid": humid_models,
     "humid_h": humid_h_models, "humid_l": humid_l_models, "humid_p": humid_p_models,
     "final4": final4_models, "frozen4": final4_models, "humid_b": humid_b_models, "events": events_models,
-    "final5": final5_models, "frozen5": final5_models,
+    "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "tbias": final2_models,
 }
 
@@ -430,8 +450,9 @@ def main(argv=None) -> int:
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
-                            field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0)
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
+                            second_run=group == "extremes2")
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -608,6 +629,18 @@ def main(argv=None) -> int:
                     "`final5` is `final4` with the wind block in the boosting (apparent temperature without wind chill in the additive "
                     "model) and the point read at the 70th percentile around the peak on the coldest decile of days, with 23 quantiles. "
                     "Compare with `docs/phase_i_events.md` (same days).")
+    extremes = report({"extremes"}, a.results.parent / "phase_j_extremes", a.doc.parent / "phase_j_extremes.md",
+                      "Phase J: the hot and cold peak quantile and cold-day training weights", g_common +
+                      "`final5` is the phase I recipe; `final5b` reads the point at the 70th percentile around the peak also when the "
+                      "forecast maximum is in the coldest decile of known maxima or in the hottest decile; `final5c` fits the additive "
+                      "and boosting members with training weights that grow with the distance of the day's observed minimum below the "
+                      "coldest decile of the training days. Compare on the winter events, the coldest mornings and the year.")
+    extremes2 = report({"extremes2"}, a.results.parent / "phase_j_second_run", a.doc.parent / "phase_j_second_run.md",
+                       "Phase J: the cut-off run and the run 6 h older averaged", g_common +
+                       "`final5a` is the phase I recipe fed with the mean of the HRRR run available at the cut-off and the run six "
+                       "hours older, hour by hour where both cover the hour (in the Eastern zone in daylight time the cut-off run is the "
+                       "06 UTC one and no older run is extracted, so the recipe falls back to the single run). Compare with "
+                       "`docs/phase_j_extremes.md` (same days).")
     frozen5 = report({"frozen5"}, a.results.parent / "frozen5_2023_2025", a.doc.parent / "frozen_evaluation_v4.md",
                      "Fourth look at 2023 to 2025: the recipe after phase I, under protocol v2",
                      "Development BAs: " + common +
@@ -643,7 +676,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2)):
         log("no rows to report")
         return 1
     if waiting:

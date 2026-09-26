@@ -49,7 +49,7 @@ def test_extra_levels_are_issued_and_scored():
     assert (np.diff(ai.last_extra[1], axis=0) >= -1e-9).all()               # levels in order
     names = {r["model"] for r in hourly}
     assert {f"{ai.name}_q01", f"{ai.name}_q10", f"{ai.name}_q90", f"{ai.name}_q99", f"{ai.name}_q05", f"{ai.name}_q95"} <= names
-    last = [r for r in rows if r["model"] == ai.name][0]
+    last = next(r for r in rows if r["model"] == ai.name)
     assert np.isfinite(last["crps"])
     assert np.isfinite(last["winkler_90"])
 

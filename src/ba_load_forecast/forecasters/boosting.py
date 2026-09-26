@@ -20,6 +20,7 @@ from ..features import (
     EXTRA_TEMP_COLUMNS,
     EXTREME_COLUMNS,
     FEATURE_COLUMNS,
+    cold_weights,
     rows_for_days,
     target_temperature,
     training_days,
@@ -35,7 +36,8 @@ class Boosting:
                  max_leaf_nodes: int = 31, min_train_days: int = 120, seed: int = 0, stations: bool = True,
                  special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None,
                  extremes: bool = False, sky: bool = False, extra: tuple[str, ...] = (), min_samples_leaf: int = 20,
-                 l2: float = 0.0, target: str = "level", loss: str = "squared_error"):
+                 l2: float = 0.0, target: str = "level", loss: str = "squared_error", cold_weight: float = 0.0):
+        self.cold_weight = cold_weight        # > 0: training rows of cold days weighted by features.cold_weights (alpha)
         self.loss = loss                      # "squared_error" (default) or "absolute_error": a robust fit that outlying days cannot pull
         self.extra = tuple(extra)             # optional feature blocks: "load", "temp", "humidity", "wind" (features / weather_extra)
         self.min_samples_leaf = min_samples_leaf
@@ -124,11 +126,12 @@ class Boosting:
             base = rows["l_mean24"].to_numpy(dtype=float)
             keep = np.isfinite(base) & (base > 0)
             rows, y = rows[keep], y[keep] / base[keep]
+        weights = cold_weights(rows.index, info.temp_history_f, self.cold_weight) if self.cold_weight > 0 else None
         self.model = HistGradientBoostingRegressor(
             max_iter=self.max_iter, learning_rate=self.learning_rate, max_leaf_nodes=self.max_leaf_nodes,
             min_samples_leaf=self.min_samples_leaf, l2_regularization=self.l2, loss=self.loss,
             early_stopping=True, validation_fraction=0.1, n_iter_no_change=20, random_state=self.seed,
-        ).fit(rows[self.columns].to_numpy(dtype=float), y)
+        ).fit(rows[self.columns].to_numpy(dtype=float), y, sample_weight=weights)
         self.fitted_on = info.day
         self.fitted_ba = info.ba
 

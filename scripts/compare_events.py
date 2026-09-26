@@ -18,10 +18,10 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from compare_days import BAS, season_of
 from grid_sentinel.events import EVENTS
 
 from ba_load_forecast.report import markdown_table
-from compare_days import BAS, season_of
 
 METRICS = ["mape", "peak_under_pct", "peak_err_pct", "crps", "winkler_90", "coverage_90"]
 STRATA = ["all", "winter", "summer", "shoulder", "events", "cold_mornings", "top_peaks"]
@@ -38,7 +38,7 @@ def load_model(runs: Path, spec: str, ba: str) -> pd.DataFrame | None:
         return None
     d = pd.read_parquet(f)
     d = d[(d["model"] == model) & ~d["skipped"].astype(bool) & d["error"].isna()]
-    cols = [c for c in METRICS + ["actual_mean", "actual_peak", "temp_min_f"] if c in d.columns]
+    cols = [c for c in [*METRICS, "actual_mean", "actual_peak", "temp_min_f"] if c in d.columns]
     return d.set_index("day")[cols]
 
 
@@ -88,7 +88,7 @@ def summary(t: pd.DataFrame, candidates: list[str]) -> pd.DataFrame:
         if g.empty:
             continue
         w = g["demand_mw"].to_numpy()
-        for name in ["ref"] + names:
+        for name in ["ref", *names]:
             row = {"stratum": stratum, "model": name, "bas": len(g), "days": int(g["days"].sum())}
             for m in METRICS:
                 col = g[f"{name}_{m}"]
