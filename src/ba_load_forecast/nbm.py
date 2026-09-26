@@ -90,9 +90,9 @@ def _get(url: str, timeout: int = 120) -> bytes:
         raise
 
 
-def list_run(day: date, init_hour: int, element: str) -> tuple[str, list[str]] | None:
+def list_run(day: date, init_hour: int, element: str, versions: tuple[str, ...] = VERSIONS) -> tuple[str, list[str]] | None:
     """The version tree holding the run and the keys of its files for one element (None when no tree has it)."""
-    for v in VERSIONS:
+    for v in versions:
         prefix = f"blendv{v}/conus/{day:%Y/%m/%d}/{init_hour:02d}00/{element}/"
         text = _get(f"{BASE}?list-type=2&prefix={prefix}&max-keys=400").decode()
         keys = re.findall(r"<Key>([^<]+)</Key>", text)
@@ -169,6 +169,83 @@ def extract(cells: dict[str, tuple[int, int]], start: date, end: date, out_dir: 
             written += 1
             log(f"{day} {h:02d}Z v{frame.attrs.get('version', '?')}: {len(frame)} rows, leads "
                 f"{int(frame['lead_h'].min()) if len(frame) else '-'}-{int(frame['lead_h'].max()) if len(frame) else '-'}")
+    return written
+
+
+# Daily products of the target day D (the run is initialised on D-1): the overnight minimum is the 18-h period ending
+# 18 UTC of D ("mint18"), the daytime maximum the 18-h period ending 06 UTC of D+1 ("maxt18"); percentiles and the
+# mean and spread of the NBM distribution, and the probabilities of the extreme thresholds (whole degrees Fahrenheit,
+# probabilities in percent).
+DAILY_ELEMENTS = ("mint18p05", "mint18p50", "mint18p95", "mint18pmean", "mint18stddev",
+                  "maxt18p05", "maxt18p50", "maxt18p95", "maxt18pmean", "maxt18stddev",
+                  "probmint18lt000", "probmint18lt010", "probmint18lt032",
+                  "probmaxt18gt090", "probmaxt18gt100", "probmaxt18gt110")
+
+
+def daily_valid(day_init: date, element: str) -> datetime:
+    """The valid time of the file that describes the target day D = ``day_init`` + 1 for a daily element."""
+    target = day_init + timedelta(days=1)
+    if element.startswith("mint18") or element.startswith("probmint18"):
+        return datetime(target.year, target.month, target.day, 18)
+    after = target + timedelta(days=1)
+    return datetime(after.year, after.month, after.day, 6)
+
+
+def valid_of(key: str) -> datetime | None:
+    m = re.search(r"_(\d{4}-\d{2}-\d{2}T\d{2}:\d{2})\.tif$", key)
+    return datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M") if m else None
+
+
+def daily_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], elements: tuple[str, ...] = DAILY_ELEMENTS,
+                workers: int = 8, log: Callable[[str], None] = print) -> pd.DataFrame:
+    """One value per station and element for the target day (long format: ``icao, init_utc, element, valid_utc,
+    lead_h, value``); elements or files the archive lacks are simply missing from the frame."""
+    init_ts = pd.Timestamp(datetime(day.year, day.month, day.day, init_hour))
+    wanted = []
+    version = None                                        # found once, then the other elements are listed in that tree only
+    for element in elements:
+        listed = list_run(day, init_hour, element, versions=VERSIONS if version is None else (version,))
+        if listed is None:
+            continue
+        version, keys = listed
+        want = daily_valid(day, element)
+        for k in keys:
+            if valid_of(k) == want:
+                wanted.append((element, k, want))
+                break
+
+    def fetch(item):
+        element, key, valid = item
+        data = with_retries(lambda: _get(BASE + urllib.request.quote(key)), key, log=log)
+        return element, valid, read_cells(data, cells)
+
+    rows = []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for element, valid, values in pool.map(fetch, wanted):
+            lead = int((valid - init_ts.to_pydatetime()).total_seconds() // 3600)
+            for icao, v in values.items():
+                rows.append({"icao": icao, "init_utc": init_ts, "element": element, "valid_utc": pd.Timestamp(valid),
+                             "lead_h": lead, "value": v})
+    frame = pd.DataFrame(rows, columns=["icao", "init_utc", "element", "valid_utc", "lead_h", "value"])
+    frame.attrs["version"] = version or "?"
+    return frame
+
+
+def extract_daily(cells: dict[str, tuple[int, int]], start: date, end: date, out_dir: Path, init_hours: tuple[int, ...] = (12, 6),
+                  elements: tuple[str, ...] = DAILY_ELEMENTS, workers: int = 8, log: Callable[[str], None] = print) -> int:
+    """Resumable like ``extract``: one parquet per run under ``out_dir/runs`` with the daily products."""
+    out_dir = Path(out_dir)
+    (out_dir / "runs").mkdir(parents=True, exist_ok=True)
+    written = 0
+    for day in days_between(start, end):
+        for h in init_hours:
+            f = run_file(out_dir, day, h)
+            if f.exists():
+                continue
+            frame = daily_frame(day, h, cells, elements=elements, workers=workers, log=log)
+            frame.to_parquet(f, index=False)
+            written += 1
+            log(f"{day} {h:02d}Z v{frame.attrs.get('version', '?')}: {frame['element'].nunique()} elements, {len(frame)} rows")
     return written
 
 
