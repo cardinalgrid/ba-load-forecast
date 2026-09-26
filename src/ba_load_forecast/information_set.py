@@ -43,6 +43,7 @@ from .cutoff import (
     run_for_day,
 )
 from .hrrr import load_station
+from .nbm import daily_at_cutoff, load_daily, nbm_path
 from .sky import all_days, forecast_as_seen, pv_capacity, run_table, sky_frame
 from .stations_multi import BA_STATIONS_MULTI, station_table_for
 from .weather_extra import read_isd_lite_field
@@ -128,6 +129,7 @@ class InformationSet:
     sky: pd.DataFrame | None = None                            # sky.SKY_COLUMNS for the history and the target day
     weather: pd.DataFrame | None = None                        # dewpoint_f, wind_ms: observed over the history, the HRRR path after
     run_second: tuple[date, int] | None = None                 # with Loader(second_run=True): the older run blended into the paths
+    nbm_daily: dict[str, float] | None = None                  # with Loader(nbm_daily_dir): the NBM daily products of the day, BA mean
 
     @property
     def cutoff(self) -> datetime:
@@ -258,7 +260,8 @@ class Loader:
                  sky: bool = False, cloud_dir: Path | None = None, pv: bool = False, irradiance: bool = False,
                  dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0,
                  supplement_dir: Path | list[Path] | None = None, fields: tuple[str, ...] = (),
-                 field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0, second_run: bool = False):
+                 field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0, second_run: bool = False,
+                 nbm_dir: Path | None = None, nbm_mode: str | None = None, nbm_daily_dir: Path | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -268,6 +271,14 @@ class Loader:
         # second_run=True: every forecast path (temperature and extra fields) is the mean of the cut-off run and the
         # extracted run up to 6 h older where that run covers the hour (a lagged ensemble of two runs)
         self.second_run = second_run
+        # nbm_dir + nbm_mode: the NBM hourly temperature at the stations (nbm.extract) enters the temperature path,
+        # "replace" (NBM where it has the hour, HRRR elsewhere) or "blend" (the mean of the two where both have it)
+        self.nbm_dir = Path(nbm_dir) if nbm_dir else None
+        self.nbm_mode = nbm_mode
+        # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
+        self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
+        self._nbm: dict[str, pd.DataFrame] = {}
+        self._nbm_daily: dict[str, pd.DataFrame] = {}
         # fields beyond the temperature ("dewpoint_f", "wind_ms"): observed like the temperature, forecast from the
         # HRRR extraction in field_dirs (default: siblings of hrrr_dir named after the field)
         self.fields = tuple(fields)
@@ -527,6 +538,16 @@ class Loader:
 
         return self._cached(("temp", ba, year), read)
 
+    def nbm(self, icao: str) -> pd.DataFrame:
+        if icao not in self._nbm:
+            self._nbm[icao] = load_station(self.nbm_dir, icao) if self.nbm_dir else pd.DataFrame()
+        return self._nbm[icao]
+
+    def nbm_daily_rows(self, icao: str) -> pd.DataFrame:
+        if icao not in self._nbm_daily:
+            self._nbm_daily[icao] = load_daily(self.nbm_daily_dir, icao)
+        return self._nbm_daily[icao]
+
     def hrrr(self, icao: str) -> pd.DataFrame:
         if icao not in self._hrrr:
             rows = load_station(self.hrrr_dir, icao)
@@ -588,6 +609,14 @@ class Loader:
             paths[icao] = forecast_path(rows, day, off_path, run) if run is not None and len(rows) else np.full(PATH_HOURS, np.nan)
             if run2 is not None and len(rows):
                 paths[icao] = blend_paths(paths[icao], forecast_path(rows, day, off_path, run2))
+            if self.nbm_mode and run is not None:
+                nrows = self.nbm(icao)
+                if len(nrows):
+                    npath = nbm_path(nrows, day, off_path, run)
+                    if self.nbm_mode == "blend":
+                        paths[icao] = blend_paths(paths[icao], npath)
+                    else:                                              # replace: NBM where known, HRRR elsewhere
+                        paths[icao] = np.where(np.isfinite(npath), npath, paths[icao])
             if self.temp_bias_days and run is not None and len(rows):
                 paths[icao] = apply_hour_bias(paths[icao], path_ts, self.hour_bias(ba, icao, day))
         path_frame = pd.DataFrame(paths, index=path_ts)
@@ -603,6 +632,14 @@ class Loader:
                              axis=1).mean(axis=1)
 
         weather = self.weather_frame(ba, start, day, history_index, path_ts, off_path, run, run2)
+
+        nbm_daily = None
+        if self.nbm_daily_dir is not None and run is not None:
+            per_station = [daily_at_cutoff(self.nbm_daily_rows(icao), run) for icao in stations]
+            per_station = [d for d in per_station if d]
+            if per_station:
+                keys = set().union(*per_station)
+                nbm_daily = {k: float(np.nanmean([d[k] for d in per_station if k in d])) for k in keys}
 
         sky = None
         if self.sky:
@@ -635,4 +672,5 @@ class Loader:
             benchmark_plausible=forecast_plausible(fcst.reindex(hours).to_numpy(dtype=float), outcome.reindex(hours).to_numpy(dtype=float)),
             sky=sky, stations=stations, temp_history_stations_f=stations_hist,
             temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None, weather=weather, run_second=run2,
+            nbm_daily=nbm_daily,
         )

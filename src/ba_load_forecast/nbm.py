@@ -249,6 +249,45 @@ def extract_daily(cells: dict[str, tuple[int, int]], start: date, end: date, out
     return written
 
 
+def nbm_path(rows: pd.DataFrame, day: date, offset_h, init: tuple[date, int], column: str = "nbm_temp_f",
+             max_gap_h: int = 3) -> np.ndarray:
+    """The 39-hour path (09:00 of D-1 to 23:00 of D) of an NBM element from the run ``init``: the hourly files
+    to 36 h, and the three-hourly files beyond linearly interpolated between neighbours no more than ``max_gap_h``
+    apart (the interpolation runs over the whole run, so the last hours of the path sit between the 39, 42 and
+    45 h files); hours the run does not reach stay NaN."""
+    from .cutoff import PATH_HOURS, path_timestamps
+
+    d, h = init
+    init_ts = pd.Timestamp(datetime(d.year, d.month, d.day, h))
+    run = rows[rows["init_utc"] == init_ts]
+    if run.empty:
+        return np.full(PATH_HOURS, np.nan)
+    s = pd.Series(run[column].to_numpy(dtype=float), index=pd.DatetimeIndex(run["valid_utc"]))
+    s = s[~s.index.duplicated()].sort_index()
+    hourly = s.reindex(pd.date_range(s.index.min(), s.index.max(), freq="h"))
+    hourly = hourly.interpolate(limit=max_gap_h - 1, limit_area="inside")
+    off = np.broadcast_to(np.asarray(offset_h, dtype=float), (PATH_HOURS,))
+    local = path_timestamps(day)
+    valid = pd.DatetimeIndex(local.to_numpy() + (off * 3600.0 * 1e9).astype("timedelta64[ns]"))
+    return hourly.reindex(valid).to_numpy(dtype=float)
+
+
+def daily_at_cutoff(daily: pd.DataFrame, init: tuple[date, int]) -> dict[str, float]:
+    """``element -> value`` of one station's daily products for the target day, from the run ``init``."""
+    d, h = init
+    init_ts = pd.Timestamp(datetime(d.year, d.month, d.day, h))
+    sub = daily[daily["init_utc"] == init_ts]
+    return {str(e): float(v) for e, v in zip(sub["element"], sub["value"], strict=True)}
+
+
+def load_daily(out_dir: Path, icao: str) -> pd.DataFrame:
+    """The consolidated daily products of one station (``icao, init_utc, element, valid_utc, lead_h, value``)."""
+    f = Path(out_dir) / f"{icao}.parquet"
+    if not f.exists():
+        return pd.DataFrame(columns=["icao", "init_utc", "element", "valid_utc", "lead_h", "value"])
+    return pd.read_parquet(f)
+
+
 def leads_for_path(day: date, offset_h: float, init: tuple[date, int]) -> np.ndarray:
     """Convenience for callers: the leads of the 39 path hours (09:00 D-1 to 23:00 D) in the run ``init``."""
     d, h = init

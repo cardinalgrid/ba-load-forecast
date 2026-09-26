@@ -199,7 +199,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  nearest: int | None = None, tail: bool = False, peak: str | None = None, peak_window: float = 0.97,
                  peak_quantile: float = 0.55, peak_quantile_cold: float | None = None, cold_decile: float = 0.10,
                  extra_levels: tuple[float, ...] = (), peak_quantile_hot: float | None = None, hot_decile: float = 0.90,
-                 cold_by_max: bool = False):
+                 cold_by_max: bool = False, cold_source: str = "path"):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         self.target = target
@@ -215,6 +215,10 @@ class AdaptiveIntervals(EmpiricalIntervals):
         self.peak_quantile_hot = peak_quantile_hot     # the peak quantile on the hottest days (forecast maximum in the top decile)
         self.hot_decile = hot_decile
         self.cold_by_max = cold_by_max                 # a day is also cold when its forecast maximum is in the coldest decile of maxima
+        # where the day's forecast minimum comes from: "path" (the temperature path) or an NBM daily element such as
+        # "mint18p50" / "mint18p05" (info.nbm_daily; falls back to the path when the day has no NBM products)
+        self.cold_source = cold_source
+        self._tmin_src: dict[date, float] = {}
         self._tmax: dict[date, float] = {}
         self.extra_levels = tuple(sorted(extra_levels))   # further quantiles issued next to the band (CRPS, tail analysis)
         self.last_extra: tuple[date, np.ndarray] | None = None
@@ -276,12 +280,22 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 q[-1, h] = p[h] * (1.0 + q90 + high.mean() * np.log(0.10 / (1.0 - hi_level)))
         return np.sort(q, axis=0)
 
+    def source_min(self, info: InformationSet) -> float:
+        """The day's forecast minimum by ``cold_source``: the path, or an NBM daily element when the day has it."""
+        t = np.asarray(info.temp_forecast_f, dtype=float)
+        path_min = float(np.nanmin(t)) if np.isfinite(t).any() else np.nan
+        if self.cold_source != "path" and info.nbm_daily and np.isfinite(info.nbm_daily.get(self.cold_source, np.nan)):
+            return float(info.nbm_daily[self.cold_source])
+        return path_min
+
     def _known_extremes(self, info: InformationSet) -> tuple[float, float, np.ndarray, np.ndarray]:
         t = np.asarray(info.temp_forecast_f, dtype=float)
-        tmin = float(np.nanmin(t)) if np.isfinite(t).any() else np.nan
+        tmin = self.source_min(info)
         tmax = float(np.nanmax(t)) if np.isfinite(t).any() else np.nan
         self._tmax.setdefault(info.day, tmax)
-        known_min = np.array([v for d, v in self._tmin.items() if d < info.day and np.isfinite(v)])
+        self._tmin_src.setdefault(info.day, tmin)
+        source = self._tmin if self.cold_source == "path" else self._tmin_src
+        known_min = np.array([v for d, v in source.items() if d < info.day and np.isfinite(v)])
         known_max = np.array([v for d, v in self._tmax.items() if d < info.day and np.isfinite(v)])
         return tmin, tmax, known_min, known_max
 
