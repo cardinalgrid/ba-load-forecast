@@ -85,8 +85,10 @@ un_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and
 | 37. Third look at 2023 to 2025 with the phase H recipe | as step 31 with `--groups frozen4` (needs the dew point extraction), then `--report-only` with `--start 2023-01-01 --end 2025-12-31` | `results/frozen4_2023_2025/`, `docs/frozen_evaluation_v3.md` | 5 h |
 | 38. Dew point verification | `python scripts/verify_dewpoint.py --years 2021 2022 2023 2024 2025` | `docs/hrrr_dewpoint_verification.md`, `results/hrrr_dewpoint_verification/`, `docs/figures/hrrr_dewpoint_*.png` | 10 min |
 | 39. Band and tail | `python scripts/tail_analysis.py --group frozen4 --model final4 --runs <runs folder of frozen4>` | `docs/tail_analysis.md`, `results/tail_analysis/` | 2 min |
+| 40. Phase I, four recipes on the extremes | `python scripts/run_phase_e.py --groups events` (needs the dew point and wind extractions), then `--report-only`; `python scripts/compare_events.py --candidate events:final4r events:final4w events:final4p --reference events:final4 --doc docs/phase_i_events_strata.md` | `results/phase_i_events/`, `docs/phase_i_events.md`, `docs/phase_i_events_strata.md` | 8 h (three processes), 2 min |
+| 41. The recipe after phase I | `python scripts/run_phase_e.py --groups final5`, then `--report-only`; `python scripts/compare_events.py --candidate final5:final5 --reference events:final4 --doc docs/phase_i_final_strata.md`; then as step 31 with `--groups frozen5` and `--report-only` with `--start 2023-01-01 --end 2025-12-31`; `python scripts/tail_analysis.py --group frozen5 --model final5 --runs <runs folder of frozen5>` | `docs/phase_i_final.md`, `docs/phase_i_final_strata.md`, `results/frozen5_2023_2025/`, `docs/frozen_evaluation_v4.md`, `docs/tail_analysis.md` | 3 h, 5 h, 2 min |
 
-Tests: `pytest -q` (104 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (108 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 
