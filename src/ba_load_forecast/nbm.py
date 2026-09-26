@@ -144,7 +144,11 @@ def run_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], colu
 
     def fetch(item):
         lead, key = item
-        data = with_retries(lambda: _get_tiff(key), key, log=log)
+        try:
+            data = with_retries(lambda: _get_tiff(key), key, log=log, waits=(5.0, 15.0, 45.0))
+        except Exception as e:                                        # an empty object in the archive: the hour is missing
+            log(f"{key}: given up ({type(e).__name__}); hour left missing")
+            return lead, {icao: np.nan for icao in cells}
         return lead, read_cells(data, cells)
 
     rows = []
@@ -226,7 +230,11 @@ def daily_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], el
 
     def fetch(item):
         element, key, valid = item
-        data = with_retries(lambda: _get_tiff(key), key, log=log)
+        try:
+            data = with_retries(lambda: _get_tiff(key), key, log=log, waits=(5.0, 15.0, 45.0))
+        except Exception as e:
+            log(f"{key}: given up ({type(e).__name__}); element left missing")
+            return element, valid, {icao: np.nan for icao in cells}
         return element, valid, read_cells(data, cells)
 
     rows = []
