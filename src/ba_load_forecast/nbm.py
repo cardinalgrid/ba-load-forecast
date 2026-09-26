@@ -94,7 +94,8 @@ def list_run(day: date, init_hour: int, element: str, versions: tuple[str, ...] 
     """The version tree holding the run and the keys of its files for one element (None when no tree has it)."""
     for v in versions:
         prefix = f"blendv{v}/conus/{day:%Y/%m/%d}/{init_hour:02d}00/{element}/"
-        text = _get(f"{BASE}?list-type=2&prefix={prefix}&max-keys=400").decode()
+        url = f"{BASE}?list-type=2&prefix={prefix}&max-keys=400"
+        text = with_retries(lambda: _get(url), f"list {prefix}", log=lambda m: None).decode()
         keys = re.findall(r"<Key>([^<]+)</Key>", text)
         if keys:
             return v, keys
