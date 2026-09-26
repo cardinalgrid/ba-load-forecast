@@ -212,6 +212,7 @@ FINAL4Q = dict(FINAL4, intervals=dict(extra_levels=EXTRA_LEVELS))               
 FINAL4R = dict(FINAL4Q, boosting=dict(loss="absolute_error"))                                           # A19: robust loss in the boosting
 FINAL4W = dict(FINAL4Q, extra_boosting=("load", "temp", "humidity", "wind"), apparent_wind=False)      # wind in the boosting only
 FINAL4P = dict(FINAL4Q, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70))            # A8: peak quantile 0.70 on the coldest decile
+FINAL5 = dict(FINAL4W, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70))             # candidate after phase I: wind in the boosting + cold-day peak quantile
 
 
 def final3b_models(ba: str | None) -> list:
@@ -323,6 +324,13 @@ def sky_members(add):
     return boo_sky, ens_sky
 
 
+def final5_models(ba: str | None) -> list:
+    """The candidate after phase I: `final4w` (wind block in the boosting, apparent temperature without wind chill)
+    with the peak read at the 70th percentile on the coldest decile of days and 23 quantiles; ``frozen5`` runs it
+    on 2023 to 2025."""
+    return _final3_models(ba, FINAL5, "final5")
+
+
 PER_BA_GROUPS = {          # groups whose members depend on the BA (solar features at ISO-NE and CAISO)
     "final": final_models, "intervals3": intervals3_models, "peak": peak_models, "irradiance": irradiance_models,
     "final2": final2_models, "frozen": final2_models,      # frozen: the same recipe, on other days
@@ -332,6 +340,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final3": final3_models, "frozen3": final3_models, "final3b": final3b_models, "humid": humid_models,
     "humid_h": humid_h_models, "humid_l": humid_l_models, "humid_p": humid_p_models,
     "final4": final4_models, "frozen4": final4_models, "humid_b": humid_b_models, "events": events_models,
+    "final5": final5_models, "frozen5": final5_models,
     "tbias": final2_models,
 }
 
@@ -421,7 +430,7 @@ def main(argv=None) -> int:
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0)
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
@@ -594,6 +603,18 @@ def main(argv=None) -> int:
                     "the wind block in the boosting and the apparent temperature without wind chill in the additive model; `final4p` "
                     "reading the point at the 70th percentile around the peak on the coldest decile of days. Compare on the winter events "
                     "and on the year.")
+    final5 = report({"final5"}, a.results.parent / "phase_i_final", a.doc.parent / "phase_i_final.md",
+                    "Phase I: the candidate recipe on the development years", g_common +
+                    "`final5` is `final4` with the wind block in the boosting (apparent temperature without wind chill in the additive "
+                    "model) and the point read at the 70th percentile around the peak on the coldest decile of days, with 23 quantiles. "
+                    "Compare with `docs/phase_i_events.md` (same days).")
+    frozen5 = report({"frozen5"}, a.results.parent / "frozen5_2023_2025", a.doc.parent / "frozen_evaluation_v4.md",
+                     "Fourth look at 2023 to 2025: the recipe after phase I, under protocol v2",
+                     "Development BAs: " + common +
+                     "The recipe after phase I (`final5`: the phase H recipe with the wind block in the boosting, the peak read at the "
+                     "70th percentile on the coldest decile of days and 23 quantiles) on 2023 to 2025 under protocol v2, with the "
+                     "observed-temperature supplement. A fourth look at these years: compare with `docs/frozen_evaluation_v3.md` "
+                     "(same days, same rules) and read the difference as an estimate.")
     humid_b = report({"humid_b"}, a.results.parent / "phase_h_dewpoint_bias", a.doc.parent / "phase_h_dewpoint_bias.md",
                      "Phase H: the dew point path corrected by its own recent bias", g_common +
                      "`final4b` is `final4` with the HRRR dew point of every station moved by the median of the forecast's own error at "
@@ -622,7 +643,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5)):
         log("no rows to report")
         return 1
     if waiting:
