@@ -33,7 +33,7 @@ BIN_LABELS = ["below 20 F", "20 to 32 F", "32 to 59 F", "59 to 72 F", "above 72 
 COLD_MORNINGS = 30
 
 
-def hrrr_rows(hrrr_dir: Path, icao: str, years: list[int]) -> pd.DataFrame:
+def hrrr_rows(hrrr_dir: Path, icao: str, years: list[int], column: str = "temp_f") -> pd.DataFrame:
     """Rows of one station from the consolidated file or, before consolidation, from the run files."""
     f = hrrr_dir / f"{icao}.parquet"
     if f.exists():
@@ -44,6 +44,8 @@ def hrrr_rows(hrrr_dir: Path, icao: str, years: list[int]) -> pd.DataFrame:
         parts = [p for p in parts if len(p)]
         d = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=COLUMNS)
     d = d[d["init_utc"].dt.year.isin(years)]
+    if column != "temp_f" and column in d.columns:
+        d = d.rename(columns={column: "temp_f"})                       # another archive's temperature column (the NBM)
     return d[(d["lead_h"] >= LEADS[0]) & (d["lead_h"] <= LEADS[1])].copy()
 
 
@@ -89,6 +91,7 @@ def main(argv=None) -> int:
     ap.add_argument("--years", type=int, nargs="+", default=[2024])
     ap.add_argument("--out", type=Path, default=ROOT / "results" / "hrrr_verification")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "hrrr_verification.md")
+    ap.add_argument("--column", default="temp_f", help="temperature column of the archive (nbm_temp_f for the NBM extraction)")
     a = ap.parse_args(argv)
     a.out.mkdir(parents=True, exist_ok=True)
     figures = a.doc.parent / "figures"
@@ -98,7 +101,7 @@ def main(argv=None) -> int:
     table = station_table(a.isd_dir).set_index("icao")
     joined = []
     for icao in grid["icao"]:
-        fc = hrrr_rows(a.hrrr, icao, a.years)
+        fc = hrrr_rows(a.hrrr, icao, a.years, column=a.column)
         if fc.empty:
             print(f"{icao}: no forecast rows", flush=True)
             continue

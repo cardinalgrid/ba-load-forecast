@@ -92,11 +92,27 @@ def log(msg: str) -> None:
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}", flush=True)
 
 
+NBM_GROUP_OPTIONS = {          # group -> loader options for the NBM input (folders under the data root: nbm/, nbm_daily/)
+    "nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
+}
+
+
+def nbm_options(group: str) -> dict:
+    c = NBM_GROUP_OPTIONS.get(group, {}) if group != "frozen6" else {k: v for k, v in FINAL6.items() if k in ("nbm_mode", "nbm_daily")}
+    out = {}
+    if c.get("nbm_mode"):
+        out["nbm_dir"] = DATA / "nbm"
+        out["nbm_mode"] = c["nbm_mode"]
+    if c.get("nbm_daily"):
+        out["nbm_daily_dir"] = DATA / "nbm_daily"
+    return out
+
+
 def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0,
-           fields: tuple[str, ...] = (), field_bias_days: int = 0, second_run: bool = False) -> Loader:
+           fields: tuple[str, ...] = (), field_bias_days: int = 0, second_run: bool = False, nbm: dict | None = None) -> Loader:
     return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
                   temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields, field_bias_days=field_bias_days,
-                  second_run=second_run)
+                  second_run=second_run, **(nbm or {}))
 
 
 def fields_ready(ld: Loader, ba: str) -> bool:
@@ -218,6 +234,10 @@ FINAL5A = dict(FINAL5, second_run=True)                                         
 FINAL5B = dict(FINAL5, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70, cold_by_max=True,
                                       peak_quantile_hot=0.70, hot_decile=0.90))                        # A8b: cold by the forecast maximum too, and the hottest decile
 FINAL5C = dict(FINAL5, cold_weight=2.0)                                                                  # A22: cold-day training weights in both fitted members
+FINAL6N = dict(FINAL5, nbm_mode="blend")                                                                # A21: NBM hourly temperature averaged with the HRRR path
+FINAL6R = dict(FINAL5, nbm_mode="replace")                                                              # A21: NBM hourly temperature instead of the HRRR path where it has the hour
+FINAL6P = dict(FINAL5, nbm_daily=True, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70, cold_source="mint18p05"))   # A24: cold-day rule on the NBM 5th-percentile minimum
+FINAL6 = FINAL5                                                                                          # set to the phase K winner before running frozen6
 
 
 def final3b_models(ba: str | None) -> list:
@@ -344,6 +364,26 @@ def extremes2_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL5A, "final5a")
 
 
+def nbm_blend_models(ba: str | None) -> list:
+    """Phase K, idea A21: the phase I recipe with the NBM hourly temperature averaged with the HRRR path (loader option)."""
+    return _final3_models(ba, FINAL6N, "final6n")
+
+
+def nbm_replace_models(ba: str | None) -> list:
+    """Phase K, idea A21: the phase I recipe with the NBM hourly temperature in place of the HRRR path where the NBM has the hour."""
+    return _final3_models(ba, FINAL6R, "final6r")
+
+
+def nbm_cold_models(ba: str | None) -> list:
+    """Phase K, idea A24: the phase I recipe with the cold-day peak rule read from the NBM 5th-percentile 18-h minimum."""
+    return _final3_models(ba, FINAL6P, "final6p")
+
+
+def final6_models(ba: str | None) -> list:
+    """The recipe after phase K (set FINAL6 to the winner); ``frozen6`` runs it on 2023 to 2025."""
+    return _final3_models(ba, FINAL6, "final6")
+
+
 def final5_models(ba: str | None) -> list:
     """The candidate after phase I: `final4w` (wind block in the boosting, apparent temperature without wind chill)
     with the peak read at the 70th percentile on the coldest decile of days and 23 quantiles; ``frozen5`` runs it
@@ -361,6 +401,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "humid_h": humid_h_models, "humid_l": humid_l_models, "humid_p": humid_p_models,
     "final4": final4_models, "frozen4": final4_models, "humid_b": humid_b_models, "events": events_models,
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
+    "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "tbias": final2_models,
 }
 
@@ -450,9 +491,9 @@ def main(argv=None) -> int:
                             irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
-                            second_run=group == "extremes2")
+                            second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -641,6 +682,22 @@ def main(argv=None) -> int:
                        "hours older, hour by hour where both cover the hour (in the Eastern zone in daylight time the cut-off run is the "
                        "06 UTC one and no older run is extracted, so the recipe falls back to the single run). Compare with "
                        "`docs/phase_j_extremes.md` (same days).")
+    nbm_common = ("`final6n` averages the NBM 2 m temperature at the stations with the HRRR path hour by hour; `final6r` uses the NBM "
+                  "where it has the hour and the HRRR elsewhere; `final6p` keeps the HRRR path and reads the cold-day peak rule from the NBM "
+                  "5th-percentile 18-hour minimum. NBM files: one GeoTIFF per element and forecast hour in the public archive, hourly to 36 h "
+                  "and three-hourly beyond (interpolated). Compare with `docs/phase_i_final.md` (same days).")
+    nbm_blend = report({"nbm_blend"}, a.results.parent / "phase_k_nbm_blend", a.doc.parent / "phase_k_nbm_blend.md",
+                       "Phase K: the NBM temperature averaged with the HRRR", g_common + nbm_common)
+    nbm_replace = report({"nbm_replace"}, a.results.parent / "phase_k_nbm_replace", a.doc.parent / "phase_k_nbm_replace.md",
+                         "Phase K: the NBM temperature in place of the HRRR", g_common + nbm_common)
+    nbm_cold = report({"nbm_cold"}, a.results.parent / "phase_k_nbm_cold", a.doc.parent / "phase_k_nbm_cold.md",
+                      "Phase K: the cold-day peak rule on the NBM minimum", g_common + nbm_common)
+    frozen6 = report({"frozen6"}, a.results.parent / "frozen6_2023_2025", a.doc.parent / "frozen_evaluation_v5.md",
+                     "Fifth look at 2023 to 2025: the recipe after phase K, under protocol v2",
+                     "Development BAs: " + common +
+                     "The recipe after phase K (`final6`) on 2023 to 2025 under protocol v2, with the observed-temperature supplement. "
+                     "A fifth look at these years: compare with `docs/frozen_evaluation_v4.md` (same days, same rules) and read the "
+                     "difference as an estimate.")
     frozen5 = report({"frozen5"}, a.results.parent / "frozen5_2023_2025", a.doc.parent / "frozen_evaluation_v4.md",
                      "Fourth look at 2023 to 2025: the recipe after phase I, under protocol v2",
                      "Development BAs: " + common +
@@ -676,7 +733,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6)):
         log("no rows to report")
         return 1
     if waiting:
