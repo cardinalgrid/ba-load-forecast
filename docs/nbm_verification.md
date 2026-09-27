@@ -1,4 +1,4 @@
-# HRRR 2 m temperature against ISD-Lite observations
+# NBM 2 m temperature against ISD-Lite observations
 
 Forecast minus observed at the grid cell of each station (the NBM 2 m temperature, whole degrees Fahrenheit, from the public archive; leads beyond 36 h interpolated from the three-hourly files), 2021, 2022, 2023, 2024, 2025, leads 17 to 45 h of the 12 and 06 UTC runs (the leads a day-ahead forecast issued at 9 a.m. local time uses). 2511356 forecast-observation pairs at 35 stations. Observations are hourly ISD-Lite readings; a station reports to the nearest tenth of a degree Celsius.
 
