@@ -234,6 +234,10 @@ Phase I ran four recipes side by side on the same days of 2020 to 2022, which co
 
 Three cheaper ideas for the storm days were tried on the same days as phase I (`docs/methods.md`, section 8h; `docs/phase_j_strata.md`): averaging the cut-off HRRR run with the run six hours older (worse by 0.005 over the year, better only at CAISO), the peak percentile extended to the hottest decile of days (peak of the hottest days 0.32 point better, but summer MAPE worse by 0.035 at every BA) and cold-day training weights (event-day MAPE worse by 0.12). The recipe stays `final5`.
 
+## Phase K: a second weather model, the largest gain since the stations
+
+The National Blend of Models (NBM, NOAA) was read at the same stations from its public archive and verified against the observations: it errs a third less than the HRRR (MAE 2.05 F against 3.12 F, `docs/nbm_verification.md`) but is too warm in the cold. Averaging its 2 m temperature with the HRRR path, hour by hour, takes the recipe from 2.40 % to **2.29 %** on 2020 to 2022 on the same days, better at all eleven BAs; using the NBM alone or reading the cold-day peak rule from its minimum were not adopted (`docs/methods.md`, section 8i; `docs/phase_k_strata.md`). The recipe after phase K is `final6`: on 2023 to 2025 under protocol v2 it gives **2.22 % against 2.90 %** for `DF` (`docs/frozen_evaluation_v5.md`), 0.16 point better than the phase I recipe at every BA, every season and every year (`docs/phase_k_frozen_strata.md`), ahead of `DF` at seven of the eleven BAs (PJM, MISO, SPP, CAISO, ERCOT, NYISO, FPL) and behind at BPA, Duke, TVA and ISO-NE; CRPS 1.61 % over the year, the 90 % band narrower (10.8 % of the load) at the same coverage (89.2 %). The archive lacks 7.5 % of the runs, among them 16 to 21 January 2024; those days use the HRRR alone.
+
 ## Layout
 
 | Module | Responsibility |

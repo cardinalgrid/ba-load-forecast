@@ -34,6 +34,7 @@ not used in any modelling decision.
 | Implausible outcome | if any hour of the load that occurred is outside 0.2 to 5 times the median of the last 672 known hours, the day scores nobody, `DF` included | an error cannot be measured against a broken reading; 0.3 % of days |
 | Blind copy | a forecaster receives the information set with the outcome and the observed temperature of the target day replaced by missing values | no model can use the result, by construction; a test with a cheating forecaster checks it |
 | Absent HRRR run | 8 of 3712 runs are not in the archive; the model declines the day and the day counts in the coverage table | no weather forecast is invented |
+| National Blend of Models (NBM), NOAA: 2 m temperature at the same stations, 12 and 06 UTC runs, hourly to 36 h and three-hourly beyond (public archive on AWS, one GeoTIFF per element and hour; version trees 4.0 to 4.3) | averaged hour by hour with the HRRR path from phase K on; 7.5 % of the runs are absent from the archive (mostly July to October 2022 and 16 to 21 January 2024) and those days use the HRRR alone |
 | Documented load-shed days | the BA-days in `docs/load_shed_days.csv` (source, page and quote per row) are left out of every table and reported apart | on those days the load that occurred is the load served, not the demand |
 
 ## 3. Weather stations
@@ -160,6 +161,8 @@ ten BAs it changes the annual mean by 0.01 point.
 | Mean of the cut-off HRRR run and the run six hours older (phase J) | worse by 0.005 over the year, by 0.036 on the coldest mornings; better only at CAISO | not adopted (section 8h) |
 | Peak percentile 0.70 on the hottest decile and cold-by-maximum days (phase J) | peak of the hottest days 0.32 better; summer MAPE worse by 0.035 at every BA | not adopted (section 8h) |
 | Cold-day training weights in the fitted members (phase J) | event-day MAPE worse by 0.12, peak worse by 0.10 | not adopted (section 8h) |
+| NBM temperature in place of the HRRR path (phase K) | 0.065 better over the year but worse at FPL and SPP and at the peak of the storms | not adopted; the average of the two was (section 8i) |
+| Cold-day peak rule read from the NBM 5th-percentile minimum (phase K) | selects the same days as the rule on the HRRR path; no change | not adopted (section 8i) |
 
 ## 8a. The recipe in one run
 
@@ -223,11 +226,27 @@ Three cheaper ideas for the storm days were run side by side against the phase I
 
 None was adopted. The older run of the same model is worse and its error correlated with the newer one, so the average inherits it (only CAISO gained, by 0.03). The cold-by-maximum clause never fired on a day the minimum rule had not already caught, and the hot-decile percentile lifts the peak of the hottest days at the cost of 0.035 point of MAPE over the whole summer at all eleven BAs, because it shifts every hour around the peak of the ordinary hot days too. The cold weights pull the fit towards the cold days of the history, which are not the storm days: they helped at SPP in Uri (peak 0.40 better) and hurt at PJM and Duke in Elliott (mean peak under-forecast -3.12 % to -3.42 %). The recipe stays `final5`.
 
+## 8i. Phase K: a second weather model
+
+The National Blend of Models (NBM, NOAA) is a bias-corrected blend of many weather models issued hourly; its public archive on AWS holds one GeoTIFF per element and forecast hour (hourly to 36 h, three-hourly beyond, whole degrees Fahrenheit). Its 2 m temperature was read at the same stations for the 12 and 06 UTC runs of December 2020 to 2025 (`scripts/extract_nbm.py`; grid mapping in `nbm.py`, checked against the HRRR at the same hour) and verified like the HRRR (`docs/nbm_verification.md`, 2.5 million pairs, 2021 to 2025, leads 17 to 45 h): bias -0.21 F and MAE 2.05 F against -1.23 F and 3.12 F for the HRRR, better in every temperature bin and in the four winter storms (MAE 2.2 to 2.7 F against 3.3 to 3.7 F), but too warm in the cold: +2.1 F below 20 F and +1.2 F on the coldest mornings. Its daily products (18-hour minimum and maximum percentiles, probabilities of extreme temperatures) were read as well. The archive lacks 7.5 % of the runs (July to October 2022 and 16 to 21 January 2024 among them); on those days the recipe falls back to the HRRR alone.
+
+Three ways of using it were run side by side against the phase I recipe on the same 8 254 BA-days of 2020 to 2022 (`docs/phase_k_nbm_blend.md`, `docs/phase_k_nbm_replace.md`, `docs/phase_k_nbm_cold.md`, `docs/phase_k_strata.md`):
+
+| Change | Year MAPE | Winter | Summer | Event days | Coldest mornings | BAs better / worse (year) |
+|---|---|---|---|---|---|---|
+| NBM temperature averaged with the HRRR path, hour by hour | **2.395 % to 2.286 % (0.110)** | 0.065 | 0.125 | 0.079 | 0.132 | **11 / 0** |
+| NBM temperature in place of the HRRR where it has the hour | 0.065 | 0.010 | 0.030 | 0.044 (peak worse by 0.19) | 0.125 | 8 / 3 |
+| Cold-day peak rule read from the NBM 5th-percentile minimum | 0.001 | 0.002 | 0.000 | 0.000 | 0.001 | 1 / 0 |
+
+The average was adopted: two weather models with weakly correlated errors beat the better of the two alone (the average wins over the replacement at nine BAs and never loses, while the replacement loses at FPL and SPP and lowers the peak in the storms, where the warm bias of the NBM shows). The cold-day rule on the NBM minimum selects the same days as the rule on the HRRR path and changes nothing. The recipe after phase K (`final6`) is the phase I recipe with the averaged temperature path; humidity and wind still come from the HRRR alone.
+
+On 2023 to 2025 under protocol v2 (`docs/frozen_evaluation_v5.md`, `docs/phase_k_frozen_strata.md`; a fifth look at those years, so an estimate) `final6` gives **2.22 % against 2.90 %** for `DF` (median 1.91 % against 2.50 %, ahead on 63 % of the days, Diebold-Mariano significant at ten of the eleven BAs), ahead of `DF` at PJM, MISO, SPP, CAISO, ERCOT, NYISO and FPL and behind at BPA, Duke, TVA and ISO-NE. Against the phase I recipe on the same 11 950 BA-days it is better by 0.160 point over the year at all eleven BAs, in every season (0.13 to 0.21) and every year (0.15 to 0.17), by 0.14 on the days of the January 2024 and January 2025 storms and by 0.19 on the coldest mornings; the under-forecast at the peak in the storms is unchanged (-2.36 % to -2.38 %). The whole distribution moved: CRPS 1.61 % over the year (from 1.73 %), 2.29 % on the event days, 2.03 % on the coldest mornings; the 90 % band narrowed from 11.7 % to 10.8 % of the load at the same coverage (89.2 %), and the band-and-tail analysis of section 4b, redone, gives exceedance 5.9 % below and 4.9 % above with mean excess 1.9 % and 1.6 %.
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
-description of any operator's process. The HRRR is a weather model with its own error and not the
-forecast any BA used; the BAs' forecasters have vendor weather and internal information this study
+description of any operator's process. The HRRR and the NBM are weather models with their own errors and not the
+forecasts any BA used; the BAs' forecasters have vendor weather and internal information this study
 does not have. Special days, events and the ten BAs are choices of the study. Prediction intervals
 are too narrow inside the storms (82 % coverage on 2023 to 2025) and slightly so on the coldest mornings (85 %). A large part of the margin over the BAs' published forecasts comes from offsets and, at PJM, a one-hour misalignment in the published `DF` (section 4a); against `DF` with its own hourly bias removed the models are behind at ten of the eleven BAs. The frozen evaluation covers three later years on the same eleven BAs;
 no evaluation on other BAs has been run yet.
