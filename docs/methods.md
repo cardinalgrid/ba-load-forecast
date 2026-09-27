@@ -163,6 +163,8 @@ ten BAs it changes the annual mean by 0.01 point.
 | Cold-day training weights in the fitted members (phase J) | event-day MAPE worse by 0.12, peak worse by 0.10 | not adopted (section 8h) |
 | NBM temperature in place of the HRRR path (phase K) | 0.065 better over the year but worse at FPL and SPP and at the peak of the storms | not adopted; the average of the two was (section 8i) |
 | Cold-day peak rule read from the NBM 5th-percentile minimum (phase K) | selects the same days as the rule on the HRRR path; no change | not adopted (section 8i) |
+| 0.7 weight on the NBM in the temperature blend (phase L, six BAs) | 0.002 over the year; better at Duke by 0.05, worse at FPL by 0.04 and at the largest peaks by 0.035 | not adopted (section 8j) |
+| NBM path corrected by its own cold-hour bias (phase L, six BAs) | no change | not adopted (section 8j) |
 
 ## 8a. The recipe in one run
 
@@ -241,6 +243,18 @@ Three ways of using it were run side by side against the phase I recipe on the s
 The average was adopted: two weather models with weakly correlated errors beat the better of the two alone (the average wins over the replacement at nine BAs and never loses, while the replacement loses at FPL and SPP and lowers the peak in the storms, where the warm bias of the NBM shows). The cold-day rule on the NBM minimum selects the same days as the rule on the HRRR path and changes nothing. The recipe after phase K (`final6`) is the phase I recipe with the averaged temperature path; humidity and wind still come from the HRRR alone.
 
 On 2023 to 2025 under protocol v2 (`docs/frozen_evaluation_v5.md`, `docs/phase_k_frozen_strata.md`; a fifth look at those years, so an estimate) `final6` gives **2.22 % against 2.90 %** for `DF` (median 1.91 % against 2.50 %, ahead on 63 % of the days, Diebold-Mariano significant at ten of the eleven BAs), ahead of `DF` at PJM, MISO, SPP, CAISO, ERCOT, NYISO and FPL and behind at BPA, Duke, TVA and ISO-NE. Against the phase I recipe on the same 11 950 BA-days it is better by 0.160 point over the year at all eleven BAs, in every season (0.13 to 0.21) and every year (0.15 to 0.17), by 0.14 on the days of the January 2024 and January 2025 storms and by 0.19 on the coldest mornings; the under-forecast at the peak in the storms is unchanged (-2.36 % to -2.38 %). The whole distribution moved: CRPS 1.61 % over the year (from 1.73 %), 2.29 % on the event days, 2.03 % on the coldest mornings; the 90 % band narrowed from 11.7 % to 10.8 % of the load at the same coverage (89.2 %), and the band-and-tail analysis of section 4b, redone, gives exceedance 5.9 % below and 4.9 % above with mean excess 1.9 % and 1.6 %.
+
+## 8j. Phase L: tuning the blend, on six BAs
+
+Two refinements of the blend were run against the plain mean on six BAs chosen for the test (PJM, MISO, SPP, Duke, TVA, FPL: the two largest, the ones where the NBM helped most, the one it hurt when used alone, and the plains) on the same days of 2020 to 2022 (`docs/phase_l_weight.md`, `docs/phase_l_cold_bias.md`, `docs/phase_l_both.md`, `docs/phase_l_strata.md`): a 0.7 weight on the NBM (the inverse-variance weights of the two verifications) and a correction of the NBM path by its own bias on cold hours (the median of observed minus forecast on hours forecast below 25 F over the last 365 known days at the station, applied before the mean).
+
+| Change | Year MAPE | Event days: MAPE | Event days: peak under-forecast | Coldest mornings: MAPE | Largest peaks: MAPE | BAs better / worse (year) |
+|---|---|---|---|---|---|---|
+| 0.7 weight on the NBM | 0.002 | 0.003 | worse by 0.04 | 0.034 | worse by 0.035 | 3 / 2 |
+| NBM corrected by its cold-hour bias | 0.000 | 0.002 | 0.01 | worse by 0.014 | 0.001 | 0 / 0 |
+| Both | 0.001 | worse by 0.005 | worse by 0.06 | 0.004 | worse by 0.036 | 3 / 2 |
+
+Neither was adopted. The fixed weight gains where the NBM is much better than the HRRR (Duke by 0.05) and loses where the two are alike or where the NBM has trouble at coastal stations (SPP by 0.02, FPL by 0.04): the right weight varies by station and season, not one number for all. The cold-hour correction is rarely available (few stations and years with 48 hours forecast below 25 F in the window) and its sign varies by station, so it changes nothing; the plain mean already halves the warm bias of the NBM in the cold. The under-forecast at the peak in the storms does not move with either. The recipe stays `final6`.
 
 ## 9. Limitations
 

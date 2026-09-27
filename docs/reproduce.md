@@ -92,8 +92,9 @@ un_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and
 | 44. NBM verification | `python scripts/verify_hrrr.py --hrrr <nbm folder> --column nbm_temp_f --years 2021 2022 2023 2024 2025 --out results/nbm_verification --doc docs/nbm_verification.md` | `docs/nbm_verification.md`, `results/nbm_verification/` | 10 min |
 | 45. Phase K, the NBM as input | `python scripts/run_phase_e.py --groups nbm_blend` (the NBM temperature averaged with the HRRR), `--groups nbm_replace` and `--groups nbm_cold` (needs the daily products under `nbm_daily/`), each followed by `--report-only`; `python scripts/compare_events.py --candidate nbm_blend:final6n nbm_replace:final6r nbm_cold:final6p --reference final5:final5 --doc docs/phase_k_strata.md` | `results/phase_k_*`, `docs/phase_k_nbm_*.md`, `docs/phase_k_strata.md` | 3 h per group (two processes), 2 min |
 | 46. Fifth look at 2023 to 2025 with the phase K recipe | as step 31 with `--groups frozen6`, then `--report-only` with `--start 2023-01-01 --end 2025-12-31`; `python scripts/compare_events.py --candidate frozen6@<runs>:final6 --reference frozen5@<runs>:final5 --doc docs/phase_k_frozen_strata.md`; `python scripts/tail_analysis.py --group frozen6 --model final6 --runs <runs>` | `results/frozen6_2023_2025/`, `docs/frozen_evaluation_v5.md`, `docs/phase_k_frozen_strata.md`, `docs/tail_analysis.md` | 6.5 h (two processes), 2 min, 2 min |
+| 47. Phase L, tuning the blend on six BAs | `python scripts/run_phase_e.py --groups blendw --bas PJM MISO SWPP DUK TVA FPL` (0.7 weight), `--groups blendc` (cold-hour bias) and `--groups blendwc` (both), each followed by `--report-only`; `python scripts/compare_events.py --candidate blendw:final6w blendc:final6c blendwc:final6wc --reference nbm_blend:final6n --bas PJM MISO SWPP DUK TVA FPL --doc docs/phase_l_strata.md` | `results/phase_l_*`, `docs/phase_l_*.md` | 5.5 h (three processes), 1 min |
 
-Tests: `pytest -q` (118 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (121 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 
