@@ -237,7 +237,7 @@ FINAL5C = dict(FINAL5, cold_weight=2.0)                                         
 FINAL6N = dict(FINAL5, nbm_mode="blend")                                                                # A21: NBM hourly temperature averaged with the HRRR path
 FINAL6R = dict(FINAL5, nbm_mode="replace")                                                              # A21: NBM hourly temperature instead of the HRRR path where it has the hour
 FINAL6P = dict(FINAL5, nbm_daily=True, intervals=dict(extra_levels=EXTRA_LEVELS, peak_quantile_cold=0.70, cold_source="mint18p05"))   # A24: cold-day rule on the NBM 5th-percentile minimum
-FINAL6 = FINAL5                                                                                          # set to the phase K winner before running frozen6
+FINAL6 = FINAL6N                                                                                         # set to the phase K winner before running frozen6
 
 
 def final3b_models(ba: str | None) -> list:
