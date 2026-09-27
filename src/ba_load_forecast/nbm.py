@@ -35,7 +35,7 @@ from .hrrr import days_between, run_file, with_retries
 
 BASE = "https://noaa-nbm-pds.s3.amazonaws.com/"
 VERSIONS = ("4.3", "4.2", "4.1", "4.0", "3.2")          # newest first: the first tree that has the run wins
-ELEMENTS = {"nbm_temp_f": "temp", "nbm_dewpoint_f": "dewpoint", "nbm_wind_mph": "windspd"}
+ELEMENTS = {"nbm_temp_f": "temp", "nbm_dewpoint_f": "dewpoint", "nbm_wind_mph": "windspd", "nbm_dswrf_wm2": "dswrf"}
 NODATA = -9999
 
 # Lambert conformal conic of the CONUS grid, from the GeoTIFF keys
@@ -132,14 +132,14 @@ def read_cells(data: bytes, cells: dict[str, tuple[int, int]]) -> dict[str, floa
 
 
 def run_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], column: str = "nbm_temp_f",
-              max_lead: int = 45, workers: int = 16, log: Callable[[str], None] = print) -> pd.DataFrame:
+              max_lead: int = 45, workers: int = 16, log: Callable[[str], None] = print, min_lead: int = 1) -> pd.DataFrame:
     """Every forecast hour of the run up to ``max_lead`` at the stations, downloaded in parallel."""
     listed = list_run(day, init_hour, ELEMENTS[column])
     if listed is None:
         raise FileNotFoundError(f"no NBM tree has {day} {init_hour:02d}Z")
     version, keys = listed
     wanted = [(lead_of(k), k) for k in keys]
-    wanted = sorted((lead, k) for lead, k in wanted if lead is not None and 1 <= lead <= max_lead)
+    wanted = sorted((lead, k) for lead, k in wanted if lead is not None and min_lead <= lead <= max_lead)
     init_ts = pd.Timestamp(datetime(day.year, day.month, day.day, init_hour))
 
     def fetch(item):
@@ -163,7 +163,8 @@ def run_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], colu
 
 
 def extract(cells: dict[str, tuple[int, int]], start: date, end: date, out_dir: Path, init_hours: tuple[int, ...] = (12, 6),
-            column: str = "nbm_temp_f", max_lead: int = 45, workers: int = 16, log: Callable[[str], None] = print) -> int:
+            column: str = "nbm_temp_f", max_lead: int = 45, workers: int = 16, log: Callable[[str], None] = print,
+            min_lead: int = 1) -> int:
     """Resumable: one parquet per run under ``out_dir/runs``; runs whose file exists are skipped. Returns the
     number of runs written; a run absent from every tree writes an empty file so that it is not retried."""
     out_dir = Path(out_dir)
@@ -175,7 +176,7 @@ def extract(cells: dict[str, tuple[int, int]], start: date, end: date, out_dir: 
             if f.exists():
                 continue
             try:
-                frame = run_frame(day, h, cells, column=column, max_lead=max_lead, workers=workers, log=log)
+                frame = run_frame(day, h, cells, column=column, max_lead=max_lead, workers=workers, log=log, min_lead=min_lead)
             except FileNotFoundError as e:
                 log(f"{day} {h:02d}Z absent ({e})")
                 frame = pd.DataFrame(columns=["icao", "init_utc", "lead_h", "valid_utc", column])

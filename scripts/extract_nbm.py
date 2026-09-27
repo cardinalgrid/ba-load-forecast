@@ -42,6 +42,9 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=DATA / "nbm")
     ap.add_argument("--init-hours", type=int, nargs="+", default=[12, 6])
     ap.add_argument("--max-lead", type=int, default=45)
+    ap.add_argument("--min-lead", type=int, default=1, help="17 keeps only the target-day hours of a 9 a.m. cut-off")
+    ap.add_argument("--element", default="nbm_temp_f", choices=["nbm_temp_f", "nbm_dewpoint_f", "nbm_wind_mph", "nbm_dswrf_wm2"],
+                    help="output column (archive element): temp, dewpoint, windspd, dswrf")
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--consolidate", action="store_true", help="gather runs/*.parquet into <ICAO>.parquet and stop")
     ap.add_argument("--daily", action="store_true", help="the daily products (18-h min and max percentiles, extreme-temperature "
@@ -56,7 +59,8 @@ def main(argv=None) -> int:
     if a.daily:
         n = extract_daily(cells, a.start, a.end, a.out, init_hours=tuple(a.init_hours), workers=a.workers, log=log)
     else:
-        n = extract(cells, a.start, a.end, a.out, init_hours=tuple(a.init_hours), max_lead=a.max_lead, workers=a.workers, log=log)
+        n = extract(cells, a.start, a.end, a.out, init_hours=tuple(a.init_hours), max_lead=a.max_lead, workers=a.workers, log=log,
+                    column=a.element, min_lead=a.min_lead)
     log(f"ALL_DONE {n} runs written")
     return 0
 

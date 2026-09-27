@@ -71,16 +71,16 @@ def previous_run(init: tuple[date, int], init_hours: tuple[int, ...] = DEFAULT_I
     return None if best is None else (best[1], best[2])
 
 
-def blend_paths(first: np.ndarray, second: np.ndarray | None) -> np.ndarray:
-    """The mean of two forecast paths where both are known, the first alone elsewhere (a lagged ensemble of
-    two runs; the older run does not reach the last hours of the path in some zones)."""
+def blend_paths(first: np.ndarray, second: np.ndarray | None, weight: float = 0.5) -> np.ndarray:
+    """The weighted mean of two forecast paths where both are known (``weight`` on the second), the first alone
+    elsewhere (a lagged ensemble of two runs, or two weather models; the second may not reach every hour)."""
     if second is None:
         return first
     a = np.asarray(first, dtype=float)
     b = np.asarray(second, dtype=float)
     both = np.isfinite(a) & np.isfinite(b)
     out = a.copy()
-    out[both] = 0.5 * (a[both] + b[both])
+    out[both] = (1.0 - weight) * a[both] + weight * b[both]
     return out
 
 

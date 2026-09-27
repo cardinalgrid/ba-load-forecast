@@ -208,6 +208,27 @@ def rolling_hour_bias(table: pd.DataFrame, day: date, window_days: int, min_days
     return med.reindex(range(24)).fillna(0.0).to_numpy(dtype=float)
 
 
+def cold_bias_from_table(table: pd.DataFrame, day: date, window_days: int, threshold_f: float, min_hours: int = 48) -> float:
+    """Median of observed minus forecast on the hours forecast below ``threshold_f`` within the ``window_days`` days
+    ending two days before ``day``; zero with fewer than ``min_hours`` such hours."""
+    if table.empty:
+        return 0.0
+    last = pd.Timestamp(day) - pd.Timedelta(days=2) + pd.Timedelta(hours=23)
+    rows = table.loc[last - pd.Timedelta(days=window_days): last]
+    cold = rows[rows["seen"] < threshold_f]
+    if len(cold) < min_hours:
+        return 0.0
+    return float(cold["e"].median())
+
+
+def apply_cold_bias(path: np.ndarray, bias: float, threshold_f: float) -> np.ndarray:
+    """Add ``bias`` (observed minus forecast) to the hours of a path forecast below the threshold."""
+    p = np.asarray(path, dtype=float).copy()
+    cold = np.isfinite(p) & (p < threshold_f)
+    p[cold] += bias
+    return p
+
+
 def apply_hour_bias(path: np.ndarray, path_ts: pd.DatetimeIndex, bias: np.ndarray) -> np.ndarray:
     """Add the local-hour bias to a temperature path (observed minus forecast: the forecast is moved toward
     what has been observed at that hour lately)."""
@@ -261,7 +282,8 @@ class Loader:
                  dswrf_dir: Path | None = None, align_labels: bool = True, temp_bias_days: int = 0,
                  supplement_dir: Path | list[Path] | None = None, fields: tuple[str, ...] = (),
                  field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0, second_run: bool = False,
-                 nbm_dir: Path | None = None, nbm_mode: str | None = None, nbm_daily_dir: Path | None = None):
+                 nbm_dir: Path | None = None, nbm_mode: str | None = None, nbm_daily_dir: Path | None = None,
+                 nbm_weight: float = 0.5, nbm_cold_bias_days: int = 0, nbm_cold_threshold_f: float = 25.0):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -275,6 +297,13 @@ class Loader:
         # "replace" (NBM where it has the hour, HRRR elsewhere) or "blend" (the mean of the two where both have it)
         self.nbm_dir = Path(nbm_dir) if nbm_dir else None
         self.nbm_mode = nbm_mode
+        # nbm_weight: the weight of the NBM in the blend (0.5 = plain mean); nbm_cold_bias_days > 0: the NBM path is moved,
+        # on hours forecast below nbm_cold_threshold_f, by the median of its own error on such hours over that many known
+        # days (the NBM is too warm in the cold: docs/nbm_verification.md)
+        self.nbm_weight = float(nbm_weight)
+        self.nbm_cold_bias_days = int(nbm_cold_bias_days)
+        self.nbm_cold_threshold_f = float(nbm_cold_threshold_f)
+        self._nbm_cold_tables: dict[tuple[str, str], pd.DataFrame] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
         self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
         self._nbm: dict[str, pd.DataFrame] = {}
@@ -538,6 +567,46 @@ class Loader:
 
         return self._cached(("temp", ba, year), read)
 
+    def nbm_seen_series(self, ba: str, icao: str) -> pd.Series | None:
+        """The NBM 2 m temperature for every local hour by the run available at that day's cut-off, one station."""
+        cache: dict = self.__dict__.setdefault("_nbm_seen", {})
+        key = (ba, icao)
+        if key not in cache:
+            rows = self.nbm(icao)
+            table = run_table(rows, "nbm_temp_f") if len(rows) else ({}, np.zeros((0, 0)))
+            if not table[0]:
+                cache[key] = None
+            else:
+                inits = sorted(table[0])
+                first, last = inits[0].date(), (inits[-1] + pd.Timedelta(days=2)).date()
+
+                def offset_of_day(d):
+                    off = self.offset(ba, d.year)
+                    if off.empty:
+                        return np.nan
+                    v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
+                    return float(off.median()) if np.isnan(v) else float(v)
+
+                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.init_hours)
+        return cache[key]
+
+    def nbm_cold_bias(self, ba: str, icao: str, day: date) -> float:
+        """The median of observed minus NBM-as-seen on the hours the NBM forecast below the cold threshold, over the
+        last ``nbm_cold_bias_days`` known days at one station; zero with fewer than 48 such hours."""
+        key = (ba, icao)
+        if key not in self._nbm_cold_tables:
+            seen = self.nbm_seen_series(ba, icao)
+            if seen is None:
+                self._nbm_cold_tables[key] = pd.DataFrame(columns=["seen", "e"])
+            else:
+                years = range(seen.index.min().year, seen.index.max().year + 1)
+                observed = pd.concat([self.station_temperature(icao, ba, y) for y in years])
+                observed = observed[~observed.index.duplicated()].sort_index().asfreq("h")
+                s = seen.reindex(observed.index)
+                t = pd.DataFrame({"seen": s, "e": observed - s}).dropna()
+                self._nbm_cold_tables[key] = t
+        return cold_bias_from_table(self._nbm_cold_tables[key], day, self.nbm_cold_bias_days, self.nbm_cold_threshold_f)
+
     def nbm(self, icao: str) -> pd.DataFrame:
         if icao not in self._nbm:
             self._nbm[icao] = load_station(self.nbm_dir, icao) if self.nbm_dir else pd.DataFrame()
@@ -613,8 +682,10 @@ class Loader:
                 nrows = self.nbm(icao)
                 if len(nrows):
                     npath = nbm_path(nrows, day, off_path, run)
+                    if self.nbm_cold_bias_days:
+                        npath = apply_cold_bias(npath, self.nbm_cold_bias(ba, icao, day), self.nbm_cold_threshold_f)
                     if self.nbm_mode == "blend":
-                        paths[icao] = blend_paths(paths[icao], npath)
+                        paths[icao] = blend_paths(paths[icao], npath, self.nbm_weight)
                     else:                                              # replace: NBM where known, HRRR elsewhere
                         paths[icao] = np.where(np.isfinite(npath), npath, paths[icao])
             if self.temp_bias_days and run is not None and len(rows):
