@@ -25,6 +25,7 @@ not used in any modelling decision.
 | Start of the history | never before 1 July 2015 | EIA-930 starts then |
 | Cut-off | load through the hour beginning 08:00 local of the day before the target day | what a forecaster running at 9 a.m. has |
 | Weather forecast | the latest HRRR run among 12 and 06 UTC whose initialisation plus 2 h is not after 09:00 local of the day before, with the UTC offset the EIA files carry for that day | 2 h is the time a 48 h run takes to finish; the rule gives 12 UTC everywhere except the Eastern zone in daylight time (06 UTC); leads are 17 to 45 h |
+| National Blend of Models (NBM), NOAA: 2 m temperature at the same stations, 12 and 06 UTC runs, hourly to 36 h and three-hourly beyond (public archive on AWS, one GeoTIFF per element and hour; version trees 4.0 to 4.3) | averaged hour by hour with the HRRR path from phase K on; 7.5 % of the runs are absent from the archive (mostly July to October 2022 and 16 to 21 January 2024) and those days use the HRRR alone |
 | Evaluation period | from 2 December 2020 | the public Zarr archive has 48 h runs only from that day; from August 2018 to then runs reach 36 h, and a 9 a.m. cut-off needs at least 39 h to cover the target day |
 | Temperature path | 39 hours of the same run, from 09:00 of the day before to 23:00 of the target day | lags and moving averages of temperature need the rest of the day before; the forecaster had those hours too |
 | Observed temperature | NOAA ISD-Lite; used to train, never to forecast | standard practice: train on observations, run on forecasts |
@@ -34,7 +35,6 @@ not used in any modelling decision.
 | Implausible outcome | if any hour of the load that occurred is outside 0.2 to 5 times the median of the last 672 known hours, the day scores nobody, `DF` included | an error cannot be measured against a broken reading; 0.3 % of days |
 | Blind copy | a forecaster receives the information set with the outcome and the observed temperature of the target day replaced by missing values | no model can use the result, by construction; a test with a cheating forecaster checks it |
 | Absent HRRR run | 8 of 3712 runs are not in the archive; the model declines the day and the day counts in the coverage table | no weather forecast is invented |
-| National Blend of Models (NBM), NOAA: 2 m temperature at the same stations, 12 and 06 UTC runs, hourly to 36 h and three-hourly beyond (public archive on AWS, one GeoTIFF per element and hour; version trees 4.0 to 4.3) | averaged hour by hour with the HRRR path from phase K on; 7.5 % of the runs are absent from the archive (mostly July to October 2022 and 16 to 21 January 2024) and those days use the HRRR alone |
 | Documented load-shed days | the BA-days in `docs/load_shed_days.csv` (source, page and quote per row) are left out of every table and reported apart | on those days the load that occurred is the load served, not the demand |
 
 ## 3. Weather stations
