@@ -208,6 +208,9 @@ def rolling_hour_bias(table: pd.DataFrame, day: date, window_days: int, min_days
     return med.reindex(range(24)).fillna(0.0).to_numpy(dtype=float)
 
 
+NBM_FIELD_COLUMNS = {"dewpoint_f": ("nbm_dewpoint_f", 1.0), "wind_ms": ("nbm_wind_mph", 0.44704)}   # field -> (NBM column, unit factor)
+
+
 def cold_bias_from_table(table: pd.DataFrame, day: date, window_days: int, threshold_f: float, min_hours: int = 48) -> float:
     """Median of observed minus forecast on the hours forecast below ``threshold_f`` within the ``window_days`` days
     ending two days before ``day``; zero with fewer than ``min_hours`` such hours."""
@@ -283,7 +286,8 @@ class Loader:
                  supplement_dir: Path | list[Path] | None = None, fields: tuple[str, ...] = (),
                  field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0, second_run: bool = False,
                  nbm_dir: Path | None = None, nbm_mode: str | None = None, nbm_daily_dir: Path | None = None,
-                 nbm_weight: float = 0.5, nbm_cold_bias_days: int = 0, nbm_cold_threshold_f: float = 25.0):
+                 nbm_weight: float = 0.5, nbm_cold_bias_days: int = 0, nbm_cold_threshold_f: float = 25.0,
+                 nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -304,6 +308,13 @@ class Loader:
         self.nbm_cold_bias_days = int(nbm_cold_bias_days)
         self.nbm_cold_threshold_f = float(nbm_cold_threshold_f)
         self._nbm_cold_tables: dict[tuple[str, str], pd.DataFrame] = {}
+        # nbm_field_dirs: field -> folder of the NBM extraction of that field (dewpoint_f -> nbm_dewpoint, wind_ms -> nbm_wind);
+        # the NBM path of the field is blended with the HRRR path with nbm_weight, like the temperature
+        self.nbm_field_dirs = {k: Path(v) for k, v in (nbm_field_dirs or {}).items()}
+        self._nbm_fields: dict[tuple[str, str], pd.DataFrame] = {}
+        # nbm_dswrf_dir: the NBM surface short-wave flux replaces the HRRR one as the irradiance seen at the cut-off
+        self.nbm_dswrf_dir = Path(nbm_dswrf_dir) if nbm_dswrf_dir else None
+        self._nbm_dswrf: dict[str, pd.Series | None] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
         self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
         self._nbm: dict[str, pd.DataFrame] = {}
@@ -360,8 +371,19 @@ class Loader:
         return self.as_seen_series(ba, self._cloud, self.cloud_dir, "cloud_pct")
 
     def dswrf_series(self, ba: str) -> pd.Series | None:
-        """Forecast surface short-wave flux (W/m2) as seen at the cut-off, mean over the BA's stations."""
+        """Forecast surface short-wave flux (W/m2) as seen at the cut-off, mean over the BA's stations; from the NBM
+        extraction when ``nbm_dswrf_dir`` is set (its three-hourly tail interpolated over gaps of up to 2 h)."""
+        if self.nbm_dswrf_dir is not None:
+            s = self.as_seen_series(ba, self._nbm_dswrf, self.nbm_dswrf_dir, "nbm_dswrf_wm2")
+            return None if s is None else s.interpolate(limit=2, limit_area="inside")
         return self.as_seen_series(ba, self._dswrf, self.dswrf_dir, "dswrf_wm2")
+
+    def nbm_field_rows(self, field: str, icao: str) -> pd.DataFrame:
+        key = (field, icao)
+        if key not in self._nbm_fields:
+            folder = self.nbm_field_dirs.get(field)
+            self._nbm_fields[key] = load_station(folder, icao) if folder else pd.DataFrame()
+        return self._nbm_fields[key]
 
     def as_seen_series(self, ba: str, cache: dict, folder: Path, field: str) -> pd.Series | None:
         if ba not in cache:
@@ -496,6 +518,11 @@ class Loader:
                                else np.full(PATH_HOURS, np.nan))
                 if run2 is not None and len(rows):
                     paths[icao] = blend_paths(paths[icao], forecast_path(rows, day, off_path, run2, column=fld))
+                if fld in self.nbm_field_dirs and run is not None:
+                    nrows = self.nbm_field_rows(fld, icao)
+                    if len(nrows):
+                        col, scale = NBM_FIELD_COLUMNS[fld]
+                        paths[icao] = blend_paths(paths[icao], nbm_path(nrows, day, off_path, run, column=col) * scale, self.nbm_weight)
                 if self.field_bias_days and run is not None and len(rows):
                     paths[icao] = apply_hour_bias(paths[icao], path_ts, self.field_hour_bias(ba, icao, fld, day))
             path = pd.DataFrame(paths, index=path_ts).mean(axis=1, skipna=False)

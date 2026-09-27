@@ -96,7 +96,7 @@ def nbm_group_options() -> dict:
     """group -> loader options for the NBM input (folders under the data root: nbm/, nbm_daily/); built at call time
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
-            "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC}
+            "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I}
 
 
 def nbm_options(group: str) -> dict:
@@ -110,6 +110,10 @@ def nbm_options(group: str) -> dict:
     for k in ("nbm_weight", "nbm_cold_bias_days", "nbm_cold_threshold_f"):
         if k in c:
             out[k] = c[k]
+    if c.get("nbm_fields"):
+        out["nbm_field_dirs"] = {"dewpoint_f": DATA / "nbm_dewpoint", "wind_ms": DATA / "nbm_wind"}
+    if c.get("nbm_dswrf"):
+        out["nbm_dswrf_dir"] = DATA / "nbm_dswrf"
     return out
 
 
@@ -246,6 +250,8 @@ FINAL6 = FINAL6N                                                                
 FINAL6W = dict(FINAL6, nbm_weight=0.7)                                                                   # A21b: inverse-variance weight on the NBM (MAE 2.05 vs 3.12 F)
 FINAL6C = dict(FINAL6, nbm_cold_bias_days=365)                                                           # A21c: the NBM moved by its own cold-hour bias of the last year
 FINAL6WC = dict(FINAL6, nbm_weight=0.7, nbm_cold_bias_days=365)                                          # both
+FINAL6F = dict(FINAL6, nbm_fields=True)                                                                  # A21d: NBM dew point and wind blended with the HRRR fields
+FINAL6I = dict(FINAL6, nbm_dswrf=True, irradiance=True)                                                  # B8: NBM irradiance in the additive PV term (ISO-NE, CAISO)
 
 
 def final3b_models(ba: str | None) -> list:
@@ -312,6 +318,7 @@ def _final3_models(ba: str | None, c: dict, tag: str) -> list:
 
     solar = ba in PV_BAS
     add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
+                               irradiance=solar and c.get("irradiance", False),
                                apparent=c.get("apparent", False), apparent_wind=c.get("apparent_wind", True), **c["additive"],
                                cold_weight=c.get("cold_weight", 0.0), name=f"{tag}_additive"))
     boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
@@ -402,6 +409,16 @@ def blendwc_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL6WC, "final6wc")
 
 
+def nbmfld_models(ba: str | None) -> list:
+    """Phase L, idea A21d: the phase K recipe with the NBM dew point and wind blended into the humidity and wind fields."""
+    return _final3_models(ba, FINAL6F, "final6f")
+
+
+def nbmirr_models(ba: str | None) -> list:
+    """Phase L, idea B8: the phase K recipe with the NBM irradiance in place of the cloud fraction in the additive PV term."""
+    return _final3_models(ba, FINAL6I, "final6i")
+
+
 def final6_models(ba: str | None) -> list:
     """The recipe after phase K (set FINAL6 to the winner); ``frozen6`` runs it on 2023 to 2025."""
     return _final3_models(ba, FINAL6, "final6")
@@ -425,7 +442,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final4": final4_models, "frozen4": final4_models, "humid_b": humid_b_models, "events": events_models,
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
-    "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models,
+    "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
     "tbias": final2_models,
 }
 
@@ -512,10 +529,10 @@ def main(argv=None) -> int:
                     continue
                 solar = group in PER_BA_GROUPS and ba in PV_BAS
                 ld = loader(a, sky=group in ("sky", "pv", "pv2") or solar, pv=group in ("pv", "pv2") or solar,
-                            irradiance=group == "irradiance" or (group == "final2" and ba in IRR_BAS),
+                            irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -726,6 +743,14 @@ def main(argv=None) -> int:
                     "over the last 365 known days at the station (the NBM is too warm in the cold), before the plain mean with the HRRR.")
     blendwc = report({"blendwc"}, a.results.parent / "phase_l_both", a.doc.parent / "phase_l_both.md",
                      "Phase L: the 0.7 weight and the cold-hour bias together", g_common + l_common + "`final6wc` applies both changes.")
+    nbmfld = report({"nbmfld"}, a.results.parent / "phase_l_fields", a.doc.parent / "phase_l_fields.md",
+                    "Phase L: the NBM dew point and wind blended into the fields", g_common + l_common +
+                    "`final6f` averages the NBM dew point and wind speed with the HRRR paths of those fields, hour by hour, before the "
+                    "humidity and wind blocks are built (the temperature is already averaged).")
+    nbmirr = report({"nbmirr"}, a.results.parent / "phase_l_irradiance", a.doc.parent / "phase_l_irradiance.md",
+                    "Phase L: the NBM irradiance in the PV term", g_common + l_common +
+                    "`final6i` feeds the additive model's PV term with the NBM surface short-wave flux as seen at the cut-off, in "
+                    "place of the cloud fraction, at the BAs with the PV terms (ISO-NE, CAISO).")
     frozen6 = report({"frozen6"}, a.results.parent / "frozen6_2023_2025", a.doc.parent / "frozen_evaluation_v5.md",
                      "Fifth look at 2023 to 2025: the recipe after phase K, under protocol v2",
                      "Development BAs: " + common +
@@ -767,7 +792,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr)):
         log("no rows to report")
         return 1
     if waiting:
