@@ -165,6 +165,8 @@ ten BAs it changes the annual mean by 0.01 point.
 | Cold-day peak rule read from the NBM 5th-percentile minimum (phase K) | selects the same days as the rule on the HRRR path; no change | not adopted (section 8i) |
 | 0.7 weight on the NBM in the temperature blend (phase L, six BAs) | 0.002 over the year; better at Duke by 0.05, worse at FPL by 0.04 and at the largest peaks by 0.035 | not adopted (section 8j) |
 | NBM path corrected by its own cold-hour bias (phase L, six BAs) | no change | not adopted (section 8j) |
+| NBM dew point and wind blended into the humidity and wind fields (phase L, four BAs) | 0.001 over the year, 0.002 worse in summer | not adopted (section 8j) |
+| NBM irradiance in place of the cloud fraction in the PV term (phase L, ISO-NE and CAISO) | worse by 0.041 over the year | not adopted (section 8j) |
 
 ## 8a. The recipe in one run
 
@@ -254,7 +256,14 @@ Two refinements of the blend were run against the plain mean on six BAs chosen f
 | NBM corrected by its cold-hour bias | 0.000 | 0.002 | 0.01 | worse by 0.014 | 0.001 | 0 / 0 |
 | Both | 0.001 | worse by 0.005 | worse by 0.06 | 0.004 | worse by 0.036 | 3 / 2 |
 
-Neither was adopted. The fixed weight gains where the NBM is much better than the HRRR (Duke by 0.05) and loses where the two are alike or where the NBM has trouble at coastal stations (SPP by 0.02, FPL by 0.04): the right weight varies by station and season, not one number for all. The cold-hour correction is rarely available (few stations and years with 48 hours forecast below 25 F in the window) and its sign varies by station, so it changes nothing; the plain mean already halves the warm bias of the NBM in the cold. The under-forecast at the peak in the storms does not move with either. The recipe stays `final6`.
+Two more uses of the NBM were tried on the BAs where they could matter, each against the plain temperature blend on the same days (`docs/phase_l_fields.md`, `docs/phase_l_fields_strata.md`, `docs/phase_l_irradiance.md`, `docs/phase_l_irradiance_strata.md`): its dew point and wind speed averaged with the HRRR paths of those fields at FPL, ERCOT, TVA and PJM, and its surface short-wave flux in place of the cloud fraction in the additive model's PV term at ISO-NE and CAISO.
+
+| Change | BAs | Year MAPE | Summer | Event days | Largest peaks | BAs better / worse (year) |
+|---|---|---|---|---|---|---|
+| NBM dew point and wind blended into the fields | FPL, ERCOT, TVA, PJM | 0.001 | worse by 0.002 | worse by 0.003 | worse by 0.023 | 1 / 1 |
+| NBM irradiance in the PV term | ISO-NE, CAISO | worse by 0.041 | worse by 0.050 | | 0.030 | 0 / 2 |
+
+Neither was adopted. The fixed weight gains where the NBM is much better than the HRRR (Duke by 0.05) and loses where the two are alike or where the NBM has trouble at coastal stations (SPP by 0.02, FPL by 0.04): the right weight varies by station and season, not one number for all. The cold-hour correction is rarely available (few stations and years with 48 hours forecast below 25 F in the window) and its sign varies by station, so it changes nothing; the plain mean already halves the warm bias of the NBM in the cold. The under-forecast at the peak in the storms does not move with either. The humidity block lives on the differences between dew point and temperature, which the HRRR gets about as well as the NBM, so averaging those fields changes nothing; and the hourly irradiance at four or five points is a noisier predictor of behind-the-meter generation than the cloud fraction, as it had been with the HRRR flux in phase F, so the PV term gets worse. The recipe stays `final6`.
 
 ## 9. Limitations
 

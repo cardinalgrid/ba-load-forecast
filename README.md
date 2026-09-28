@@ -240,7 +240,7 @@ The National Blend of Models (NBM, NOAA) was read at the same stations from its 
 
 ## Phase L: tuning the blend
 
-A 0.7 weight on the NBM and a correction of the NBM by its own cold-hour bias were tried on six BAs against the plain mean (`docs/methods.md`, section 8j; `docs/phase_l_strata.md`): the weight gains at Duke and loses at FPL and SPP (0.002 over the year, worse at the largest peaks), the correction changes nothing. The recipe stays `final6`.
+A 0.7 weight on the NBM and a correction of the NBM by its own cold-hour bias were tried on six BAs against the plain mean (`docs/methods.md`, section 8j; `docs/phase_l_strata.md`): the weight gains at Duke and loses at FPL and SPP (0.002 over the year, worse at the largest peaks), the correction changes nothing. The NBM dew point and wind blended into the fields (four BAs) and the NBM irradiance in the PV term (ISO-NE and CAISO, worse by 0.04) were tried next and not adopted either. The recipe stays `final6`.
 
 ## Layout
 
