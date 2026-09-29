@@ -97,7 +97,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B}
 
 
 def nbm_options(group: str) -> dict:
@@ -117,6 +117,8 @@ def nbm_options(group: str) -> dict:
         out["nbm_dswrf_dir"] = DATA / "nbm_dswrf"
     if c.get("gfs"):
         out["gfs_dir"] = DATA / "gfs"
+    if c.get("model_weights"):
+        out["model_weight_days"] = c["model_weights"]
     return out
 
 
@@ -256,6 +258,8 @@ FINAL6WC = dict(FINAL6, nbm_weight=0.7, nbm_cold_bias_days=365)                 
 FINAL6F = dict(FINAL6, nbm_fields=True)                                                                  # A21d: NBM dew point and wind blended with the HRRR fields
 FINAL6I = dict(FINAL6, nbm_dswrf=True, irradiance=True)                                                  # B8: NBM irradiance in the additive PV term (ISO-NE, CAISO)
 FINAL7 = dict(FINAL6, gfs=True)                                                                          # phase M: the GFS as a third model in the temperature mean
+FINAL8 = dict(FINAL7, model_weights=30)                                                                  # phase N (A27): HRRR, NBM and GFS weighted per station by their 30-day error
+FINAL8B = dict(FINAL6, model_weights=30)                                                                 # phase N: HRRR and NBM only, weighted per station
 
 
 def final3b_models(ba: str | None) -> list:
@@ -423,6 +427,16 @@ def nbmirr_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL6I, "final6i")
 
 
+def mw3_models(ba: str | None) -> list:
+    """Phase N: three weather models weighted per station by the inverse of their recent mean squared error."""
+    return _final3_models(ba, FINAL8, "final8")
+
+
+def mw2_models(ba: str | None) -> list:
+    """Phase N: the HRRR and the NBM weighted per station (no GFS), to separate the weighting from the third model."""
+    return _final3_models(ba, FINAL8B, "final8b")
+
+
 def gfs3_models(ba: str | None) -> list:
     """Phase M: the phase K recipe with the temperature path as the mean of HRRR, NBM and GFS, hour by hour."""
     return _final3_models(ba, FINAL7, "final7")
@@ -452,7 +466,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models,
     "tbias": final2_models,
 }
 
@@ -542,7 +556,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -767,6 +781,16 @@ def main(argv=None) -> int:
                   "GFS 0.25 degree run available at the cut-off (a 5 h availability lag: 06 UTC in most zones), each model where it has "
                   "the hour; before 23 March 2021 the GFS archive is three-hourly and its path is interpolated. Compare with "
                   "`docs/phase_k_nbm_blend.md` (`final6n`, same days).")
+    mw3 = report({"mw3"}, a.results.parent / "phase_n_weights3", a.doc.parent / "phase_n_weights3.md",
+                 "Phase N: the weather models weighted per station by their recent error", g_common +
+                 "`final8` is `final7` (HRRR, NBM and GFS in the temperature mean) with the weights of the three models set per station and "
+                 "per day as the inverse of each model's mean squared error at that station's observations over the last 30 days known at "
+                 "the cut-off (equal weights with fewer than 240 common hours). Compare with `docs/phase_k_nbm_blend.md` (`final6n`) and "
+                 "`docs/phase_m_gfs.md` (`final7`), same days.")
+    mw2 = report({"mw2"}, a.results.parent / "phase_n_weights2", a.doc.parent / "phase_n_weights2.md",
+                 "Phase N: the HRRR and the NBM weighted per station by their recent error", g_common +
+                 "`final8b` is `final6` with the weights of the HRRR and the NBM set per station and per day as the inverse of each "
+                 "model's mean squared error over the last 30 days known at the cut-off; no GFS. Compare with `docs/phase_k_nbm_blend.md`.")
     frozen7 = report({"frozen7"}, a.results.parent / "frozen7_2023_2025", a.doc.parent / "frozen_evaluation_v6.md",
                      "Sixth look at 2023 to 2025: the recipe after phase M, under protocol v2",
                      "Development BAs: " + common +
@@ -813,7 +837,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2)):
         log("no rows to report")
         return 1
     if waiting:

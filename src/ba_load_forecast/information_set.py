@@ -42,6 +42,7 @@ from .cutoff import (
     path_timestamps,
     previous_run,
     run_for_day,
+    weighted_paths,
 )
 from .hrrr import load_station
 from .nbm import daily_at_cutoff, load_daily, nbm_path
@@ -225,6 +226,22 @@ def cold_bias_from_table(table: pd.DataFrame, day: date, window_days: int, thres
     return float(cold["e"].median())
 
 
+def model_weights(errors: dict[str, pd.Series], day: date, window_days: int, min_hours: int = 240) -> dict[str, float] | None:
+    """Inverse mean-squared-error weights of the weather models at one station, from the hours of the last
+    ``window_days`` known at the cut-off of ``day`` on which every model and the observation exist; None (equal
+    weights) with fewer than ``min_hours`` such hours. ``errors[name]`` is observed minus the model as seen."""
+    if len(errors) < 2:
+        return None
+    end = pd.Timestamp(last_load_hour(day))
+    start = end - pd.Timedelta(days=window_days)
+    table = pd.DataFrame({k: v.loc[start:end] for k, v in errors.items()}).dropna()
+    if len(table) < min_hours:
+        return None
+    mse = (table ** 2).mean()
+    inv = 1.0 / np.maximum(mse.to_numpy(dtype=float), 1e-6)
+    return {str(k): float(w) for k, w in zip(mse.index, inv / inv.sum(), strict=True)}
+
+
 def apply_cold_bias(path: np.ndarray, bias: float, threshold_f: float) -> np.ndarray:
     """Add ``bias`` (observed minus forecast) to the hours of a path forecast below the threshold."""
     p = np.asarray(path, dtype=float).copy()
@@ -289,7 +306,7 @@ class Loader:
                  nbm_dir: Path | None = None, nbm_mode: str | None = None, nbm_daily_dir: Path | None = None,
                  nbm_weight: float = 0.5, nbm_cold_bias_days: int = 0, nbm_cold_threshold_f: float = 25.0,
                  nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None,
-                 gfs_dir: Path | None = None, gfs_lag_h: float = 5.0):
+                 gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -322,6 +339,11 @@ class Loader:
         self.gfs_dir = Path(gfs_dir) if gfs_dir else None
         self.gfs_lag_h = float(gfs_lag_h)
         self._gfs: dict[str, pd.DataFrame] = {}
+        # model_weight_days: when set, the temperature path is the mean of the weather models weighted per station by the
+        # inverse of their mean squared error at that station's observations over the last model_weight_days known days
+        # (equal weights with fewer than 240 common hours); 0 keeps the equal-weight mean
+        self.model_weight_days = int(model_weight_days)
+        self._model_errors: dict[tuple[str, str], dict[str, pd.Series]] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
         self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
         self._nbm: dict[str, pd.DataFrame] = {}
@@ -641,6 +663,50 @@ class Loader:
                 self._nbm_cold_tables[key] = t
         return cold_bias_from_table(self._nbm_cold_tables[key], day, self.nbm_cold_bias_days, self.nbm_cold_threshold_f)
 
+    def gfs_seen_series(self, ba: str, icao: str) -> pd.Series | None:
+        """The GFS 2 m temperature for every local hour by the run available at that day's cut-off, one station."""
+        cache: dict = self.__dict__.setdefault("_gfs_seen", {})
+        key = (ba, icao)
+        if key not in cache:
+            rows = self.gfs(icao)
+            table = run_table(rows, "gfs_temp_f") if len(rows) else ({}, np.zeros((0, 0)))
+            if not table[0]:
+                cache[key] = None
+            else:
+                inits = sorted(table[0])
+                first, last = inits[0].date(), (inits[-1] + pd.Timedelta(days=2)).date()
+
+                def offset_of_day(d):
+                    off = self.offset(ba, d.year)
+                    if off.empty:
+                        return np.nan
+                    v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
+                    return float(off.median()) if np.isnan(v) else float(v)
+
+                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, (12, 6), lag_h=self.gfs_lag_h)
+        return cache[key]
+
+    def model_errors(self, ba: str, icao: str) -> dict[str, pd.Series]:
+        """Observed minus each weather model as seen at the cut-off, hourly, one station: the HRRR, the NBM when
+        blended and the GFS when loaded."""
+        key = (ba, icao)
+        if key not in self._model_errors:
+            seen = {"hrrr": self.temp_seen_series(ba, icao)}
+            if self.nbm_mode == "blend":
+                seen["nbm"] = self.nbm_seen_series(ba, icao)
+            if self.gfs_dir is not None:
+                seen["gfs"] = self.gfs_seen_series(ba, icao)
+            seen = {k: v for k, v in seen.items() if v is not None}
+            out = {}
+            if seen:
+                lo = min(v.index.min().year for v in seen.values())
+                hi = max(v.index.max().year for v in seen.values())
+                observed = pd.concat([self.station_temperature(icao, ba, y) for y in range(lo, hi + 1)])
+                observed = observed[~observed.index.duplicated()].sort_index().asfreq("h")
+                out = {k: (observed - v.reindex(observed.index)).dropna() for k, v in seen.items()}
+            self._model_errors[key] = out
+        return self._model_errors[key]
+
     def gfs(self, icao: str) -> pd.DataFrame:
         if icao not in self._gfs:
             self._gfs[icao] = load_station(self.gfs_dir, icao) if self.gfs_dir else pd.DataFrame()
@@ -718,6 +784,7 @@ class Loader:
             if run2 is not None and len(rows):
                 paths[icao] = blend_paths(paths[icao], forecast_path(rows, day, off_path, run2))
             sources = [paths[icao]]                                    # the models that enter the temperature mean
+            names = ["hrrr"]
             if self.nbm_mode and run is not None:
                 nrows = self.nbm(icao)
                 if len(nrows):
@@ -728,6 +795,7 @@ class Loader:
                         if self.gfs_dir is None:
                             paths[icao] = blend_paths(paths[icao], npath, self.nbm_weight)
                         sources.append(npath)
+                        names.append("nbm")
                     else:                                              # replace: NBM where known, HRRR elsewhere
                         paths[icao] = np.where(np.isfinite(npath), npath, paths[icao])
             if self.gfs_dir is not None and not np.isnan(off_cutoff):
@@ -735,7 +803,13 @@ class Loader:
                 if len(grows):
                     grun = run_for_day(day, float(off_cutoff), (12, 6), lag_h=self.gfs_lag_h)
                     sources.append(nbm_path(grows, day, off_path, grun, column="gfs_temp_f"))
+                    names.append("gfs")
                     paths[icao] = np.where(np.isfinite(mean_paths(sources)), mean_paths(sources), paths[icao])
+            if self.model_weight_days and len(sources) > 1:
+                w = model_weights(self.model_errors(ba, icao), day, self.model_weight_days)
+                if w is not None and all(n in w for n in names):
+                    mixed = weighted_paths(sources, [w[n] for n in names])
+                    paths[icao] = np.where(np.isfinite(mixed), mixed, paths[icao])
             if self.temp_bias_days and run is not None and len(rows):
                 paths[icao] = apply_hour_bias(paths[icao], path_ts, self.hour_bias(ba, icao, day))
         path_frame = pd.DataFrame(paths, index=path_ts)

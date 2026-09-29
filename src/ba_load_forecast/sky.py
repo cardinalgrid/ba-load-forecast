@@ -68,9 +68,11 @@ def run_table(rows: pd.DataFrame, field: str) -> tuple[dict, np.ndarray]:
     return {pd.Timestamp(i): k for k, i in enumerate(wide.index)}, wide.to_numpy(dtype=float)
 
 
-def forecast_as_seen(tables: list[tuple[dict, np.ndarray]], days: list[date], offset_of_day, init_hours) -> pd.Series:
+def forecast_as_seen(tables: list[tuple[dict, np.ndarray]], days: list[date], offset_of_day, init_hours,
+                     lag_h: float | None = None) -> pd.Series:
     """For every local hour of ``days``, the value forecast by the run available at that day's cut-off, averaged
-    over the stations (``tables``). ``offset_of_day(day)`` gives the UTC offset (hours behind UTC)."""
+    over the stations (``tables``). ``offset_of_day(day)`` gives the UTC offset (hours behind UTC); ``lag_h`` is
+    the availability lag of the model (the HRRR default when None)."""
     index, values = [], []
     for d in days:
         off = offset_of_day(d)
@@ -79,7 +81,7 @@ def forecast_as_seen(tables: list[tuple[dict, np.ndarray]], days: list[date], of
         if np.isnan(off):
             values.extend([np.nan] * 24)
             continue
-        run = run_for_day(d, float(off), init_hours)
+        run = run_for_day(d, float(off), init_hours) if lag_h is None else run_for_day(d, float(off), init_hours, lag_h=lag_h)
         init = pd.Timestamp(datetime(run[0].year, run[0].month, run[0].day, run[1]))
         leads = lead_hours(d, float(off), run)
         per_station = []

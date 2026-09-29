@@ -84,6 +84,16 @@ def blend_paths(first: np.ndarray, second: np.ndarray | None, weight: float = 0.
     return out
 
 
+def weighted_paths(paths: list[np.ndarray], weights: list[float]) -> np.ndarray:
+    """Hour by hour, the weighted mean of the paths that have the hour, the weights renormalised over those
+    (NaN where none has it); equal weights give ``mean_paths``."""
+    stack = np.vstack([np.asarray(p, dtype=float) for p in paths])
+    w = np.asarray(weights, dtype=float)[:, None] * np.isfinite(stack)
+    total = np.nansum(stack * w, axis=0)
+    norm = w.sum(axis=0)
+    return np.where(norm > 0, total / np.where(norm > 0, norm, 1.0), np.nan)
+
+
 def mean_paths(paths: list[np.ndarray]) -> np.ndarray:
     """Hour by hour, the mean of the paths that have the hour (NaN where none has it): several weather models
     with equal weight, each covering what it covers."""
