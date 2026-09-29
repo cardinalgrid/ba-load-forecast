@@ -50,5 +50,5 @@ def test_model_weights_can_be_restricted_to_the_cold_hours():
     plain = model_weights(errors, date(2024, 3, 1), 30)
     assert plain["nbm"] > plain["hrrr"]
     cold_only = model_weights(errors, date(2024, 3, 1), 365, min_hours=48, hours=cold)
-    assert cold_only["hrrr"] == 0.9                                              # MSE 1 against 9
+    assert abs(cold_only["hrrr"] - 0.9) < 1e-9                                 # MSE 1 against 9
     assert model_weights(errors, date(2024, 1, 3), 365, min_hours=48, hours=cold) is None
