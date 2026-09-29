@@ -26,6 +26,7 @@ not used in any modelling decision.
 | Cut-off | load through the hour beginning 08:00 local of the day before the target day | what a forecaster running at 9 a.m. has |
 | Weather forecast | the latest HRRR run among 12 and 06 UTC whose initialisation plus 2 h is not after 09:00 local of the day before, with the UTC offset the EIA files carry for that day | 2 h is the time a 48 h run takes to finish; the rule gives 12 UTC everywhere except the Eastern zone in daylight time (06 UTC); leads are 17 to 45 h |
 | National Blend of Models (NBM), NOAA: 2 m temperature at the same stations, 12 and 06 UTC runs, hourly to 36 h and three-hourly beyond (public archive on AWS, one GeoTIFF per element and hour; version trees 4.0 to 4.3) | averaged hour by hour with the HRRR path from phase K on; 7.5 % of the runs are absent from the archive (mostly July to October 2022 and 16 to 21 January 2024) and those days use the HRRR alone |
+| Global Forecast System (GFS), NOAA: 0.25 degree 2 m temperature at the nearest grid point of the same stations, 06 and 12 UTC runs, hourly (three-hourly before 23 March 2021; public archive on AWS from 1 January 2021) | tried as a third model in the temperature mean in phase M and not adopted (section 8k); verified against the observations in `docs/gfs_verification.md` |
 | Evaluation period | from 2 December 2020 | the public Zarr archive has 48 h runs only from that day; from August 2018 to then runs reach 36 h, and a 9 a.m. cut-off needs at least 39 h to cover the target day |
 | Temperature path | 39 hours of the same run, from 09:00 of the day before to 23:00 of the target day | lags and moving averages of temperature need the rest of the day before; the forecaster had those hours too |
 | Observed temperature | NOAA ISD-Lite; used to train, never to forecast | standard practice: train on observations, run on forecasts |
@@ -167,6 +168,7 @@ ten BAs it changes the annual mean by 0.01 point.
 | NBM path corrected by its own cold-hour bias (phase L, six BAs) | no change | not adopted (section 8j) |
 | NBM dew point and wind blended into the humidity and wind fields (phase L, four BAs) | 0.001 over the year, 0.002 worse in summer | not adopted (section 8j) |
 | NBM irradiance in place of the cloud fraction in the PV term (phase L, ISO-NE and CAISO) | worse by 0.041 over the year | not adopted (section 8j) |
+| GFS 0.25 degree temperature as a third model in the temperature mean, equal weight (phase M, six BAs) | worse by 0.020 over the year, 0.038 in winter, 0.052 on the coldest mornings; FPL alone gains 0.17 | not adopted (section 8k) |
 
 ## 8a. The recipe in one run
 
@@ -264,6 +266,21 @@ Two more uses of the NBM were tried on the BAs where they could matter, each aga
 | NBM irradiance in the PV term | ISO-NE, CAISO | worse by 0.041 | worse by 0.050 | | 0.030 | 0 / 2 |
 
 Neither was adopted. The fixed weight gains where the NBM is much better than the HRRR (Duke by 0.05) and loses where the two are alike or where the NBM has trouble at coastal stations (SPP by 0.02, FPL by 0.04): the right weight varies by station and season, not one number for all. The cold-hour correction is rarely available (few stations and years with 48 hours forecast below 25 F in the window) and its sign varies by station, so it changes nothing; the plain mean already halves the warm bias of the NBM in the cold. The under-forecast at the peak in the storms does not move with either. The humidity block lives on the differences between dew point and temperature, which the HRRR gets about as well as the NBM, so averaging those fields changes nothing; and the hourly irradiance at four or five points is a noisier predictor of behind-the-meter generation than the cloud fraction, as it had been with the HRRR flux in phase F, so the PV term gets worse. The recipe stays `final6`.
+
+## 8k. Phase M: a third weather model, on six BAs
+
+The GFS 0.25 degree 2 m temperature (NOAA; public archive on AWS from 1 January 2021; `src/ba_load_forecast/gfs.py` reads one 0.9 MB GRIB2 message per forecast hour by byte range and takes the nearest grid point of each station) was extracted for the 06 and 12 UTC runs of 2021 to 2025 and verified against the observations (`docs/gfs_verification.md`): MAE 3.30 F against 3.12 F for the HRRR and 2.05 F for the NBM, bias -0.63 F, and the warmest of the three on the coldest mornings (+2.49 F). With a 5 h availability lag the run available at a 9 a.m. cut-off is the 06 UTC one in the Eastern, Central and Mountain zones and the 12 UTC one in the Pacific zone in standard time. The recipe `final7` takes the temperature path as the mean, hour by hour, of the models that have the hour (HRRR, NBM and GFS, equal weight; `cutoff.mean_paths`), everything else as in `final6`. It was run on the six BAs of phase L against `final6` on the same days (`docs/phase_m_gfs.md`, `docs/phase_m_strata.md`):
+
+| Stratum | `final6` MAPE | `final7` MAPE | Difference | BAs better / worse |
+|---|---|---|---|---|
+| Year | 2.199 | 2.220 | worse by 0.020 | 2 / 3 |
+| Winter | 2.376 | 2.414 | worse by 0.038 | 1 / 5 |
+| Summer | 2.346 | 2.350 | worse by 0.004 | 4 / 2 |
+| Event days | 3.755 | 3.795 | worse by 0.039 | 1 / 3 |
+| 30 coldest mornings | 2.908 | 2.959 | worse by 0.052 | 2 / 4 |
+| 30 largest peaks | 2.259 | 2.248 | 0.011 | 4 / 2 |
+
+By BA over the year: FPL gains 0.17 (3.52 to 3.35) and TVA 0.02; PJM, MISO and Duke lose 0.01 to 0.03 and SPP 0.13. The peak under-forecast in the storms deepens (-2.84 to -3.01 %), most at Duke (-3.0 to -3.9 %). Not adopted. A model that errs more than the HRRR at the point and is warm in the cold dilutes the NBM, and an equal-weight mean has no way to know it; FPL, where the HRRR and the NBM both have trouble at coastal stations, is the one place a third opinion helps, and that stays as a note for a station-wise choice of models. Days before 1 January 2021 have no GFS and would be forecast as in `final6`. The recipe stays `final6`.
 
 ## 9. Limitations
 

@@ -242,6 +242,10 @@ The National Blend of Models (NBM, NOAA) was read at the same stations from its 
 
 A 0.7 weight on the NBM and a correction of the NBM by its own cold-hour bias were tried on six BAs against the plain mean (`docs/methods.md`, section 8j; `docs/phase_l_strata.md`): the weight gains at Duke and loses at FPL and SPP (0.002 over the year, worse at the largest peaks), the correction changes nothing. The NBM dew point and wind blended into the fields (four BAs) and the NBM irradiance in the PV term (ISO-NE and CAISO, worse by 0.04) were tried next and not adopted either. The recipe stays `final6`.
 
+## Phase M: a third weather model
+
+The GFS 0.25 degree temperature was read at the same stations from its public archive (2021 to 2025) and verified: it errs more than the HRRR at the point (MAE 3.30 F against 3.12 F; the NBM 2.05 F, `docs/gfs_verification.md`) and is the warmest of the three on cold mornings. Averaged with the HRRR and the NBM, equal weight, on the six BAs of phase L it is worse than the phase K recipe by 0.02 over the year, 0.04 in winter and 0.05 on the coldest mornings; only FPL gains (0.17). Not adopted (`docs/methods.md`, section 8k; `docs/phase_m_strata.md`). The recipe stays `final6`.
+
 ## Layout
 
 | Module | Responsibility |
