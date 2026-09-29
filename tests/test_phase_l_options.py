@@ -4,7 +4,7 @@ from datetime import date
 import numpy as np
 import pandas as pd
 
-from ba_load_forecast.cutoff import blend_paths
+from ba_load_forecast.cutoff import blend_paths, mean_paths
 from ba_load_forecast.information_set import apply_cold_bias, cold_bias_from_table
 
 
@@ -35,3 +35,13 @@ def test_apply_cold_bias_touches_cold_hours_only():
     out = apply_cold_bias(np.array([10.0, 30.0, np.nan, 24.9]), -2.0, 25.0)
     assert np.allclose(out[[0, 1, 3]], [8.0, 30.0, 22.9])
     assert np.isnan(out[2])
+
+
+def test_mean_of_the_models_that_have_the_hour():
+    a = np.array([10.0, 20.0, np.nan, np.nan])
+    b = np.array([20.0, np.nan, np.nan, 5.0])
+    c = np.array([30.0, 26.0, np.nan, np.nan])
+    out = mean_paths([a, b, c])
+    assert np.allclose(out[[0, 1, 3]], [20.0, 23.0, 5.0])
+    assert np.isnan(out[2])
+

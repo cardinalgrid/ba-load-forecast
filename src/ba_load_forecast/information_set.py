@@ -38,6 +38,7 @@ from .cutoff import (
     blend_paths,
     forecast_path,
     last_load_hour,
+    mean_paths,
     path_timestamps,
     previous_run,
     run_for_day,
@@ -287,7 +288,8 @@ class Loader:
                  field_dirs: dict[str, Path] | None = None, field_bias_days: int = 0, second_run: bool = False,
                  nbm_dir: Path | None = None, nbm_mode: str | None = None, nbm_daily_dir: Path | None = None,
                  nbm_weight: float = 0.5, nbm_cold_bias_days: int = 0, nbm_cold_threshold_f: float = 25.0,
-                 nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None):
+                 nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None,
+                 gfs_dir: Path | None = None, gfs_lag_h: float = 5.0):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -315,6 +317,11 @@ class Loader:
         # nbm_dswrf_dir: the NBM surface short-wave flux replaces the HRRR one as the irradiance seen at the cut-off
         self.nbm_dswrf_dir = Path(nbm_dswrf_dir) if nbm_dswrf_dir else None
         self._nbm_dswrf: dict[str, pd.Series | None] = {}
+        # gfs_dir: the GFS 0.25 degree 2 m temperature at the stations (gfs.extract); its path from the run available at the
+        # cut-off with gfs_lag_h of availability lag joins the temperature mean with equal weight (three-hourly gaps interpolated)
+        self.gfs_dir = Path(gfs_dir) if gfs_dir else None
+        self.gfs_lag_h = float(gfs_lag_h)
+        self._gfs: dict[str, pd.DataFrame] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
         self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
         self._nbm: dict[str, pd.DataFrame] = {}
@@ -634,6 +641,11 @@ class Loader:
                 self._nbm_cold_tables[key] = t
         return cold_bias_from_table(self._nbm_cold_tables[key], day, self.nbm_cold_bias_days, self.nbm_cold_threshold_f)
 
+    def gfs(self, icao: str) -> pd.DataFrame:
+        if icao not in self._gfs:
+            self._gfs[icao] = load_station(self.gfs_dir, icao) if self.gfs_dir else pd.DataFrame()
+        return self._gfs[icao]
+
     def nbm(self, icao: str) -> pd.DataFrame:
         if icao not in self._nbm:
             self._nbm[icao] = load_station(self.nbm_dir, icao) if self.nbm_dir else pd.DataFrame()
@@ -705,6 +717,7 @@ class Loader:
             paths[icao] = forecast_path(rows, day, off_path, run) if run is not None and len(rows) else np.full(PATH_HOURS, np.nan)
             if run2 is not None and len(rows):
                 paths[icao] = blend_paths(paths[icao], forecast_path(rows, day, off_path, run2))
+            sources = [paths[icao]]                                    # the models that enter the temperature mean
             if self.nbm_mode and run is not None:
                 nrows = self.nbm(icao)
                 if len(nrows):
@@ -712,9 +725,17 @@ class Loader:
                     if self.nbm_cold_bias_days:
                         npath = apply_cold_bias(npath, self.nbm_cold_bias(ba, icao, day), self.nbm_cold_threshold_f)
                     if self.nbm_mode == "blend":
-                        paths[icao] = blend_paths(paths[icao], npath, self.nbm_weight)
+                        if self.gfs_dir is None:
+                            paths[icao] = blend_paths(paths[icao], npath, self.nbm_weight)
+                        sources.append(npath)
                     else:                                              # replace: NBM where known, HRRR elsewhere
                         paths[icao] = np.where(np.isfinite(npath), npath, paths[icao])
+            if self.gfs_dir is not None and not np.isnan(off_cutoff):
+                grows = self.gfs(icao)
+                if len(grows):
+                    grun = run_for_day(day, float(off_cutoff), (12, 6), lag_h=self.gfs_lag_h)
+                    sources.append(nbm_path(grows, day, off_path, grun, column="gfs_temp_f"))
+                    paths[icao] = np.where(np.isfinite(mean_paths(sources)), mean_paths(sources), paths[icao])
             if self.temp_bias_days and run is not None and len(rows):
                 paths[icao] = apply_hour_bias(paths[icao], path_ts, self.hour_bias(ba, icao, day))
         path_frame = pd.DataFrame(paths, index=path_ts)

@@ -84,6 +84,15 @@ def blend_paths(first: np.ndarray, second: np.ndarray | None, weight: float = 0.
     return out
 
 
+def mean_paths(paths: list[np.ndarray]) -> np.ndarray:
+    """Hour by hour, the mean of the paths that have the hour (NaN where none has it): several weather models
+    with equal weight, each covering what it covers."""
+    stack = np.vstack([np.asarray(p, dtype=float) for p in paths])
+    n = np.isfinite(stack).sum(axis=0)
+    total = np.nansum(stack, axis=0)
+    return np.where(n > 0, total / np.maximum(n, 1), np.nan)
+
+
 def valid_utc_for_day(day: date, offset_h) -> np.ndarray:
     """UTC instants (hour beginning) of the 24 local hours of ``day``; ``offset_h`` is a scalar or one per hour."""
     off = np.broadcast_to(np.asarray(offset_h, dtype=float), (24,))
