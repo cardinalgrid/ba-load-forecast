@@ -114,7 +114,15 @@ def run_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], work
         for lead, data in pool.map(fetch, leads):
             if data is None:
                 continue
-            grid = with_retries(lambda data=data: decode(data), f"{day} {init_hour:02d}Z f{lead:03d} decode", log, waits=(1.0, 3.0))
+            try:
+                grid = decode(data)
+            except Exception as e:                                    # a damaged message: fetch it once more, else leave the hour out
+                log(f"{day} {init_hour:02d}Z f{lead:03d}: {type(e).__name__} on decode; fetching again")
+                try:
+                    grid = decode(with_retries(lambda: message_bytes(day, init_hour, lead), f"{day} {init_hour:02d}Z f{lead:03d}", log))
+                except Exception as e2:
+                    log(f"{day} {init_hour:02d}Z f{lead:03d}: given up ({type(e2).__name__}); hour left missing")
+                    continue
             for icao, (r, c) in cells.items():
                 rows.append((icao, init, lead, init + timedelta(hours=lead), float((grid[r, c] - 273.15) * 9.0 / 5.0 + 32.0)))
     return pd.DataFrame(rows, columns=[*KEYS, "gfs_temp_f"]).astype({"lead_h": "int16", "gfs_temp_f": "float32"})
