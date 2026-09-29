@@ -31,6 +31,13 @@ LEADS = (17, 45)
 BINS = [-np.inf, 20, 32, 59, 72, np.inf]
 BIN_LABELS = ["below 20 F", "20 to 32 F", "32 to 59 F", "59 to 72 F", "above 72 F"]
 COLD_MORNINGS = 30
+MODELS = {                                    # column -> (name, where the forecast is read for the station)
+    "temp_f": ("HRRR", "at the nearest HRRR grid cell of each station"),
+    "nbm_temp_f": ("NBM", "at the grid cell of each station (the NBM 2 m temperature, whole degrees Fahrenheit, from the "
+                          "public archive; leads beyond 36 h interpolated from the three-hourly files)"),
+    "gfs_temp_f": ("GFS", "at the nearest 0.25 degree grid point of each station (the GFS 2 m temperature from the public "
+                          "archive; runs before 23 March 2021 are three-hourly and interpolated)"),
+}
 
 
 def hrrr_rows(hrrr_dir: Path, icao: str, years: list[int], column: str = "temp_f") -> pd.DataFrame:
@@ -91,8 +98,10 @@ def main(argv=None) -> int:
     ap.add_argument("--years", type=int, nargs="+", default=[2024])
     ap.add_argument("--out", type=Path, default=ROOT / "results" / "hrrr_verification")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "hrrr_verification.md")
-    ap.add_argument("--column", default="temp_f", help="temperature column of the archive (nbm_temp_f for the NBM extraction)")
+    ap.add_argument("--column", default="temp_f", help="temperature column of the archive (nbm_temp_f, gfs_temp_f)")
     a = ap.parse_args(argv)
+    model, source = MODELS.get(a.column, (a.column, f"at the grid cell of each station (column `{a.column}`)"))
+    tag = model.lower()
     a.out.mkdir(parents=True, exist_ok=True)
     figures = a.doc.parent / "figures"
     figures.mkdir(parents=True, exist_ok=True)
@@ -167,7 +176,7 @@ def main(argv=None) -> int:
     ax.tick_params(labelsize=8)
     fig.tight_layout()
     for ext in ("pdf", "png"):
-        fig.savefig(figures / f"hrrr_mae_by_lead.{ext}", dpi=200)
+        fig.savefig(figures / f"{tag}_mae_by_lead.{ext}", dpi=200)
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(7.16, 2.6))
@@ -179,15 +188,15 @@ def main(argv=None) -> int:
     ax.tick_params(axis="y", labelsize=8)
     fig.tight_layout()
     for ext in ("pdf", "png"):
-        fig.savefig(figures / f"hrrr_cold_morning_bias.{ext}", dpi=200)
+        fig.savefig(figures / f"{tag}_cold_morning_bias.{ext}", dpi=200)
     plt.close(fig)
 
     years = ", ".join(str(y) for y in a.years)
     allsum = summarize(d).round(2)
     lines = [
-        "# HRRR 2 m temperature against ISD-Lite observations",
+        f"# {model} 2 m temperature against ISD-Lite observations",
         "",
-        f"Forecast minus observed at the nearest HRRR grid cell of each station, {years}, leads {LEADS[0]} to {LEADS[1]} h "
+        f"Forecast minus observed {source}, {years}, leads {LEADS[0]} to {LEADS[1]} h "
         f"of the 12 and 06 UTC runs (the leads a day-ahead forecast issued at 9 a.m. local time uses). "
         f"{int(allsum['n'])} forecast-observation pairs at {d['icao'].nunique()} stations. Observations are hourly "
         "ISD-Lite readings; a station reports to the nearest tenth of a degree Celsius.",
@@ -198,9 +207,9 @@ def main(argv=None) -> int:
         f"time), hours 04:00 to 09:00: bias {cold_all['bias_f']:+.2f} °F, MAE {cold_all['mae_f']:.2f} °F, "
         f"{int(cold_all['n'])} pairs. A positive bias means the forecast was warmer than what occurred.",
         "",
-        "![MAE by lead](figures/hrrr_mae_by_lead.png)",
+        f"![MAE by lead](figures/{tag}_mae_by_lead.png)",
         "",
-        "![Bias on cold mornings by station](figures/hrrr_cold_morning_bias.png)",
+        f"![Bias on cold mornings by station](figures/{tag}_cold_morning_bias.png)",
         "",
         "## By observed temperature",
         "",

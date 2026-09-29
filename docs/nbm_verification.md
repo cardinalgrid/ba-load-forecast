@@ -6,9 +6,9 @@ Overall: bias -0.21 °F, MAE 2.05 °F, RMSE 2.75 °F.
 
 On the 30 coldest mornings of each station (lowest observed minimum between 04:00 and 09:00 local time), hours 04:00 to 09:00: bias +1.24 °F, MAE 2.40 °F, 12521 pairs. A positive bias means the forecast was warmer than what occurred.
 
-![MAE by lead](figures/hrrr_mae_by_lead.png)
+![MAE by lead](figures/nbm_mae_by_lead.png)
 
-![Bias on cold mornings by station](figures/hrrr_cold_morning_bias.png)
+![Bias on cold mornings by station](figures/nbm_cold_morning_bias.png)
 
 ## By observed temperature
 
