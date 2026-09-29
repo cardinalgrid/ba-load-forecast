@@ -69,36 +69,54 @@ def decode(message: bytes) -> np.ndarray:
         eccodes.codes_release(gid)
 
 
-def field_at_points(day: date, init_hour: int, lead: int, cells: dict[str, tuple[int, int]]) -> dict[str, float]:
+def message_bytes(day: date, init_hour: int, lead: int) -> bytes:
+    """The 2 m temperature message of one forecast hour (a byte-range read guided by the .idx file)."""
     url = gfs_url(day, init_hour, lead)
     start, end = message_range(_get(url + ".idx").decode(), KEY)
-    grid = decode(_get(url, {"Range": f"bytes={start}-{end if end is not None else ''}"}))
+    return _get(url, {"Range": f"bytes={start}-{end if end is not None else ''}"})
+
+
+def field_at_points(day: date, init_hour: int, lead: int, cells: dict[str, tuple[int, int]]) -> dict[str, float]:
+    grid = decode(message_bytes(day, init_hour, lead))
     return {icao: float((grid[r, c] - 273.15) * 9.0 / 5.0 + 32.0) for icao, (r, c) in cells.items()}
+
+
+def run_exists(day: date, init_hour: int) -> bool:
+    """The run is in the archive when its first hourly or first three-hourly file has an index (before 23 March
+    2021 the archive keeps three-hourly files only)."""
+    first = LEADS[init_hour][0]
+    for lead in (first, first + (-first) % 3):
+        try:
+            _get(gfs_url(day, init_hour, lead) + ".idx")
+            return True
+        except FileNotFoundError:
+            continue
+    return False
 
 
 def run_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], workers: int = 8,
               log: Callable[[str], None] = print) -> pd.DataFrame | None:
-    """Rows for one run and its leads; None when the run is not in the archive."""
+    """Rows for one run and its leads (the hours the archive has: hourly, or three-hourly before 23 March 2021);
+    None when the run is not in the archive. Downloads run in threads, decoding in the calling thread."""
     init = datetime(day.year, day.month, day.day, init_hour)
-    leads = LEADS[init_hour]
-    try:
-        _get(gfs_url(day, init_hour, leads[0]) + ".idx")
-    except FileNotFoundError:
+    if not run_exists(day, init_hour):
         return None
+    leads = LEADS[init_hour] if day >= ATMOS_FROM else tuple(k for k in LEADS[init_hour] if k % 3 == 0)
 
     def fetch(lead):
         try:
-            return lead, with_retries(lambda: field_at_points(day, init_hour, lead, cells), f"{day} {init_hour:02d}Z f{lead:03d}", log)
+            return lead, with_retries(lambda: message_bytes(day, init_hour, lead), f"{day} {init_hour:02d}Z f{lead:03d}", log)
         except FileNotFoundError:
             return lead, None
 
     rows = []
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        for lead, vals in pool.map(fetch, leads):
-            if vals is None:
+        for lead, data in pool.map(fetch, leads):
+            if data is None:
                 continue
-            for icao, v in vals.items():
-                rows.append((icao, init, lead, init + timedelta(hours=lead), v))
+            grid = with_retries(lambda data=data: decode(data), f"{day} {init_hour:02d}Z f{lead:03d} decode", log, waits=(1.0, 3.0))
+            for icao, (r, c) in cells.items():
+                rows.append((icao, init, lead, init + timedelta(hours=lead), float((grid[r, c] - 273.15) * 9.0 / 5.0 + 32.0)))
     return pd.DataFrame(rows, columns=[*KEYS, "gfs_temp_f"]).astype({"lead_h": "int16", "gfs_temp_f": "float32"})
 
 
