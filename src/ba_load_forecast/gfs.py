@@ -81,13 +81,13 @@ def field_at_points(day: date, init_hour: int, lead: int, cells: dict[str, tuple
     return {icao: float((grid[r, c] - 273.15) * 9.0 / 5.0 + 32.0) for icao, (r, c) in cells.items()}
 
 
-def run_exists(day: date, init_hour: int) -> bool:
+def run_exists(day: date, init_hour: int, log: Callable[[str], None] = print) -> bool:
     """The run is in the archive when its first hourly or first three-hourly file has an index (before 23 March
-    2021 the archive keeps three-hourly files only)."""
+    2021 the archive keeps three-hourly files only). Network errors are retried as everywhere else."""
     first = LEADS[init_hour][0]
     for lead in (first, first + (-first) % 3):
         try:
-            _get(gfs_url(day, init_hour, lead) + ".idx")
+            with_retries(lambda k=lead: _get(gfs_url(day, init_hour, k) + ".idx"), f"{day} {init_hour:02d}Z index", log)
             return True
         except FileNotFoundError:
             continue
@@ -99,7 +99,7 @@ def run_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], work
     """Rows for one run and its leads (the hours the archive has: hourly, or three-hourly before 23 March 2021);
     None when the run is not in the archive. Downloads run in threads, decoding in the calling thread."""
     init = datetime(day.year, day.month, day.day, init_hour)
-    if not run_exists(day, init_hour):
+    if not run_exists(day, init_hour, log):
         return None
     leads = LEADS[init_hour] if day >= ATMOS_FROM else tuple(k for k in LEADS[init_hour] if k % 3 == 0)
 
