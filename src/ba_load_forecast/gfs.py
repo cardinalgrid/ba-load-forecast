@@ -119,7 +119,7 @@ def run_frame(day: date, init_hour: int, cells: dict[str, tuple[int, int]], work
             except Exception as e:                                    # a damaged message: fetch it once more, else leave the hour out
                 log(f"{day} {init_hour:02d}Z f{lead:03d}: {type(e).__name__} on decode; fetching again")
                 try:
-                    grid = decode(with_retries(lambda: message_bytes(day, init_hour, lead), f"{day} {init_hour:02d}Z f{lead:03d}", log))
+                    grid = decode(with_retries(lambda k=lead: message_bytes(day, init_hour, k), f"{day} {init_hour:02d}Z f{lead:03d}", log))
                 except Exception as e2:
                     log(f"{day} {init_hour:02d}Z f{lead:03d}: given up ({type(e2).__name__}); hour left missing")
                     continue
