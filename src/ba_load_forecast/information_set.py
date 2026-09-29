@@ -226,15 +226,19 @@ def cold_bias_from_table(table: pd.DataFrame, day: date, window_days: int, thres
     return float(cold["e"].median())
 
 
-def model_weights(errors: dict[str, pd.Series], day: date, window_days: int, min_hours: int = 240) -> dict[str, float] | None:
+def model_weights(errors: dict[str, pd.Series], day: date, window_days: int, min_hours: int = 240,
+                  hours: pd.Series | None = None) -> dict[str, float] | None:
     """Inverse mean-squared-error weights of the weather models at one station, from the hours of the last
     ``window_days`` known at the cut-off of ``day`` on which every model and the observation exist; None (equal
-    weights) with fewer than ``min_hours`` such hours. ``errors[name]`` is observed minus the model as seen."""
+    weights) with fewer than ``min_hours`` such hours. ``errors[name]`` is observed minus the model as seen.
+    ``hours`` (a boolean series on the same index) restricts the hours that count, e.g. the cold ones."""
     if len(errors) < 2:
         return None
     end = pd.Timestamp(last_load_hour(day))
     start = end - pd.Timedelta(days=window_days)
     table = pd.DataFrame({k: v.loc[start:end] for k, v in errors.items()}).dropna()
+    if hours is not None:
+        table = table[hours.reindex(table.index).fillna(False).to_numpy(dtype=bool)]
     if len(table) < min_hours:
         return None
     mse = (table ** 2).mean()
@@ -306,7 +310,8 @@ class Loader:
                  nbm_dir: Path | None = None, nbm_mode: str | None = None, nbm_daily_dir: Path | None = None,
                  nbm_weight: float = 0.5, nbm_cold_bias_days: int = 0, nbm_cold_threshold_f: float = 25.0,
                  nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None,
-                 gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0):
+                 gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0,
+                 model_weight_cold_days: int = 0, model_weight_cold_threshold_f: float = 25.0):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -343,6 +348,12 @@ class Loader:
         # inverse of their mean squared error at that station's observations over the last model_weight_days known days
         # (equal weights with fewer than 240 common hours); 0 keeps the equal-weight mean
         self.model_weight_days = int(model_weight_days)
+        # model_weight_cold_days: when set, on a day whose temperature path dips below model_weight_cold_threshold_f the
+        # weights come instead from the models' errors on the observed hours below that threshold over the last
+        # model_weight_cold_days days (at least 48 such hours), so the cold-morning failures of a model count where they matter
+        self.model_weight_cold_days = int(model_weight_cold_days)
+        self.model_weight_cold_threshold_f = float(model_weight_cold_threshold_f)
+        self._cold_hours: dict[tuple[str, str], pd.Series] = {}
         self._model_errors: dict[tuple[str, str], dict[str, pd.Series]] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
         self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
@@ -704,8 +715,19 @@ class Loader:
                 observed = pd.concat([self.station_temperature(icao, ba, y) for y in range(lo, hi + 1)])
                 observed = observed[~observed.index.duplicated()].sort_index().asfreq("h")
                 out = {k: (observed - v.reindex(observed.index)).dropna() for k, v in seen.items()}
+                self._cold_hours[key] = observed < self.model_weight_cold_threshold_f
             self._model_errors[key] = out
         return self._model_errors[key]
+
+    def station_weights(self, ba: str, icao: str, day: date, path_min: float) -> dict[str, float] | None:
+        """The models' weights at one station for ``day``: on a cold day (path minimum below the threshold) from the
+        cold hours of the long window when there are enough of them, else from the last ``model_weight_days``."""
+        errors = self.model_errors(ba, icao)
+        if self.model_weight_cold_days and np.isfinite(path_min) and path_min < self.model_weight_cold_threshold_f:
+            w = model_weights(errors, day, self.model_weight_cold_days, min_hours=48, hours=self._cold_hours.get((ba, icao)))
+            if w is not None:
+                return w
+        return model_weights(errors, day, self.model_weight_days)
 
     def gfs(self, icao: str) -> pd.DataFrame:
         if icao not in self._gfs:
@@ -806,7 +828,7 @@ class Loader:
                     names.append("gfs")
                     paths[icao] = np.where(np.isfinite(mean_paths(sources)), mean_paths(sources), paths[icao])
             if self.model_weight_days and len(sources) > 1:
-                w = model_weights(self.model_errors(ba, icao), day, self.model_weight_days)
+                w = self.station_weights(ba, icao, day, float(np.nanmin(paths[icao])) if np.isfinite(paths[icao]).any() else np.nan)
                 if w is not None and all(n in w for n in names):
                     mixed = weighted_paths(sources, [w[n] for n in names])
                     paths[icao] = np.where(np.isfinite(mixed), mixed, paths[icao])

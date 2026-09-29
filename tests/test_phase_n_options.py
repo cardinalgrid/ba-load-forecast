@@ -39,3 +39,16 @@ def test_model_weights_are_inverse_mse_on_the_common_known_hours():
     w2 = model_weights(partial, date(2024, 3, 1), 30)
     assert w2 is not None
     assert 0.7 < w2["nbm"] < 0.9
+
+
+def test_model_weights_can_be_restricted_to_the_cold_hours():
+    idx = pd.date_range("2024-01-01", periods=24 * 60, freq="h")
+    cold = pd.Series(np.arange(len(idx)) % 24 < 6, index=idx)                   # six cold hours a night
+    hrrr = pd.Series(np.where(cold, 1.0, 3.0), index=idx)                        # good in the cold, poor otherwise
+    nbm = pd.Series(np.where(cold, 3.0, 1.0), index=idx)
+    errors = {"hrrr": hrrr, "nbm": nbm}
+    plain = model_weights(errors, date(2024, 3, 1), 30)
+    assert plain["nbm"] > plain["hrrr"]
+    cold_only = model_weights(errors, date(2024, 3, 1), 365, min_hours=48, hours=cold)
+    assert cold_only["hrrr"] == 0.9                                              # MSE 1 against 9
+    assert model_weights(errors, date(2024, 1, 3), 365, min_hours=48, hours=cold) is None

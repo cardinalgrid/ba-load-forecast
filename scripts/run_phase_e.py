@@ -97,7 +97,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C}
 
 
 def nbm_options(group: str) -> dict:
@@ -119,6 +119,8 @@ def nbm_options(group: str) -> dict:
         out["gfs_dir"] = DATA / "gfs"
     if c.get("model_weights"):
         out["model_weight_days"] = c["model_weights"]
+    if c.get("model_weights_cold"):
+        out["model_weight_cold_days"] = c["model_weights_cold"]
     return out
 
 
@@ -260,6 +262,7 @@ FINAL6I = dict(FINAL6, nbm_dswrf=True, irradiance=True)                         
 FINAL7 = dict(FINAL6, gfs=True)                                                                          # phase M: the GFS as a third model in the temperature mean
 FINAL8 = dict(FINAL7, model_weights=30)                                                                  # phase N (A27): HRRR, NBM and GFS weighted per station by their 30-day error
 FINAL8B = dict(FINAL6, model_weights=30)                                                                 # phase N: HRRR and NBM only, weighted per station
+FINAL8C = dict(FINAL8, model_weights_cold=365)                                                           # phase N: on cold days, weights from the cold hours of the last year
 
 
 def final3b_models(ba: str | None) -> list:
@@ -432,6 +435,11 @@ def mw3_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL8, "final8")
 
 
+def mw3c_models(ba: str | None) -> list:
+    """Phase N: three models weighted per station, with cold-day weights from the cold hours of the last year."""
+    return _final3_models(ba, FINAL8C, "final8c")
+
+
 def mw2_models(ba: str | None) -> list:
     """Phase N: the HRRR and the NBM weighted per station (no GFS), to separate the weighting from the third model."""
     return _final3_models(ba, FINAL8B, "final8b")
@@ -466,7 +474,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models,
     "tbias": final2_models,
 }
 
@@ -556,7 +564,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -791,6 +799,11 @@ def main(argv=None) -> int:
                  "Phase N: the HRRR and the NBM weighted per station by their recent error", g_common +
                  "`final8b` is `final6` with the weights of the HRRR and the NBM set per station and per day as the inverse of each "
                  "model's mean squared error over the last 30 days known at the cut-off; no GFS. Compare with `docs/phase_k_nbm_blend.md`.")
+    mw3c = report({"mw3c"}, a.results.parent / "phase_n_weights3_cold", a.doc.parent / "phase_n_weights3_cold.md",
+                  "Phase N: station weights, with cold-day weights from the cold hours", g_common +
+                  "`final8c` is `final8` (HRRR, NBM and GFS weighted per station by their 30-day error) except on days whose temperature "
+                  "path dips below 25 F: there the weights come from each model's error on the observed hours below 25 F over the last "
+                  "365 days known at the cut-off (at least 48 such hours, else the 30-day weights). Compare with `docs/phase_n_weights3.md`.")
     frozen7 = report({"frozen7"}, a.results.parent / "frozen7_2023_2025", a.doc.parent / "frozen_evaluation_v6.md",
                      "Sixth look at 2023 to 2025: the recipe after phase M, under protocol v2",
                      "Development BAs: " + common +
@@ -837,7 +850,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c)):
         log("no rows to report")
         return 1
     if waiting:
