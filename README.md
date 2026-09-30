@@ -246,6 +246,10 @@ A 0.7 weight on the NBM and a correction of the NBM by its own cold-hour bias we
 
 The GFS 0.25 degree temperature was read at the same stations from its public archive (2021 to 2025) and verified: it errs more than the HRRR at the point (MAE 3.30 F against 3.12 F; the NBM 2.05 F, `docs/gfs_verification.md`) and is the warmest of the three on cold mornings. Averaged with the HRRR and the NBM, equal weight, on the six BAs of phase L it is worse than the phase K recipe by 0.02 over the year, 0.04 in winter and 0.05 on the coldest mornings; only FPL gains (0.17). Not adopted (`docs/methods.md`, section 8k; `docs/phase_m_strata.md`). The recipe stays `final6`.
 
+## Phase N: the weather models weighted per station
+
+The temperature path became the mean of the HRRR, the NBM and the GFS weighted, per station and per day, by the inverse of each model's squared error at that station's observations over the last 30 days known at the cut-off, with the GFS left out on days below the station's cold decile (`docs/methods.md`, section 8l; `docs/phase_n_strata_all.md`). Weighting the HRRR and the NBM alone changes nothing; the GFS, let in where it helps and kept out of the cold, gains 0.02 over the year on the eleven BAs (8 better, 1 worse), 0.06 in summer and 0.08 at the largest peaks, with the whole distribution slightly sharper; the event days and the coldest mornings do not move. The recipe is now `final8`.
+
 ## Layout
 
 | Module | Responsibility |

@@ -26,7 +26,7 @@ not used in any modelling decision.
 | Cut-off | load through the hour beginning 08:00 local of the day before the target day | what a forecaster running at 9 a.m. has |
 | Weather forecast | the latest HRRR run among 12 and 06 UTC whose initialisation plus 2 h is not after 09:00 local of the day before, with the UTC offset the EIA files carry for that day | 2 h is the time a 48 h run takes to finish; the rule gives 12 UTC everywhere except the Eastern zone in daylight time (06 UTC); leads are 17 to 45 h |
 | National Blend of Models (NBM), NOAA: 2 m temperature at the same stations, 12 and 06 UTC runs, hourly to 36 h and three-hourly beyond (public archive on AWS, one GeoTIFF per element and hour; version trees 4.0 to 4.3) | averaged hour by hour with the HRRR path from phase K on; 7.5 % of the runs are absent from the archive (mostly July to October 2022 and 16 to 21 January 2024) and those days use the HRRR alone |
-| Global Forecast System (GFS), NOAA: 0.25 degree 2 m temperature at the nearest grid point of the same stations, 06 and 12 UTC runs, hourly (three-hourly before 23 March 2021; public archive on AWS from 1 January 2021) | tried as a third model in the temperature mean in phase M and not adopted (section 8k); verified against the observations in `docs/gfs_verification.md` |
+| Global Forecast System (GFS), NOAA: 0.25 degree 2 m temperature at the nearest grid point of the same stations, 06 and 12 UTC runs, hourly (three-hourly before 23 March 2021; public archive on AWS from 1 January 2021) | in the temperature mean from phase N on, weighted per station by its recent error and left out on the station's coldest days (section 8l); an equal-weight mean was tried in phase M and not adopted (section 8k); verified against the observations in `docs/gfs_verification.md` |
 | Evaluation period | from 2 December 2020 | the public Zarr archive has 48 h runs only from that day; from August 2018 to then runs reach 36 h, and a 9 a.m. cut-off needs at least 39 h to cover the target day |
 | Temperature path | 39 hours of the same run, from 09:00 of the day before to 23:00 of the target day | lags and moving averages of temperature need the rest of the day before; the forecaster had those hours too |
 | Observed temperature | NOAA ISD-Lite; used to train, never to forecast | standard practice: train on observations, run on forecasts |
@@ -168,7 +168,9 @@ ten BAs it changes the annual mean by 0.01 point.
 | NBM path corrected by its own cold-hour bias (phase L, six BAs) | no change | not adopted (section 8j) |
 | NBM dew point and wind blended into the humidity and wind fields (phase L, four BAs) | 0.001 over the year, 0.002 worse in summer | not adopted (section 8j) |
 | NBM irradiance in place of the cloud fraction in the PV term (phase L, ISO-NE and CAISO) | worse by 0.041 over the year | not adopted (section 8j) |
-| GFS 0.25 degree temperature as a third model in the temperature mean, equal weight (phase M, six BAs) | worse by 0.020 over the year, 0.038 in winter, 0.052 on the coldest mornings; FPL alone gains 0.17 | not adopted (section 8k) |
+| GFS 0.25 degree temperature as a third model in the temperature mean, equal weight (phase M, six BAs) | worse by 0.020 over the year, 0.038 in winter, 0.052 on the coldest mornings; FPL alone gains 0.17 | not adopted (section 8k); adopted with station weights and a cold rule in phase N (section 8l) |
+| HRRR and NBM weighted per station by their recent error, no GFS (phase N, six BAs) | 0.002 over the year, 2 BAs better and 2 worse | not adopted (section 8l): the two err too alike |
+| Cold-day station weights from the hours below 25 F of the last year (phase N, six BAs) | the same as the 30-day weights: the rule barely fires in the Southeast | not adopted (section 8l) |
 
 ## 8a. The recipe in one run
 
@@ -281,6 +283,33 @@ The GFS 0.25 degree 2 m temperature (NOAA; public archive on AWS from 1 January 
 | 30 largest peaks | 2.259 | 2.248 | 0.011 | 4 / 2 |
 
 By BA over the year: FPL gains 0.17 (3.52 to 3.35) and TVA 0.02; PJM, MISO and Duke lose 0.01 to 0.03 and SPP 0.13. The peak under-forecast in the storms deepens (-2.84 to -3.01 %), most at Duke (-3.0 to -3.9 %). Not adopted. A model that errs more than the HRRR at the point and is warm in the cold dilutes the NBM, and an equal-weight mean has no way to know it; FPL, where the HRRR and the NBM both have trouble at coastal stations, is the one place a third opinion helps, and that stays as a note for a station-wise choice of models. Days before 1 January 2021 have no GFS and would be forecast as in `final6`. The recipe stays `final6`.
+
+## 8l. Phase N: the weather models weighted per station
+
+Phase M showed that an equal-weight mean has no way to know where each model is good: the GFS helped at FPL and hurt at SPP, and in phase L a heavier NBM helped at Duke and hurt at FPL. Phase N lets the station's own observations decide. For each station and each day, the temperature path is the mean of the models (HRRR, NBM, GFS) weighted by the inverse of each model's mean squared error at that station's observations over the hours of the last 30 days known at the cut-off on which every model and the observation exist (a Bates-Granger combination without covariances; `information_set.model_weights`, `cutoff.weighted_paths`); with fewer than 240 such hours the weights are equal. Each model's forecast "as seen" is the run available at each day's cut-off, so the errors are those a forecaster could have measured. Two refinements were tried on the six BAs of phase L (`docs/phase_n_weights3.md`, `docs/phase_n_weights2.md`, `docs/phase_n_weights3_cold.md`, `docs/phase_n_weights3_q.md`, and the `_strata` files):
+
+| Recipe | Year MAPE | Winter | Summer | Event days | Coldest mornings | Largest peaks | BAs better / worse (year) |
+|---|---|---|---|---|---|---|---|
+| `final8`: HRRR, NBM, GFS weighted, 30 days | 0.010 | worse by 0.032 | 0.054 | worse by 0.046 | worse by 0.048 | 0.035 | 4 / 2 |
+| `final8b`: HRRR and NBM weighted, no GFS | 0.002 | 0.003 | worse by 0.008 | 0.015 | 0.025 | worse by 0.040 | 2 / 2 |
+| `final8c`: as `final8`, cold-day weights from the hours below 25 F of the last year | 0.012 | worse by 0.026 | 0.054 | worse by 0.053 | worse by 0.042 | 0.033 | 4 / 2 |
+| `final8q`: as `final8`, the GFS left out on days below the station's cold decile | 0.016 | worse by 0.014 | 0.054 | worse by 0.002 | worse by 0.002 | 0.037 | 4 / 1 |
+
+Differences against `final6` on the same days of 2020 to 2022, positive when `final8x` is better. Weighting the HRRR and the NBM against each other does nothing (`final8b`), as the fixed 0.7 weight of phase L had already said: the two err too alike for the weights to choose. All the gain of `final8` comes from the GFS entering where it helps (summer, the largest peaks, FPL by 0.15 and TVA by 0.06) and all its loss from the GFS entering on cold days, where the recent squared error does not see its rare warm failures; an absolute cold rule (`final8c`) barely fires in the Southeast. The relative rule of `final8q` keeps the GFS out of the mean on a day whose path minimum falls below the tenth percentile of the station's observed daily minima over the last 365 days known at the cut-off: it keeps the summer and peak gains and removes the loss on event days and cold mornings.
+
+`final8q` was then run on the eleven BAs against `final6` on the same days (`docs/phase_n_strata_all.md`):
+
+| Stratum | `final6` MAPE | `final8q` MAPE | Difference | BAs better / worse |
+|---|---|---|---|---|
+| Year | 2.286 | 2.264 | 0.021 | 8 / 1 |
+| Winter | 2.454 | 2.462 | worse by 0.009 | 3 / 7 |
+| Summer | 2.405 | 2.346 | 0.059 | 8 / 2 |
+| Shoulder | 2.070 | 2.060 | 0.010 | 5 / 3 |
+| Event days | 4.253 | 4.257 | worse by 0.004 | 4 / 6 |
+| 30 coldest mornings | 3.256 | 3.241 | 0.015 | 6 / 5 |
+| 30 largest peaks | 2.277 | 2.199 | 0.078 | 9 / 2 |
+
+CRPS 1.49 to 1.48 %, Winkler 13.7 to 13.6 %, coverage unchanged at 88.7 %. By BA over the year: FPL 0.14, CAISO 0.08, ISO-NE 0.08, TVA 0.06, Duke 0.04, PJM 0.04, ERCOT 0.01, NYISO 0.01, BPA 0.00, MISO worse by 0.01, SPP worse by 0.09 (the GFS enters on the mild days of the plains and does not help there). The peak under-forecast on event days goes from -2.65 to -2.76 % (Elliott -3.25 to -3.45 %, Uri unchanged): the weighting does not touch the limitation that has stood since phase I. Adopted as `final8` (the recipe is `final8q`): a broad gain over the year, in summer, at the largest peaks and in the whole distribution, at a small and local cost.
 
 ## 9. Limitations
 
