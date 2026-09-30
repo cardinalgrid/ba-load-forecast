@@ -171,6 +171,8 @@ ten BAs it changes the annual mean by 0.01 point.
 | GFS 0.25 degree temperature as a third model in the temperature mean, equal weight (phase M, six BAs) | worse by 0.020 over the year, 0.038 in winter, 0.052 on the coldest mornings; FPL alone gains 0.17 | not adopted (section 8k); adopted with station weights and a cold rule in phase N (section 8l) |
 | HRRR and NBM weighted per station by their recent error, no GFS (phase N, six BAs) | 0.002 over the year, 2 BAs better and 2 worse | not adopted (section 8l): the two err too alike |
 | Cold-day station weights from the hours below 25 F of the last year (phase N, six BAs) | the same as the 30-day weights: the rule barely fires in the Southeast | not adopted (section 8l) |
+| A storm member: a boosting model fitted on the coldest decile of days, used on such days only (phase O, six BAs) | event days 0.007 better, peak under-forecast deeper (-2.98 to -3.09 %) | not adopted (section 8m) |
+| A separate adaptive band level on the cold-decile days (phase O, six BAs) | coldest mornings' coverage 79.7 to 78.4 %: the level oscillates | not adopted (section 8m) |
 
 ## 8a. The recipe in one run
 
@@ -312,6 +314,22 @@ Differences against `final6` on the same days of 2020 to 2022, positive when `fi
 CRPS 1.49 to 1.48 %, Winkler 13.7 to 13.6 %, coverage unchanged at 88.7 %. By BA over the year: FPL 0.14, CAISO 0.08, ISO-NE 0.08, TVA 0.06, Duke 0.04, PJM 0.04, ERCOT 0.01, NYISO 0.01, BPA 0.00, MISO worse by 0.01, SPP worse by 0.09 (the GFS enters on the mild days of the plains and does not help there). The peak under-forecast on event days goes from -2.65 to -2.76 % (Elliott -3.25 to -3.45 %, Uri unchanged): the weighting does not touch the limitation that has stood since phase I. Adopted as `final8` (the recipe is `final8q`): a broad gain over the year, in summer, at the largest peaks and in the whole distribution, at a small and local cost.
 
 On 2023 to 2025 under protocol v2 (`docs/frozen_evaluation_v6.md`, `docs/phase_n_frozen_strata.md`; a sixth look at those years, so an estimate) `final8` gives **2.20 % against 2.90 %** for `DF` (median 1.90 % against 2.50 %) and beats `final6` on the same days by 0.016 over the three years, better at ten BAs and equal at MISO: winter 0.018, summer 0.014, shoulder 0.015, the event days 0.043 (Gerri and Heather 3.71 to 3.66 %, January 2025 2.59 to 2.55 %) with the peak under-forecast on those days from -2.38 to -2.32 %, the 30 coldest mornings 0.042; the 30 largest peaks are the one stratum that loses (2.01 to 2.05 %, peak under-forecast -1.50 to -1.61 %). CRPS 1.44 to 1.43 %, Winkler 13.1 to 13.0 %, coverage 89.3 to 89.2 %. The gain is smaller than in development and spread thinner, and it reaches the winter and the storms there, where development had shown none.
+
+## 8m. Phase O: a storm member, and the band on the coldest days
+
+**A storm member.** The under-forecast at the peak on event days (-2.3 to -3.0 %) has not moved through phases I to N, and phase J had shown that weighting the cold days more inside the members does not move it either. Phase O tried a member of its own: a boosting model fitted on the days of the training window whose observed minimum is in the coldest decile (at least 40 such days), which answers only on a target day whose forecast minimum is at or below that threshold and is left out of the ensemble on every other day (`Boosting(cold_only=0.10)`; the same option exists for the additive model). On the six winter BAs (PJM, MISO, SPP, Duke, TVA, ERCOT) against the phase N recipe on the same days (`docs/phase_o_storm.md`, `docs/phase_o_storm_strata.md`): year 0.001 worse, event days 0.007 better (2 BAs better, 4 worse) with the peak under-forecast deeper (-2.98 to -3.09 %; ERCOT -3.99 to -4.92 %), the coldest mornings 0.007 better. On the days it answers the storm member alone errs 2.7 to 3.7 %, well above the ensemble on those same days, and it enters with about a quarter of the weight when it has no recent record: it dilutes rather than corrects. Not adopted. The reading that stays is that the peak under-forecast in the storms is not a lack of cold examples in the training set but the limit of what the point temperature forecast explains on those days.
+
+**The band on the coldest days.** The 90 % interval covers 72 % of the hours on the event days and 80 % on the 30 coldest mornings of the development years (86 % in winter, 89 % over the year). Four changes to `AdaptiveIntervals` were tried on the same six BAs against the phase N recipe, which leave the point forecast untouched (`docs/phase_o_band_*.md` and the `_strata` files):
+
+| Change on the days whose forecast minimum is in the coldest decile | Coverage, event days | Coverage, coldest mornings | Winkler, event days | Winkler, year |
+|---|---|---|---|---|
+| none (phase N recipe) | 71.9 % | 79.7 % | 28.9 | 13.12 |
+| `final10a`: the adaptive miscoverage level halved (a nominal 95 % band) | 73.9 % | 81.4 % | 27.3 | 13.14 |
+| `final10b`: a separate adaptive level tracked on the cold days alone (step 0.10) | 73.6 % | 78.4 % | 28.8 | 13.14 |
+| `final10a2`: the level quartered (a nominal 97.5 % band) | 75.0 % | 82.4 % | 26.4 | 13.16 |
+| `final10a2t`: the level quartered and the outer quantiles read from an exponential tail fitted beyond the pool's 10th and 90th percentiles | 78.7 % | 85.0 % | 25.7 | 13.28 |
+
+The separate adaptive level oscillates: fed by few, large updates it narrows the band after a well-covered cold day, which is what the coldest mornings cannot afford. The fixed scale works, with diminishing returns, because with 40 nearest days a 1.25 % quantile is the extreme of the sample and the band cannot pass the largest error seen; the exponential tail on those days lifts that ceiling, brings the event-day coverage from 72 to 79 % (up at all six BAs; Winkler down at all six) and the coldest mornings to the 85 % the study had set as its target, for 0.16 of Winkler over the year (1.2 %) and 0.56 in winter, since the tail widens all the cold-decile days and the storms are few of them. `final10a2t` is the candidate; the NBM temperature spread as a width factor and the 2023 to 2025 check follow below.
 
 ## 9. Limitations
 
