@@ -71,7 +71,6 @@ def test_adaptive_cold_level_is_tracked_apart():
     later.load_history.loc[info.timestamps] = 1300.0                          # the cold day missed every hour
     ai.update_alpha(later)
     assert ai.alphas["cold"] < before - 0.05                                  # the cold level fell by about cold_gamma * (0.1 - 1)
-    assert abs(ai.alphas.get(None, ai.target) - ai.alphas.get(None, ai.target)) < 1e-9
 
 
 def test_spread_factor_scales_the_half_widths():
