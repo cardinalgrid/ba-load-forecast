@@ -849,6 +849,8 @@ class Loader:
                     sources.append(nbm_path(grows, day, off_path, grun, column="gfs_temp_f"))
                     names.append("gfs")
                     paths[icao] = np.where(np.isfinite(mean_paths(sources)), mean_paths(sources), paths[icao])
+            elif gfs_out and len(sources) > 1:                         # a cold day without the GFS: the equal mean of the rest
+                paths[icao] = np.where(np.isfinite(mean_paths(sources)), mean_paths(sources), paths[icao])
             if self.model_weight_days and len(sources) > 1:
                 w = self.station_weights(ba, icao, day, float(np.nanmin(paths[icao])) if np.isfinite(paths[icao]).any() else np.nan)
                 if w is not None and all(n in w for n in names):
