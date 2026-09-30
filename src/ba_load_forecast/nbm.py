@@ -35,7 +35,8 @@ from .hrrr import days_between, run_file, with_retries
 
 BASE = "https://noaa-nbm-pds.s3.amazonaws.com/"
 VERSIONS = ("4.3", "4.2", "4.1", "4.0", "3.2")          # newest first: the first tree that has the run wins
-ELEMENTS = {"nbm_temp_f": "temp", "nbm_dewpoint_f": "dewpoint", "nbm_wind_mph": "windspd", "nbm_dswrf_wm2": "dswrf"}
+ELEMENTS = {"nbm_temp_f": "temp", "nbm_dewpoint_f": "dewpoint", "nbm_wind_mph": "windspd", "nbm_dswrf_wm2": "dswrf",
+            "nbm_tempstd_f": "tempstddev"}                           # the blend spread of the 2 m temperature, F
 NODATA = -9999
 
 # Lambert conformal conic of the CONUS grid, from the GeoTIFF keys

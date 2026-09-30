@@ -43,7 +43,7 @@ def main(argv=None) -> int:
     ap.add_argument("--init-hours", type=int, nargs="+", default=[12, 6])
     ap.add_argument("--max-lead", type=int, default=45)
     ap.add_argument("--min-lead", type=int, default=1, help="17 keeps only the target-day hours of a 9 a.m. cut-off")
-    ap.add_argument("--element", default="nbm_temp_f", choices=["nbm_temp_f", "nbm_dewpoint_f", "nbm_wind_mph", "nbm_dswrf_wm2"],
+    ap.add_argument("--element", default="nbm_temp_f", choices=["nbm_temp_f", "nbm_dewpoint_f", "nbm_wind_mph", "nbm_dswrf_wm2", "nbm_tempstd_f"],
                     help="output column (archive element): temp, dewpoint, windspd, dswrf")
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--consolidate", action="store_true", help="gather runs/*.parquet into <ICAO>.parquet and stop")
