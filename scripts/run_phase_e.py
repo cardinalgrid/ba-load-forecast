@@ -97,7 +97,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST}
 
 
 def nbm_options(group: str) -> dict:
@@ -274,6 +274,7 @@ FINAL10A = dict(FINAL8Q, intervals=dict(FINAL8Q["intervals"], cold_level="scale"
 FINAL10B = dict(FINAL8Q, intervals=dict(FINAL8Q["intervals"], cold_level="adaptive", cold_gamma=0.10))     # A1: a separate adaptive level on cold days
 FINAL10S = dict(FINAL8Q, nbm_spread=True, intervals=dict(FINAL8Q["intervals"], spread_beta=1.0))            # A24c: the NBM spread as the width factor
 FINAL10AS = dict(FINAL10S, intervals=dict(FINAL10S["intervals"], cold_level="scale", cold_alpha_scale=0.5))  # A1 + A24c
+FINAL10AST = dict(FINAL10S, intervals=dict(FINAL10S["intervals"], cold_level="scale", cold_alpha_scale=0.25, cold_tail=True))  # A24c on top of the A1 candidate
 FINAL10A2 = dict(FINAL8Q, intervals=dict(FINAL8Q["intervals"], cold_level="scale", cold_alpha_scale=0.25))    # A1: the level quartered on cold days
 FINAL10A2T = dict(FINAL10A2, intervals=dict(FINAL10A2["intervals"], cold_tail=True))                        # A1: the quartered level and the exponential tail on cold days
 
@@ -486,6 +487,10 @@ def band_as_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL10AS, "final10as")
 
 
+def band_ast_models(ba: str | None) -> list:
+    return _final3_models(ba, FINAL10AST, "final10ast")
+
+
 def storm_models(ba: str | None) -> list:
     """Phase O: the phase N recipe with a boosting storm member (fitted on the cold decile, used on cold days)."""
     return _final3_models(ba, FINAL9, "final9")
@@ -535,7 +540,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models,
     "tbias": final2_models,
 }
 
@@ -625,7 +630,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -905,6 +910,10 @@ def main(argv=None) -> int:
     band_as = report({"band_as"}, a.results.parent / "phase_o_band_as", a.doc.parent / "phase_o_band_as.md",
                      "Phase O: the halved level on cold days and the NBM spread factor", g_common + band_common +
                      "`final10as` combines `final10a` and `final10s`. Compare with `docs/phase_o_band_a.md` and `docs/phase_o_band_s.md`.")
+    band_ast = report({"band_ast"}, a.results.parent / "phase_o_band_ast", a.doc.parent / "phase_o_band_ast.md",
+                      "Phase O: the NBM spread factor on top of the quartered level and the cold tail", g_common + band_common +
+                      "`final10ast` combines `final10a2t` (the level quartered and the exponential tail on cold days) with the NBM spread as the "
+                      "width factor. Compare with `docs/phase_o_band_a2t.md` and `docs/phase_o_band_s.md`.")
     frozen8 = report({"frozen8"}, a.results.parent / "frozen8_2023_2025", a.doc.parent / "frozen_evaluation_v6.md",
                      "Sixth look at 2023 to 2025: the recipe after phase N, under protocol v2",
                      "Development BAs: " + common +
@@ -957,7 +966,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as, band_ast)):
         log("no rows to report")
         return 1
     if waiting:
