@@ -311,6 +311,8 @@ Differences against `final6` on the same days of 2020 to 2022, positive when `fi
 
 CRPS 1.49 to 1.48 %, Winkler 13.7 to 13.6 %, coverage unchanged at 88.7 %. By BA over the year: FPL 0.14, CAISO 0.08, ISO-NE 0.08, TVA 0.06, Duke 0.04, PJM 0.04, ERCOT 0.01, NYISO 0.01, BPA 0.00, MISO worse by 0.01, SPP worse by 0.09 (the GFS enters on the mild days of the plains and does not help there). The peak under-forecast on event days goes from -2.65 to -2.76 % (Elliott -3.25 to -3.45 %, Uri unchanged): the weighting does not touch the limitation that has stood since phase I. Adopted as `final8` (the recipe is `final8q`): a broad gain over the year, in summer, at the largest peaks and in the whole distribution, at a small and local cost.
 
+On 2023 to 2025 under protocol v2 (`docs/frozen_evaluation_v6.md`, `docs/phase_n_frozen_strata.md`; a sixth look at those years, so an estimate) `final8` gives **2.20 % against 2.90 %** for `DF` (median 1.90 % against 2.50 %) and beats `final6` on the same days by 0.016 over the three years, better at ten BAs and equal at MISO: winter 0.018, summer 0.014, shoulder 0.015, the event days 0.043 (Gerri and Heather 3.71 to 3.66 %, January 2025 2.59 to 2.55 %) with the peak under-forecast on those days from -2.38 to -2.32 %, the 30 coldest mornings 0.042; the 30 largest peaks are the one stratum that loses (2.01 to 2.05 %, peak under-forecast -1.50 to -1.61 %). CRPS 1.44 to 1.43 %, Winkler 13.1 to 13.0 %, coverage 89.3 to 89.2 %. The gain is smaller than in development and spread thinner, and it reaches the winter and the storms there, where development had shown none.
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
