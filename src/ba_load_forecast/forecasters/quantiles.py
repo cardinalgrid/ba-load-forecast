@@ -199,9 +199,25 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  nearest: int | None = None, tail: bool = False, peak: str | None = None, peak_window: float = 0.97,
                  peak_quantile: float = 0.55, peak_quantile_cold: float | None = None, cold_decile: float = 0.10,
                  extra_levels: tuple[float, ...] = (), peak_quantile_hot: float | None = None, hot_decile: float = 0.90,
-                 cold_by_max: bool = False, cold_source: str = "path"):
+                 cold_by_max: bool = False, cold_source: str = "path", cold_level: str | None = None,
+                 cold_alpha_scale: float = 0.5, cold_gamma: float = 0.10, spread_beta: float = 0.0,
+                 spread_bounds: tuple[float, float] = (0.7, 2.0)):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
+        # cold_level: the band on the coldest days (is_cold_day). "scale": the day's level is alpha * cold_alpha_scale (a wider
+        # nominal band); "adaptive": one more adaptive level, tracked on the cold days alone with step cold_gamma, so that the
+        # misses of the storms widen the next cold days only. spread_beta > 0: the half-widths are multiplied by
+        # (nbm_spread_f / median spread of the pool days) ** spread_beta, clipped to spread_bounds (the NBM blend spread as a
+        # measure of how uncertain the weather is on the day)
+        if cold_level not in (None, "scale", "adaptive"):
+            raise ValueError("cold_level must be None, 'scale' or 'adaptive'")
+        self.cold_level = cold_level
+        self.cold_alpha_scale = cold_alpha_scale
+        self.cold_gamma = cold_gamma
+        self.spread_beta = spread_beta
+        self.spread_bounds = spread_bounds
+        self._cold: set[date] = set()
+        self._spread: dict[date, float] = {}
         self.target = target
         self.gamma = gamma
         self.alpha_by_regime = alpha_by_regime
@@ -230,7 +246,9 @@ class AdaptiveIntervals(EmpiricalIntervals):
     def alpha(self) -> float:
         return self.alphas.get(None, self.target)
 
-    def level_key(self, d: date) -> int | None:
+    def level_key(self, d: date) -> int | str | None:
+        if self.cold_level == "adaptive" and d in self._cold:
+            return "cold"
         return self._regime.get(d) if self.alpha_by_regime else None
 
     def update_alpha(self, info: InformationSet) -> None:
@@ -246,10 +264,13 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 continue
             miss = float(((actual[ok] < lo[ok]) | (actual[ok] > hi[ok])).mean())
             key = self.level_key(d)
-            self.alphas[key] = float(np.clip(self.alphas.get(key, self.target) + self.gamma * (self.target - miss), 0.005, 0.5))
+            gamma = self.cold_gamma if key == "cold" else self.gamma
+            self.alphas[key] = float(np.clip(self.alphas.get(key, self.target) + gamma * (self.target - miss), 0.005, 0.5))
         for d in [d for d in self._issued if d < info.day - timedelta(days=self.window_days + 40)]:
             del self._issued[d]
             self._scored.discard(d)
+            self._cold.discard(d)
+            self._spread.pop(d, None)
 
     def pool_days(self, info: InformationSet) -> list[date]:
         days = super().pool_days(info)
@@ -356,18 +377,43 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 shift[h] = p[h] * (float(np.quantile(eh, level)) - float(np.median(eh)))
         return q + np.maximum(shift, 0.0)[None, :]
 
+    def spread_factor(self, info: InformationSet, days: list[date]) -> float:
+        """The width factor of the day from the NBM spread, against the median spread of the pool days (1 when unknown)."""
+        s = float(getattr(info, "nbm_spread_f", np.nan))
+        self._spread[info.day] = s
+        if self.spread_beta <= 0 or not np.isfinite(s):
+            return 1.0
+        known = np.array([self._spread.get(d, np.nan) for d in days], dtype=float)
+        known = known[np.isfinite(known)]
+        if len(known) < self.min_days:
+            return 1.0
+        ref = float(np.median(known))
+        if not ref > 0:
+            return 1.0
+        return float(np.clip((s / ref) ** self.spread_beta, *self.spread_bounds))
+
     def predict_quantiles(self, info: InformationSet) -> np.ndarray:
         p = self.predict(info)
         self.update_alpha(info)
+        if self.cold_level and self.is_cold_day(info):
+            self._cold.add(info.day)
         alpha = self.alphas.get(self.level_key(info.day), self.target)
+        if self.cold_level == "scale" and info.day in self._cold:
+            alpha = max(alpha * self.cold_alpha_scale, 0.005)
         days = self.pool_days(info)
         e = self.errors_of(info, days)
+        factor = self.spread_factor(info, days)
         q = self.band(p, e, (alpha / 2.0, 0.5, 1.0 - alpha / 2.0))
+        if factor != 1.0:
+            q = q[1][None, :] + (q - q[1][None, :]) * factor
         if self.peak:
             q = self.peak_adjust(info, p, e, q, days)
         self._issued[info.day] = (q[0], q[-1])
         if self.extra_levels:
             qx = self.band(p, e, self.extra_levels)
+            if factor != 1.0:
+                mid = self.band(p, e, (0.5,))[0]
+                qx = mid[None, :] + (qx - mid[None, :]) * factor
             if self.peak:
                 qx = qx + (q[1] - self.band(p, e, (0.5,))[0])[None, :]     # the same peak shift as the band
             self.last_extra = (info.day, qx)

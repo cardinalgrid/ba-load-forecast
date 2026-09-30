@@ -97,7 +97,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS}
 
 
 def nbm_options(group: str) -> dict:
@@ -123,6 +123,8 @@ def nbm_options(group: str) -> dict:
         out["model_weight_cold_days"] = c["model_weights_cold"]
     if c.get("gfs_cold_quantile"):
         out["gfs_cold_quantile"] = c["gfs_cold_quantile"]
+    if c.get("nbm_spread"):
+        out["nbm_spread_dir"] = DATA / "nbm_tempstd"
     return out
 
 
@@ -268,6 +270,10 @@ FINAL8C = dict(FINAL8, model_weights_cold=365)                                  
 FINAL8Q = dict(FINAL8, gfs_cold_quantile=0.10)                                                           # phase N: the GFS leaves the mean on days below the station's cold decile
 FINAL9 = dict(FINAL8Q, storm="boosting")                                                                # phase O (A9): a boosting member fitted on the cold decile, used on cold days
 FINAL9B = dict(FINAL8Q, storm="both")                                                                   # phase O: a boosting and an additive storm member
+FINAL10A = dict(FINAL8Q, intervals=dict(FINAL8Q["intervals"], cold_level="scale", cold_alpha_scale=0.5))     # A1: the nominal level halved on cold days
+FINAL10B = dict(FINAL8Q, intervals=dict(FINAL8Q["intervals"], cold_level="adaptive", cold_gamma=0.10))     # A1: a separate adaptive level on cold days
+FINAL10S = dict(FINAL8Q, nbm_spread=True, intervals=dict(FINAL8Q["intervals"], spread_beta=1.0))            # A24c: the NBM spread as the width factor
+FINAL10AS = dict(FINAL10S, intervals=dict(FINAL10S["intervals"], cold_level="scale", cold_alpha_scale=0.5))  # A1 + A24c
 
 
 def final3b_models(ba: str | None) -> list:
@@ -454,6 +460,22 @@ def mw3c_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL8C, "final8c")
 
 
+def band_a_models(ba: str | None) -> list:
+    return _final3_models(ba, FINAL10A, "final10a")
+
+
+def band_b_models(ba: str | None) -> list:
+    return _final3_models(ba, FINAL10B, "final10b")
+
+
+def band_s_models(ba: str | None) -> list:
+    return _final3_models(ba, FINAL10S, "final10s")
+
+
+def band_as_models(ba: str | None) -> list:
+    return _final3_models(ba, FINAL10AS, "final10as")
+
+
 def storm_models(ba: str | None) -> list:
     """Phase O: the phase N recipe with a boosting storm member (fitted on the cold decile, used on cold days)."""
     return _final3_models(ba, FINAL9, "final9")
@@ -503,7 +525,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models,
     "tbias": final2_models,
 }
 
@@ -593,7 +615,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_b", "band_s", "band_as") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -847,6 +869,23 @@ def main(argv=None) -> int:
     storm2 = report({"storm2"}, a.results.parent / "phase_o_storm2", a.doc.parent / "phase_o_storm2.md",
                     "Phase O: two storm members", g_common +
                     "`final9b` is `final9` with a second storm member, the additive model fitted on the same cold decile. Compare with `docs/phase_o_storm.md`.")
+    band_common = ("The band on the coldest days, where the 90 % interval has covered 77 to 82 % of the hours in the storms. ")
+    band_a = report({"band_a"}, a.results.parent / "phase_o_band_a", a.doc.parent / "phase_o_band_a.md",
+                    "Phase O: the nominal level halved on cold days", g_common + band_common +
+                    "`final10a` reads the band at half the adaptive miscoverage level on the days whose forecast minimum is in the coldest decile "
+                    "(a nominal 95 % band on a 90 % target), everything else as the phase N recipe. Compare with `docs/phase_n_weights3_q.md`.")
+    band_b = report({"band_b"}, a.results.parent / "phase_o_band_b", a.doc.parent / "phase_o_band_b.md",
+                    "Phase O: a separate adaptive level on cold days", g_common + band_common +
+                    "`final10b` tracks one more adaptive level on the cold-decile days alone (step 0.10 instead of 0.02), so that the misses of "
+                    "the storms widen the next cold days and not the mild ones. Compare with `docs/phase_n_weights3_q.md`.")
+    band_s = report({"band_s"}, a.results.parent / "phase_o_band_s", a.doc.parent / "phase_o_band_s.md",
+                    "Phase O: the NBM spread as the width factor", g_common + band_common +
+                    "`final10s` multiplies the half-widths of the band by the ratio of the day's NBM temperature spread (the blend's standard "
+                    "deviation, mean over the day and the stations) to the median spread of the pool days, clipped to 0.7 to 2. "
+                    "Compare with `docs/phase_n_weights3_q.md`.")
+    band_as = report({"band_as"}, a.results.parent / "phase_o_band_as", a.doc.parent / "phase_o_band_as.md",
+                     "Phase O: the halved level on cold days and the NBM spread factor", g_common + band_common +
+                     "`final10as` combines `final10a` and `final10s`. Compare with `docs/phase_o_band_a.md` and `docs/phase_o_band_s.md`.")
     frozen8 = report({"frozen8"}, a.results.parent / "frozen8_2023_2025", a.doc.parent / "frozen_evaluation_v6.md",
                      "Sixth look at 2023 to 2025: the recipe after phase N, under protocol v2",
                      "Development BAs: " + common +
@@ -899,7 +938,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_b, band_s, band_as)):
         log("no rows to report")
         return 1
     if waiting:

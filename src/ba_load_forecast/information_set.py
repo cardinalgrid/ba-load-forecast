@@ -132,6 +132,7 @@ class InformationSet:
     weather: pd.DataFrame | None = None                        # dewpoint_f, wind_ms: observed over the history, the HRRR path after
     run_second: tuple[date, int] | None = None                 # with Loader(second_run=True): the older run blended into the paths
     nbm_daily: dict[str, float] | None = None                  # with Loader(nbm_daily_dir): the NBM daily products of the day, BA mean
+    nbm_spread_f: float = np.nan                               # with Loader(nbm_spread_dir): the NBM temperature spread of the day, F, BA mean
 
     @property
     def cutoff(self) -> datetime:
@@ -312,7 +313,7 @@ class Loader:
                  nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None,
                  gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0,
                  model_weight_cold_days: int = 0, model_weight_cold_threshold_f: float = 25.0,
-                 gfs_cold_quantile: float = 0.0):
+                 gfs_cold_quantile: float = 0.0, nbm_spread_dir: Path | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -360,6 +361,10 @@ class Loader:
         # cold decile of the intervals); the GFS is warm on cold mornings and the recent-error weights do not see it
         self.gfs_cold_quantile = float(gfs_cold_quantile)
         self._daily_min: dict[tuple[str, str], pd.Series] = {}
+        # nbm_spread_dir: the NBM blend spread of the 2 m temperature (tempstddev, F; nbm.extract with nbm_tempstd_f); the mean over
+        # the target day's hours and the BA's stations, from the run at the cut-off, is the day's nbm_spread_f (intervals, A24c)
+        self.nbm_spread_dir = Path(nbm_spread_dir) if nbm_spread_dir else None
+        self._nbm_spread: dict[str, pd.DataFrame] = {}
         self._model_errors: dict[tuple[str, str], dict[str, pd.Series]] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
         self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
@@ -757,6 +762,11 @@ class Loader:
             self._nbm[icao] = load_station(self.nbm_dir, icao) if self.nbm_dir else pd.DataFrame()
         return self._nbm[icao]
 
+    def nbm_spread_rows(self, icao: str) -> pd.DataFrame:
+        if icao not in self._nbm_spread:
+            self._nbm_spread[icao] = load_station(self.nbm_spread_dir, icao) if self.nbm_spread_dir else pd.DataFrame()
+        return self._nbm_spread[icao]
+
     def nbm_daily_rows(self, icao: str) -> pd.DataFrame:
         if icao not in self._nbm_daily:
             self._nbm_daily[icao] = load_daily(self.nbm_daily_dir, icao)
@@ -872,6 +882,17 @@ class Loader:
 
         weather = self.weather_frame(ba, start, day, history_index, path_ts, off_path, run, run2)
 
+        nbm_spread = np.nan
+        if self.nbm_spread_dir is not None and run is not None:
+            per_station = []
+            for icao in stations:
+                srows = self.nbm_spread_rows(icao)
+                if len(srows):
+                    sp = nbm_path(srows, day, off_path, run, column="nbm_tempstd_f")[-24:]
+                    if np.isfinite(sp).sum() >= 12:
+                        per_station.append(float(np.nanmean(sp)))
+            if per_station:
+                nbm_spread = float(np.mean(per_station))
         nbm_daily = None
         if self.nbm_daily_dir is not None and run is not None:
             per_station = [daily_at_cutoff(self.nbm_daily_rows(icao), run) for icao in stations]
@@ -912,4 +933,5 @@ class Loader:
             sky=sky, stations=stations, temp_history_stations_f=stations_hist,
             temp_forecast_path_stations_f=path_frame if len(stations) > 1 else None, weather=weather, run_second=run2,
             nbm_daily=nbm_daily,
+            nbm_spread_f=nbm_spread,
         )
