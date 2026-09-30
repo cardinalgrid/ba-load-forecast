@@ -311,7 +311,8 @@ class Loader:
                  nbm_weight: float = 0.5, nbm_cold_bias_days: int = 0, nbm_cold_threshold_f: float = 25.0,
                  nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None,
                  gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0,
-                 model_weight_cold_days: int = 0, model_weight_cold_threshold_f: float = 25.0):
+                 model_weight_cold_days: int = 0, model_weight_cold_threshold_f: float = 25.0,
+                 gfs_cold_quantile: float = 0.0):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -354,6 +355,11 @@ class Loader:
         self.model_weight_cold_days = int(model_weight_cold_days)
         self.model_weight_cold_threshold_f = float(model_weight_cold_threshold_f)
         self._cold_hours: dict[tuple[str, str], pd.Series] = {}
+        # gfs_cold_quantile: when set, the GFS leaves the temperature mean on a day whose path minimum is below that quantile
+        # of the station's observed daily minima over the last 365 days known at the cut-off (a relative cold rule, as the
+        # cold decile of the intervals); the GFS is warm on cold mornings and the recent-error weights do not see it
+        self.gfs_cold_quantile = float(gfs_cold_quantile)
+        self._daily_min: dict[tuple[str, str], pd.Series] = {}
         self._model_errors: dict[tuple[str, str], dict[str, pd.Series]] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
         self.nbm_daily_dir = Path(nbm_daily_dir) if nbm_daily_dir else None
@@ -716,8 +722,20 @@ class Loader:
                 observed = observed[~observed.index.duplicated()].sort_index().asfreq("h")
                 out = {k: (observed - v.reindex(observed.index)).dropna() for k, v in seen.items()}
                 self._cold_hours[key] = observed < self.model_weight_cold_threshold_f
+                self._daily_min[key] = observed.resample("D").min().dropna()
             self._model_errors[key] = out
         return self._model_errors[key]
+
+    def cold_threshold(self, ba: str, icao: str, day: date) -> float:
+        """The ``gfs_cold_quantile`` quantile of the station's observed daily minima over the last 365 days known at the
+        cut-off of ``day``; NaN with fewer than 60 days."""
+        self.model_errors(ba, icao)
+        mins = self._daily_min.get((ba, icao))
+        if mins is None or not len(mins):
+            return np.nan
+        end = pd.Timestamp(last_load_hour(day)).normalize() - pd.Timedelta(days=1)
+        window = mins.loc[end - pd.Timedelta(days=365):end]
+        return float(window.quantile(self.gfs_cold_quantile)) if len(window) >= 60 else np.nan
 
     def station_weights(self, ba: str, icao: str, day: date, path_min: float) -> dict[str, float] | None:
         """The models' weights at one station for ``day``: on a cold day (path minimum below the threshold) from the
@@ -820,7 +838,11 @@ class Loader:
                         names.append("nbm")
                     else:                                              # replace: NBM where known, HRRR elsewhere
                         paths[icao] = np.where(np.isfinite(npath), npath, paths[icao])
-            if self.gfs_dir is not None and not np.isnan(off_cutoff):
+            gfs_out = False
+            if self.gfs_dir is not None and self.gfs_cold_quantile and np.isfinite(paths[icao]).any():
+                threshold = self.cold_threshold(ba, icao, day)
+                gfs_out = np.isfinite(threshold) and float(np.nanmin(paths[icao])) < threshold
+            if self.gfs_dir is not None and not np.isnan(off_cutoff) and not gfs_out:
                 grows = self.gfs(icao)
                 if len(grows):
                     grun = run_for_day(day, float(off_cutoff), (12, 6), lag_h=self.gfs_lag_h)
