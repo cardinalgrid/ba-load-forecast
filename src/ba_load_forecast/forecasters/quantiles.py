@@ -201,7 +201,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  extra_levels: tuple[float, ...] = (), peak_quantile_hot: float | None = None, hot_decile: float = 0.90,
                  cold_by_max: bool = False, cold_source: str = "path", cold_level: str | None = None,
                  cold_alpha_scale: float = 0.5, cold_gamma: float = 0.10, spread_beta: float = 0.0,
-                 spread_bounds: tuple[float, float] = (0.7, 2.0)):
+                 spread_bounds: tuple[float, float] = (0.7, 2.0), cold_tail: bool = False):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         # cold_level: the band on the coldest days (is_cold_day). "scale": the day's level is alpha * cold_alpha_scale (a wider
@@ -216,6 +216,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
         self.cold_gamma = cold_gamma
         self.spread_beta = spread_beta
         self.spread_bounds = spread_bounds
+        self.cold_tail = cold_tail            # the exponential tail reading (as tail=True) on the cold-decile days only
         self._cold: set[date] = set()
         self._spread: dict[date, float] = {}
         self.target = target
@@ -284,9 +285,9 @@ class AdaptiveIntervals(EmpiricalIntervals):
             days = sorted(days, key=distance)[: self.nearest]
         return days
 
-    def band(self, p: np.ndarray, e: np.ndarray, levels: tuple[float, ...]) -> np.ndarray:
+    def band(self, p: np.ndarray, e: np.ndarray, levels: tuple[float, ...], tail: bool | None = None) -> np.ndarray:
         q = super().band(p, e, levels)
-        if not self.tail:
+        if not (self.tail if tail is None else tail):
             return q
         lo_level, hi_level = levels[0], levels[-1]
         for h in range(24):
@@ -403,14 +404,15 @@ class AdaptiveIntervals(EmpiricalIntervals):
         days = self.pool_days(info)
         e = self.errors_of(info, days)
         factor = self.spread_factor(info, days)
-        q = self.band(p, e, (alpha / 2.0, 0.5, 1.0 - alpha / 2.0))
+        tail = True if (self.cold_tail and info.day in self._cold) else None
+        q = self.band(p, e, (alpha / 2.0, 0.5, 1.0 - alpha / 2.0), tail=tail)
         if factor != 1.0:
             q = q[1][None, :] + (q - q[1][None, :]) * factor
         if self.peak:
             q = self.peak_adjust(info, p, e, q, days)
         self._issued[info.day] = (q[0], q[-1])
         if self.extra_levels:
-            qx = self.band(p, e, self.extra_levels)
+            qx = self.band(p, e, self.extra_levels, tail=tail)
             if factor != 1.0:
                 mid = self.band(p, e, (0.5,))[0]
                 qx = mid[None, :] + (qx - mid[None, :]) * factor
