@@ -97,7 +97,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B}
 
 
 def nbm_options(group: str) -> dict:
@@ -266,6 +266,8 @@ FINAL8 = dict(FINAL7, model_weights=30)                                         
 FINAL8B = dict(FINAL6, model_weights=30)                                                                 # phase N: HRRR and NBM only, weighted per station
 FINAL8C = dict(FINAL8, model_weights_cold=365)                                                           # phase N: on cold days, weights from the cold hours of the last year
 FINAL8Q = dict(FINAL8, gfs_cold_quantile=0.10)                                                           # phase N: the GFS leaves the mean on days below the station's cold decile
+FINAL9 = dict(FINAL8Q, storm="boosting")                                                                # phase O (A9): a boosting member fitted on the cold decile, used on cold days
+FINAL9B = dict(FINAL8Q, storm="both")                                                                   # phase O: a boosting and an additive storm member
 
 
 def final3b_models(ba: str | None) -> list:
@@ -339,6 +341,15 @@ def _final3_models(ba: str | None, c: dict, tag: str) -> list:
                           target="ratio" if c["ratio"] else "level", **c["boosting"], cold_weight=c.get("cold_weight", 0.0),
                           name=f"{tag}_boosting"))
     members = [add, boo]
+    if c.get("storm"):                                                # A9: members fitted on the coldest decile of days, answering on such days only
+        members.append(Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
+                                       target="ratio" if c["ratio"] else "level", **c["boosting"], cold_only=0.10,
+                                       name=f"{tag}_storm")))
+        if c["storm"] == "both":
+            members.append(Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
+                                                irradiance=solar and c.get("irradiance", False), apparent=c.get("apparent", False),
+                                                apparent_wind=c.get("apparent_wind", True), **c["additive"], cold_only=0.10,
+                                                name=f"{tag}_storm_additive")))
     if c["third_member"]:
         rec = RecencyRegression(train_days=c["train_days"])
         rec.name = f"{tag}_recency"
@@ -443,6 +454,16 @@ def mw3c_models(ba: str | None) -> list:
     return _final3_models(ba, FINAL8C, "final8c")
 
 
+def storm_models(ba: str | None) -> list:
+    """Phase O: the phase N recipe with a boosting storm member (fitted on the cold decile, used on cold days)."""
+    return _final3_models(ba, FINAL9, "final9")
+
+
+def storm2_models(ba: str | None) -> list:
+    """Phase O: the phase N recipe with a boosting and an additive storm member."""
+    return _final3_models(ba, FINAL9B, "final9b")
+
+
 def mw3q_models(ba: str | None) -> list:
     """Phase N: three models weighted per station, the GFS left out on days below the station's cold decile."""
     return _final3_models(ba, FINAL8Q, "final8q")
@@ -482,7 +503,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models,
     "tbias": final2_models,
 }
 
@@ -572,7 +593,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -817,6 +838,15 @@ def main(argv=None) -> int:
                   "`final8q` is `final8` (HRRR, NBM and GFS weighted per station by their 30-day error) except on days whose temperature "
                   "path minimum falls below the tenth percentile of the station's observed daily minima over the last 365 days known at "
                   "the cut-off: there the GFS leaves the mean and the HRRR and the NBM carry it. Compare with `docs/phase_n_weights3.md`.")
+    storm = report({"storm"}, a.results.parent / "phase_o_storm", a.doc.parent / "phase_o_storm.md",
+                   "Phase O: a storm member", g_common +
+                   "`final9` is the phase N recipe with one more ensemble member: a boosting model fitted on the days of the training window "
+                   "whose observed minimum is in the coldest decile (at least 40 such days), which answers only on a target day whose forecast "
+                   "minimum is at or below that threshold and is left out of the ensemble on every other day; its weight in the ensemble comes "
+                   "from its recent error like the others' (the mean of the others' when it has no record). Compare with `docs/phase_n_weights3_q.md`.")
+    storm2 = report({"storm2"}, a.results.parent / "phase_o_storm2", a.doc.parent / "phase_o_storm2.md",
+                    "Phase O: two storm members", g_common +
+                    "`final9b` is `final9` with a second storm member, the additive model fitted on the same cold decile. Compare with `docs/phase_o_storm.md`.")
     frozen8 = report({"frozen8"}, a.results.parent / "frozen8_2023_2025", a.doc.parent / "frozen_evaluation_v6.md",
                      "Sixth look at 2023 to 2025: the recipe after phase N, under protocol v2",
                      "Development BAs: " + common +
@@ -869,7 +899,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2)):
         log("no rows to report")
         return 1
     if waiting:

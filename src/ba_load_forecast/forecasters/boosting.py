@@ -20,6 +20,7 @@ from ..features import (
     EXTRA_TEMP_COLUMNS,
     EXTREME_COLUMNS,
     FEATURE_COLUMNS,
+    cold_only_weights,
     cold_weights,
     rows_for_days,
     target_temperature,
@@ -36,8 +37,15 @@ class Boosting:
                  max_leaf_nodes: int = 31, min_train_days: int = 120, seed: int = 0, stations: bool = True,
                  special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None,
                  extremes: bool = False, sky: bool = False, extra: tuple[str, ...] = (), min_samples_leaf: int = 20,
-                 l2: float = 0.0, target: str = "level", loss: str = "squared_error", cold_weight: float = 0.0):
+                 l2: float = 0.0, target: str = "level", loss: str = "squared_error", cold_weight: float = 0.0,
+                 cold_only: float = 0.0, min_cold_days: int = 40):
         self.cold_weight = cold_weight        # > 0: training rows of cold days weighted by features.cold_weights (alpha)
+        # cold_only > 0: a storm member. Fitted on the days whose observed minimum is in the coldest cold_only quantile of the
+        # training days alone (at least min_cold_days of them), and answering only on a target day whose forecast minimum
+        # is at or below that threshold; on every other day it raises, and an ensemble leaves it out
+        self.cold_only = cold_only
+        self.min_cold_days = min_cold_days
+        self.cold_threshold_f = np.nan
         self.loss = loss                      # "squared_error" (default) or "absolute_error": a robust fit that outlying days cannot pull
         self.extra = tuple(extra)             # optional feature blocks: "load", "temp", "humidity", "wind" (features / weather_extra)
         self.min_samples_leaf = min_samples_leaf
@@ -127,6 +135,12 @@ class Boosting:
             keep = np.isfinite(base) & (base > 0)
             rows, y = rows[keep], y[keep] / base[keep]
         weights = cold_weights(rows.index, info.temp_history_f, self.cold_weight) if self.cold_weight > 0 else None
+        if self.cold_only > 0:
+            weights, self.cold_threshold_f = cold_only_weights(rows.index, info.temp_history_f, self.cold_only)
+            keep = weights > 0
+            if not np.isfinite(self.cold_threshold_f) or keep.sum() < 24 * self.min_cold_days:
+                raise ForecastError(f"only {int(keep.sum()) // 24} cold days to fit the storm member on")
+            rows, y, weights = rows[keep], y[keep], None
         self.model = HistGradientBoostingRegressor(
             max_iter=self.max_iter, learning_rate=self.learning_rate, max_leaf_nodes=self.max_leaf_nodes,
             min_samples_leaf=self.min_samples_leaf, l2_regularization=self.l2, loss=self.loss,
@@ -140,6 +154,8 @@ class Boosting:
             raise ForecastError("no weather forecast for the day")
         if self.needs_fit(info):
             self.fit(info)
+        if self.cold_only > 0 and not (float(np.nanmin(info.temp_forecast_f)) <= self.cold_threshold_f):
+            raise ForecastError("not a cold day: the storm member stays out")
         rows = rows_for_days(info.load_history, target_temperature(info), [info.day], self._station_frames(info, target=True),
                              labels=self.day_labels(info, target=True), sky=info.sky if self.sky else None,
                              weather=self._weather(info))

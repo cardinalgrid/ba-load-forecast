@@ -200,6 +200,26 @@ def cold_weights(rows_index: pd.DatetimeIndex, temp: pd.Series, alpha: float, de
     return 1.0 + alpha * excess / scale_f
 
 
+def cold_threshold(rows_index: pd.DatetimeIndex, temp: pd.Series, decile: float = 0.10) -> float:
+    """The ``decile`` quantile of the observed daily minima over the training days (NaN when unknown)."""
+    days = pd.DatetimeIndex(rows_index).normalize()
+    tmin = temp.groupby(temp.index.normalize()).min()
+    per_day = tmin.reindex(days.unique())
+    return float(np.nanquantile(per_day.to_numpy(dtype=float), decile)) if per_day.notna().sum() else np.nan
+
+
+def cold_only_weights(rows_index: pd.DatetimeIndex, temp: pd.Series, decile: float = 0.10) -> tuple[np.ndarray, float]:
+    """One weight per training row: 1 on the days whose observed minimum is at or below the ``decile`` quantile of
+    the training days' minima, 0 elsewhere (a member fitted on the cold tail alone), and that threshold."""
+    days = pd.DatetimeIndex(rows_index).normalize()
+    threshold = cold_threshold(rows_index, temp, decile)
+    tmin = temp.groupby(temp.index.normalize()).min()
+    row_tmin = tmin.reindex(days).to_numpy(dtype=float)
+    if not np.isfinite(threshold):
+        return np.ones(len(days)), np.nan
+    return np.where(np.isfinite(row_tmin) & (row_tmin <= threshold), 1.0, 0.0), threshold
+
+
 def training_days(last: date, n_days: int) -> list[date]:
     """The ``n_days`` days ending at ``last`` (inclusive), oldest first."""
     return [last - timedelta(days=k) for k in range(n_days - 1, -1, -1)]

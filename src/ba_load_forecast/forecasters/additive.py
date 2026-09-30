@@ -26,6 +26,7 @@ from ..features import (
     EXTRA_TEMP_COLUMNS,
     EXTREME_COLUMNS,
     apparent_series,
+    cold_only_weights,
     cold_weights,
     rows_for_days,
     target_temperature,
@@ -61,8 +62,12 @@ class AdditiveModel:
                  lambdas: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0, 100.0), val_days: int = 60,
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
                  labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False,
-                 extra: tuple[str, ...] = (), apparent: bool = False, apparent_wind: bool = True, cold_weight: float = 0.0):
+                 extra: tuple[str, ...] = (), apparent: bool = False, apparent_wind: bool = True, cold_weight: float = 0.0,
+                 cold_only: float = 0.0, min_cold_days: int = 40):
         self.cold_weight = cold_weight        # > 0: training rows of cold days weighted by features.cold_weights (alpha)
+        self.cold_only = cold_only            # > 0: a storm member, as in Boosting (fitted on and answering for the cold decile only)
+        self.min_cold_days = min_cold_days
+        self.cold_threshold_f = np.nan
         self.extra = tuple(extra)             # optional linear blocks: "load", "temp", "humidity" (HUMIDITY_LINEAR); the last needs Loader(fields=...)
         self.apparent = apparent              # the smooth response on the apparent temperature (heat index, wind chill); needs Loader(fields=...)
         self.apparent_wind = apparent_wind    # False: the apparent temperature ignores the wind (heat index only) even when the wind is loaded
@@ -187,6 +192,12 @@ class AdditiveModel:
         y_all = rows["y"].to_numpy(dtype=float)
         hours = rows["hour"].to_numpy()
         weights = cold_weights(rows.index, info.temp_history_f, self.cold_weight) if self.cold_weight > 0 else None
+        if self.cold_only > 0:
+            weights, self.cold_threshold_f = cold_only_weights(rows.index, info.temp_history_f, self.cold_only)
+            keep = weights > 0
+            if not np.isfinite(self.cold_threshold_f) or keep.sum() < 24 * self.min_cold_days:
+                raise ForecastError(f"only {int(keep.sum()) // 24} cold days to fit the storm member on")
+            rows, x_all, y_all, hours, weights = rows[keep], x_all[keep], y_all[keep], hours[keep], None
         day_of = pd.DatetimeIndex(rows.index).normalize()
         cut = day_of.max() - pd.Timedelta(days=self.val_days)
         train, val = np.asarray(day_of <= cut), np.asarray(day_of > cut)
@@ -211,6 +222,8 @@ class AdditiveModel:
             raise ForecastError("no weather forecast for the day")
         if self.needs_fit(info):
             self.fit(info)
+        if self.cold_only > 0 and not (float(np.nanmin(info.temp_forecast_f)) <= self.cold_threshold_f):
+            raise ForecastError("not a cold day: the storm member stays out")
         rows = self._rows(info, target_temperature(info), [info.day], target=True)
         rows = rows.drop(columns=[c for c in EXTRA_LOAD_COLUMNS + EXTRA_TEMP_COLUMNS
                                   if c in rows.columns and c not in self._extra_columns()])
