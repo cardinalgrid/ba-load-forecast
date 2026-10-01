@@ -250,6 +250,10 @@ The GFS 0.25 degree temperature was read at the same stations from its public ar
 
 The temperature path became the mean of the HRRR, the NBM and the GFS weighted, per station and per day, by the inverse of each model's squared error at that station's observations over the last 30 days known at the cut-off, with the GFS left out on days below the station's cold decile (`docs/methods.md`, section 8l; `docs/phase_n_strata_all.md`). Weighting the HRRR and the NBM alone changes nothing; the GFS, let in where it helps and kept out of the cold, gains 0.02 over the year on the eleven BAs (8 better, 1 worse), 0.06 in summer and 0.08 at the largest peaks, with the whole distribution slightly sharper; the event days and the coldest mornings do not move. On 2023 to 2025 under protocol v2 (`docs/frozen_evaluation_v6.md`, `docs/phase_n_frozen_strata.md`, an estimate after six looks) `final8` gives **2.20 % against 2.90 %** for `DF`, ahead of the phase K recipe at ten BAs and equal at one, by 0.02 over the three years and 0.04 on the event days and the coldest mornings. The recipe is now `final8`.
 
+## Phase O: a storm member, and the band on the coldest days
+
+A boosting member fitted on the coldest decile of days and used on such days only was tried against the phase N recipe on six winter BAs and not adopted: the event days move by 0.007 and the peak under-forecast deepens (`docs/methods.md`, section 8m). The band was then reworked on the cold-decile days: the adaptive level is read at a quarter of its value and the outer quantiles come from an exponential tail fitted beyond the pool's 10th and 90th percentiles, so that the band can pass the largest error seen in the 40 nearest days. On 2023 to 2025 the 90 % interval covers the event days at 90.5 % (82.0 % before) with a lower Winkler score, and the 30 coldest mornings at 90.3 % (84.4 %), for 1.3 % of Winkler over the three years; the point forecast does not change (`docs/phase_o_frozen_band_strata.md`). The recipe's band is now `final10a2t`.
+
 ## Layout
 
 | Module | Responsibility |
