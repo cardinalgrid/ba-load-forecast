@@ -191,7 +191,8 @@ class AdaptiveIntervals(EmpiricalIntervals):
     ``nearest=k`` keeps, of the pool, only the ``k`` known days closest to the target day in forecast daily
     minimum temperature (the regime pool is used when fewer than ``min_days`` qualify); ``tail=True`` reads the
     outer quantiles from an exponential fitted to the errors beyond the pool 10th and 90th percentiles instead
-    of from the empirical distribution, so that a level below the smallest observed error is still defined.
+    of from the empirical distribution, so that a level below the smallest observed error is still defined; the tail
+    reading applies to every issued level beyond those percentiles (the band's and the extra ones alike).
     """
 
     def __init__(self, base: Forecaster, target: float = 0.10, gamma: float = 0.02, window_days: int = 120,
@@ -289,17 +290,17 @@ class AdaptiveIntervals(EmpiricalIntervals):
         q = super().band(p, e, levels)
         if not (self.tail if tail is None else tail):
             return q
-        lo_level, hi_level = levels[0], levels[-1]
-        for h in range(24):
+        for h in range(24):                                              # every level beyond the pool's 10th and 90th percentiles
             eh = e[:, h]
             eh = eh[np.isfinite(eh)]
             q10, q90 = np.quantile(eh, 0.10), np.quantile(eh, 0.90)
             low = q10 - eh[eh < q10]
             high = eh[eh > q90] - q90
-            if lo_level < 0.10 and len(low) >= 3:
-                q[0, h] = p[h] * (1.0 + q10 - low.mean() * np.log(0.10 / lo_level))
-            if hi_level > 0.90 and len(high) >= 3:
-                q[-1, h] = p[h] * (1.0 + q90 + high.mean() * np.log(0.10 / (1.0 - hi_level)))
+            for i, level in enumerate(levels):
+                if level < 0.10 and len(low) >= 3:
+                    q[i, h] = p[h] * (1.0 + q10 - low.mean() * np.log(0.10 / level))
+                elif level > 0.90 and len(high) >= 3:
+                    q[i, h] = p[h] * (1.0 + q90 + high.mean() * np.log(0.10 / (1.0 - level)))
         return np.sort(q, axis=0)
 
     def source_min(self, info: InformationSet) -> float:

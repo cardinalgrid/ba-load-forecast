@@ -83,3 +83,22 @@ def test_spread_factor_scales_the_half_widths():
     np.testing.assert_allclose(wide[1], base[1])                              # the median does not move
     unknown = ai.predict_quantiles(cold_info(load, temp, nxt))                # no spread that day: factor 1
     assert abs(width(unknown) / width(base) - 1.0) < 1e-6
+
+
+def test_cold_tail_reaches_every_extra_level_beyond_the_pool_percentiles():
+    load, temp = flat_history(level=1000.0, days=400)
+    plain = AdaptiveIntervals(Const("b", 1000.0), window_days=200, min_days=10, extra_levels=(0.01, 0.02, 0.10, 0.90, 0.98, 0.99))
+    tailed = AdaptiveIntervals(Const("b", 1000.0), window_days=200, min_days=10, extra_levels=(0.01, 0.02, 0.10, 0.90, 0.98, 0.99),
+                               cold_level="scale", cold_alpha_scale=1.0, cold_tail=True)
+    nxt = warmed_up(plain, load, temp)
+    warmed_up(tailed, load, temp)
+    plain.predict_quantiles(cold_info(load, temp, nxt))
+    tailed.predict_quantiles(cold_info(load, temp, nxt))
+    qp, qt = plain.last_extra[1], tailed.last_extra[1]
+    assert not np.allclose(qt[0], qp[0])                                      # 1 % and 2 %: read from the tail
+    assert not np.allclose(qt[1], qp[1])
+    np.testing.assert_allclose(qt[2], qp[2])                                  # 10 % and 90 %: unchanged (inside the percentiles)
+    np.testing.assert_allclose(qt[3], qp[3])
+    assert not np.allclose(qt[4], qp[4])                                      # 98 % and 99 %: read from the tail
+    assert not np.allclose(qt[5], qp[5])
+    assert (np.diff(qt, axis=0) >= -1e-9).all()                               # the levels stay in order
