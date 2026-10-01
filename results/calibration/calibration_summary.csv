@@ -1,0 +1,15 @@
+stratum,model,levels,hours,mean_abs_calibration_error,worst_level_error
+all,final8q,23,287304,0.0228,0.0407
+all,final10a2t,23,287304,0.0227,0.0407
+winter,final8q,23,71352,0.0241,0.0428
+winter,final10a2t,23,71352,0.0234,0.0428
+summer,final8q,23,96288,0.0245,0.0423
+summer,final10a2t,23,96288,0.0245,0.0423
+shoulder,final8q,23,119664,0.0224,0.0383
+shoulder,final10a2t,23,119664,0.0223,0.0383
+events,final8q,23,3144,0.1114,0.1849
+events,final10a2t,23,3144,0.1079,0.1849
+cold_mornings,final8q,23,7920,0.0596,0.1013
+cold_mornings,final10a2t,23,7920,0.0577,0.1013
+top_peaks,final8q,23,7920,0.0981,0.1588
+top_peaks,final10a2t,23,7920,0.0977,0.1588
