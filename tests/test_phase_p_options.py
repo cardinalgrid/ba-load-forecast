@@ -102,3 +102,22 @@ def test_cold_tail_reaches_every_extra_level_beyond_the_pool_percentiles():
     assert not np.allclose(qt[4], qp[4])                                      # 98 % and 99 %: read from the tail
     assert not np.allclose(qt[5], qp[5])
     assert (np.diff(qt, axis=0) >= -1e-9).all()                               # the levels stay in order
+
+
+def test_cold_shift_moves_the_whole_distribution_up_on_cold_days_only():
+    load, temp = flat_history(level=1000.0, days=400)
+    plain = AdaptiveIntervals(Const("b", 1000.0), window_days=200, min_days=10, extra_levels=(0.10, 0.90),
+                              cold_level="scale", cold_alpha_scale=1.0)
+    shifted = AdaptiveIntervals(Const("b", 1000.0), window_days=200, min_days=10, extra_levels=(0.10, 0.90),
+                                cold_level="scale", cold_alpha_scale=1.0, cold_shift=0.15)
+    nxt = warmed_up(plain, load, temp)
+    warmed_up(shifted, load, temp)
+    qp = plain.predict_quantiles(cold_info(load, temp, nxt))
+    qs = shifted.predict_quantiles(cold_info(load, temp, nxt))
+    assert (qs[1] >= qp[1]).all()                                             # the median moves up on a cold day
+    assert float(np.mean(qs[1] - qp[1])) > 0.0
+    assert (shifted.last_extra[1][0] >= plain.last_extra[1][0] - 1e-9).all()  # and so does every other level
+    mild = perfect_weather_info(load, temp, nxt + timedelta(days=1))
+    mild.temp_forecast_f = np.full(24, 60.0)
+    mild.temp_forecast_path_f[-24:] = mild.temp_forecast_f
+    assert shifted.shifted((0.5,), mild) == (0.5,)                            # no shift on a mild day

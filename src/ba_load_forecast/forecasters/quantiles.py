@@ -202,7 +202,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  extra_levels: tuple[float, ...] = (), peak_quantile_hot: float | None = None, hot_decile: float = 0.90,
                  cold_by_max: bool = False, cold_source: str = "path", cold_level: str | None = None,
                  cold_alpha_scale: float = 0.5, cold_gamma: float = 0.10, spread_beta: float = 0.0,
-                 spread_bounds: tuple[float, float] = (0.7, 2.0), cold_tail: bool = False):
+                 spread_bounds: tuple[float, float] = (0.7, 2.0), cold_tail: bool = False, cold_shift: float = 0.0):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         # cold_level: the band on the coldest days (is_cold_day). "scale": the day's level is alpha * cold_alpha_scale (a wider
@@ -218,6 +218,10 @@ class AdaptiveIntervals(EmpiricalIntervals):
         self.spread_beta = spread_beta
         self.spread_bounds = spread_bounds
         self.cold_tail = cold_tail            # the exponential tail reading (as tail=True) on the cold-decile days only
+        # cold_shift > 0: on the cold-decile days every issued level is read cold_shift higher in the error pool (clipped to
+        # 0.005 and 0.995): the whole distribution moves up, as the peak quantile does for the peak hours, because on those
+        # days the load exceeds the median more often than not (a shift of location, which widening alone cannot repair)
+        self.cold_shift = cold_shift
         self._cold: set[date] = set()
         self._spread: dict[date, float] = {}
         self.target = target
@@ -379,6 +383,12 @@ class AdaptiveIntervals(EmpiricalIntervals):
                 shift[h] = p[h] * (float(np.quantile(eh, level)) - float(np.median(eh)))
         return q + np.maximum(shift, 0.0)[None, :]
 
+    def shifted(self, levels: tuple[float, ...], info: InformationSet) -> tuple[float, ...]:
+        """The reading levels of the day: ``cold_shift`` higher on a cold day, unchanged otherwise."""
+        if self.cold_shift > 0 and info.day in self._cold:
+            return tuple(float(np.clip(lv + self.cold_shift, 0.005, 0.995)) for lv in levels)
+        return levels
+
     def spread_factor(self, info: InformationSet, days: list[date]) -> float:
         """The width factor of the day from the NBM spread, against the median spread of the pool days (1 when unknown)."""
         s = float(getattr(info, "nbm_spread_f", np.nan))
@@ -406,18 +416,18 @@ class AdaptiveIntervals(EmpiricalIntervals):
         e = self.errors_of(info, days)
         factor = self.spread_factor(info, days)
         tail = True if (self.cold_tail and info.day in self._cold) else None
-        q = self.band(p, e, (alpha / 2.0, 0.5, 1.0 - alpha / 2.0), tail=tail)
+        q = self.band(p, e, self.shifted((alpha / 2.0, 0.5, 1.0 - alpha / 2.0), info), tail=tail)
         if factor != 1.0:
             q = q[1][None, :] + (q - q[1][None, :]) * factor
         if self.peak:
             q = self.peak_adjust(info, p, e, q, days)
         self._issued[info.day] = (q[0], q[-1])
         if self.extra_levels:
-            qx = self.band(p, e, self.extra_levels, tail=tail)
+            qx = self.band(p, e, self.shifted(self.extra_levels, info), tail=tail)
             if factor != 1.0:
                 mid = self.band(p, e, (0.5,))[0]
                 qx = mid[None, :] + (qx - mid[None, :]) * factor
             if self.peak:
-                qx = qx + (q[1] - self.band(p, e, (0.5,))[0])[None, :]     # the same peak shift as the band
+                qx = qx + (q[1] - self.band(p, e, self.shifted((0.5,), info))[0])[None, :]     # the same peak shift as the band
             self.last_extra = (info.day, qx)
         return q
