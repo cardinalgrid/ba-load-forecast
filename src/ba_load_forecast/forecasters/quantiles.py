@@ -433,7 +433,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
     def predict_quantiles(self, info: InformationSet) -> np.ndarray:
         p = self.predict(info)
         self.update_alpha(info)
-        if self.cold_level and self.is_cold_day(info):
+        if (self.cold_level or self.cold_tail or self.cold_shift > 0) and self.is_cold_day(info):
             self._cold.add(info.day)
         alpha = self.alphas.get(self.level_key(info.day), self.target)
         if self.cold_level == "scale" and info.day in self._cold:
