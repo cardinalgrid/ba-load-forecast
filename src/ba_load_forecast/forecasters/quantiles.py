@@ -203,7 +203,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  cold_by_max: bool = False, cold_source: str = "path", cold_level: str | None = None,
                  cold_alpha_scale: float = 0.5, cold_gamma: float = 0.10, spread_beta: float = 0.0,
                  spread_bounds: tuple[float, float] = (0.7, 2.0), cold_tail: bool = False, cold_shift: float = 0.0,
-                 cold_shift_mode: str = "levels"):
+                 cold_shift_mode: str = "levels", cold_shift_scale_f: float = 0.0):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         # cold_level: the band on the coldest days (is_cold_day). "scale": the day's level is alpha * cold_alpha_scale (a wider
@@ -229,6 +229,10 @@ class AdaptiveIntervals(EmpiricalIntervals):
         if cold_shift_mode not in ("levels", "translate"):
             raise ValueError("cold_shift_mode must be 'levels' or 'translate'")
         self.cold_shift_mode = cold_shift_mode
+        # cold_shift_scale_f > 0: the translation grows with the severity of the cold, cold_shift for every cold_shift_scale_f
+        # degrees the day's forecast minimum sits below the cold-decile threshold (zero at the threshold, capped at twice
+        # cold_shift), so that an ordinary cold-decile day is barely moved and a storm is moved in full
+        self.cold_shift_scale_f = cold_shift_scale_f
         self._cold: set[date] = set()
         self._spread: dict[date, float] = {}
         self.target = target
@@ -399,7 +403,15 @@ class AdaptiveIntervals(EmpiricalIntervals):
     def translation(self, p: np.ndarray, e: np.ndarray, info: InformationSet) -> np.ndarray:
         """The upward move of every quantile on a cold day in translate mode (zeros otherwise)."""
         if self.cold_shift > 0 and self.cold_shift_mode == "translate" and info.day in self._cold:
-            hi = min(0.5 + self.cold_shift, 0.995)
+            shift = self.cold_shift
+            if self.cold_shift_scale_f > 0:
+                tmin, _, known_min, _ = self._known_extremes(info)
+                threshold = float(np.quantile(known_min, self.cold_decile)) if len(known_min) >= 100 else np.nan
+                severity = (threshold - tmin) / self.cold_shift_scale_f if np.isfinite(threshold) and np.isfinite(tmin) else 0.0
+                shift = self.cold_shift * float(np.clip(severity, 0.0, 2.0))
+            if shift <= 0:
+                return np.zeros(24)
+            hi = min(0.5 + shift, 0.995)
             return self.band(p, e, (0.5, hi))[1] - self.band(p, e, (0.5,))[0]
         return np.zeros(24)
 

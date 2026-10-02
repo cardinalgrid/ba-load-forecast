@@ -139,3 +139,23 @@ def test_translate_mode_moves_every_quantile_by_the_same_amount_and_keeps_the_wi
     np.testing.assert_allclose(d[2], d[1], atol=1e-6)
     np.testing.assert_allclose(qm[-1] - qm[0], qp[-1] - qp[0], atol=1e-6)     # width unchanged
     np.testing.assert_allclose(xm - xp, np.vstack([d[1], d[1]]), atol=1e-6)   # the extra levels move with it
+
+
+def test_severity_scaled_translation_is_zero_at_the_threshold_and_full_well_below_it():
+    load, temp = flat_history(level=1000.0, days=400)
+    ai = AdaptiveIntervals(Const("b", 1000.0), window_days=200, min_days=10, cold_level="scale", cold_alpha_scale=1.0,
+                           cold_shift=0.15, cold_shift_mode="translate", cold_shift_scale_f=10.0)
+    nxt = warmed_up(ai, load, temp)
+    deep = cold_info(load, temp, nxt)                                        # -20 F: far below any known minimum
+    ai.predict_quantiles(deep)
+    days = ai.pool_days(deep)
+    e = ai.errors_of(deep, days)
+    p = ai.predict(deep)
+    full = ai.translation(p, e, deep)
+    assert (full > 0).any()
+    _, _, known_min, _ = ai._known_extremes(deep)
+    at = cold_info(load, temp, nxt + timedelta(days=1))
+    at.temp_forecast_f = np.full(24, float(np.quantile(known_min, ai.cold_decile)) + 0.5)   # just above the threshold
+    at.temp_forecast_path_f[-24:] = at.temp_forecast_f
+    ai.predict_quantiles(at)
+    assert not (ai.translation(p, e, at) > 0).any()                           # nothing to move at the threshold
