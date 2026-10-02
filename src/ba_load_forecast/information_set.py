@@ -542,7 +542,7 @@ class Loader:
     def station_field_series(self, icao: str, ba: str, year: int, field: str) -> pd.Series:
         def read():
             if self._station_table is None:
-                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v}),
+                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v} | set(BA_STATION.values())),
                                                         self.isd_dir).set_index("icao")
             st = self._station_table.loc[icao]
             return station_field(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir, field,
@@ -583,7 +583,7 @@ class Loader:
     def station_temperature(self, icao: str, ba: str, year: int) -> pd.Series:
         def read():
             if self._station_table is None:
-                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v}),
+                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v} | set(BA_STATION.values())),
                                                         self.isd_dir).set_index("icao")
             st = self._station_table.loc[icao]
             return station_temperature_f(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir,
