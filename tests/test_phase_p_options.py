@@ -121,3 +121,21 @@ def test_cold_shift_moves_the_whole_distribution_up_on_cold_days_only():
     mild.temp_forecast_f = np.full(24, 60.0)
     mild.temp_forecast_path_f[-24:] = mild.temp_forecast_f
     assert shifted.shifted((0.5,), mild) == (0.5,)                            # no shift on a mild day
+
+
+def test_translate_mode_moves_every_quantile_by_the_same_amount_and_keeps_the_width():
+    load, temp = flat_history(level=1000.0, days=400)
+    plain = AdaptiveIntervals(Const("b", 1000.0), window_days=200, min_days=10, extra_levels=(0.10, 0.90),
+                              cold_level="scale", cold_alpha_scale=1.0)
+    moved = AdaptiveIntervals(Const("b", 1000.0), window_days=200, min_days=10, extra_levels=(0.10, 0.90),
+                              cold_level="scale", cold_alpha_scale=1.0, cold_shift=0.15, cold_shift_mode="translate")
+    nxt = warmed_up(plain, load, temp)
+    warmed_up(moved, load, temp)
+    qp = plain.predict_quantiles(cold_info(load, temp, nxt))
+    qm = moved.predict_quantiles(cold_info(load, temp, nxt))
+    d = qm - qp
+    assert (d[1] > 0).any()                                                   # the median moved up
+    np.testing.assert_allclose(d[0], d[1], atol=1e-6)                         # by the same amount as the bounds
+    np.testing.assert_allclose(d[2], d[1], atol=1e-6)
+    np.testing.assert_allclose(qm[-1] - qm[0], qp[-1] - qp[0], atol=1e-6)     # width unchanged
+    np.testing.assert_allclose(moved.last_extra[1] - plain.last_extra[1], np.vstack([d[1], d[1]]), atol=1e-6)

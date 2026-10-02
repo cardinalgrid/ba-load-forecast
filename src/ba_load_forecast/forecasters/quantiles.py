@@ -202,7 +202,8 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  extra_levels: tuple[float, ...] = (), peak_quantile_hot: float | None = None, hot_decile: float = 0.90,
                  cold_by_max: bool = False, cold_source: str = "path", cold_level: str | None = None,
                  cold_alpha_scale: float = 0.5, cold_gamma: float = 0.10, spread_beta: float = 0.0,
-                 spread_bounds: tuple[float, float] = (0.7, 2.0), cold_tail: bool = False, cold_shift: float = 0.0):
+                 spread_bounds: tuple[float, float] = (0.7, 2.0), cold_tail: bool = False, cold_shift: float = 0.0,
+                 cold_shift_mode: str = "levels"):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         # cold_level: the band on the coldest days (is_cold_day). "scale": the day's level is alpha * cold_alpha_scale (a wider
@@ -222,6 +223,12 @@ class AdaptiveIntervals(EmpiricalIntervals):
         # 0.005 and 0.995): the whole distribution moves up, as the peak quantile does for the peak hours, because on those
         # days the load exceeds the median more often than not (a shift of location, which widening alone cannot repair)
         self.cold_shift = cold_shift
+        # cold_shift_mode: "levels" re-reads every level cold_shift higher (the lower tail is compressed); "translate" keeps the
+        # widths and moves every quantile by the same amount, the distance between the pool's median and its (0.5 + cold_shift)
+        # quantile: a shift of location alone
+        if cold_shift_mode not in ("levels", "translate"):
+            raise ValueError("cold_shift_mode must be 'levels' or 'translate'")
+        self.cold_shift_mode = cold_shift_mode
         self._cold: set[date] = set()
         self._spread: dict[date, float] = {}
         self.target = target
@@ -385,9 +392,16 @@ class AdaptiveIntervals(EmpiricalIntervals):
 
     def shifted(self, levels: tuple[float, ...], info: InformationSet) -> tuple[float, ...]:
         """The reading levels of the day: ``cold_shift`` higher on a cold day, unchanged otherwise."""
-        if self.cold_shift > 0 and info.day in self._cold:
+        if self.cold_shift > 0 and self.cold_shift_mode == "levels" and info.day in self._cold:
             return tuple(float(np.clip(lv + self.cold_shift, 0.005, 0.995)) for lv in levels)
         return levels
+
+    def translation(self, p: np.ndarray, e: np.ndarray, info: InformationSet) -> np.ndarray:
+        """The upward move of every quantile on a cold day in translate mode (zeros otherwise)."""
+        if self.cold_shift > 0 and self.cold_shift_mode == "translate" and info.day in self._cold:
+            hi = min(0.5 + self.cold_shift, 0.995)
+            return self.band(p, e, (0.5, hi))[1] - self.band(p, e, (0.5,))[0]
+        return np.zeros(24)
 
     def spread_factor(self, info: InformationSet, days: list[date]) -> float:
         """The width factor of the day from the NBM spread, against the median spread of the pool days (1 when unknown)."""
@@ -419,6 +433,8 @@ class AdaptiveIntervals(EmpiricalIntervals):
         q = self.band(p, e, self.shifted((alpha / 2.0, 0.5, 1.0 - alpha / 2.0), info), tail=tail)
         if factor != 1.0:
             q = q[1][None, :] + (q - q[1][None, :]) * factor
+        move = self.translation(p, e, info)
+        q = q + move[None, :]
         if self.peak:
             q = self.peak_adjust(info, p, e, q, days)
         self._issued[info.day] = (q[0], q[-1])
@@ -427,6 +443,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
             if factor != 1.0:
                 mid = self.band(p, e, (0.5,))[0]
                 qx = mid[None, :] + (qx - mid[None, :]) * factor
+            qx = qx + move[None, :]
             if self.peak:
                 qx = qx + (q[1] - self.band(p, e, self.shifted((0.5,), info))[0])[None, :]     # the same peak shift as the band
             self.last_extra = (info.day, qx)
