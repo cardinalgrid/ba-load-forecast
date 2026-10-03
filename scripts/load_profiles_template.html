@@ -1,0 +1,232 @@
+<title>Load Profile Atlas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --ground: #f3f2ec;
+  --panel: #fbfaf6;
+  --ink: #1b2126;
+  --muted: #6a7078;
+  --line: #d8d5cc;
+  --grid: #e6e3da;
+  --night: rgba(27, 33, 38, 0.045);
+  --accent: #0c5f66;
+  --band-outer: rgba(12, 95, 102, 0.16);
+  --band-inner: rgba(12, 95, 102, 0.32);
+  --chip: #e9e7df;
+  --chip-on: #1b2126;
+  --chip-on-ink: #f3f2ec;
+  --focus: #c4541e;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #15191c; --panel: #1d2226; --ink: #e9e7df; --muted: #9aa1a8; --line: #343b41; --grid: #2a3035;
+    --night: rgba(233, 231, 223, 0.05); --accent: #5ec2c8; --band-outer: rgba(94, 194, 200, 0.16); --band-inner: rgba(94, 194, 200, 0.34);
+    --chip: #262c31; --chip-on: #e9e7df; --chip-on-ink: #15191c; --focus: #f08a55;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #15191c; --panel: #1d2226; --ink: #e9e7df; --muted: #9aa1a8; --line: #343b41; --grid: #2a3035;
+  --night: rgba(233, 231, 223, 0.05); --accent: #5ec2c8; --band-outer: rgba(94, 194, 200, 0.16); --band-inner: rgba(94, 194, 200, 0.34);
+  --chip: #262c31; --chip-on: #e9e7df; --chip-on-ink: #15191c; --focus: #f08a55;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1480px; margin: 0 auto; padding-block: 28px 48px; padding-inline: 20px; }
+header { display: grid; gap: 10px; max-width: 72ch; }
+h1 { font-family: "Fraunces", "Iowan Old Style", Georgia, serif; font-weight: 600; font-size: clamp(28px, 4vw, 40px); line-height: 1.05; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+.lede { margin: 0; color: var(--muted); font-size: 15px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 22px; height: 11px; border-radius: 2px; display: inline-block; }
+.sw.inner { background: var(--band-inner); }
+.sw.outer { background: var(--band-outer); }
+.sw.median { height: 2px; background: var(--accent); }
+.sw.night { background: var(--night); border: 1px solid var(--line); }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 26px; margin-block: 26px 18px; padding-block: 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); position: sticky; top: env(safe-area-inset-top, 0px); background: var(--ground); z-index: 2; }
+.group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.group > .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 4px; }
+.chip { font: inherit; font-size: 13px; padding: 4px 11px; border-radius: 999px; border: 1px solid transparent; background: var(--chip); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); }
+.chip:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 12px 8px; display: grid; gap: 4px; cursor: pointer; }
+.card:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.code { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-weight: 500; font-size: 15px; }
+.tag { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.name { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; display: flex; gap: 12px; }
+svg { width: 100%; height: auto; display: block; }
+.chart text { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 9px; fill: var(--muted); }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .night { fill: var(--night); }
+.chart .outer { fill: var(--band-outer); }
+.chart .inner { fill: var(--band-inner); }
+.chart .median { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linejoin: round; }
+.chart .ref { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.8; }
+.empty { color: var(--muted); font-size: 12px; padding: 30px 0; text-align: center; }
+dialog { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); padding: 0; width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); }
+dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.detail { padding: 18px 20px 20px; display: grid; gap: 14px; }
+.detail .head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.detail h2 { margin: 0; font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 24px; }
+.detail h2 small { font-family: "IBM Plex Sans", sans-serif; font-weight: 400; font-size: 14px; color: var(--muted); margin-left: 10px; }
+.detail .sub { font-size: 12px; color: var(--muted); }
+.close { font: inherit; background: var(--chip); color: var(--ink); border: 0; border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.dgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.dcell { display: grid; gap: 4px; }
+.dcell .ttl { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+.dcell .ttl b { color: var(--ink); font-weight: 500; }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+footer { margin-top: 36px; color: var(--muted); font-size: 12px; max-width: 80ch; }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color 120ms ease; } .card:hover { border-color: var(--accent); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Load Profile Atlas</h1>
+    <p class="lede">The typical day of 43 U.S. balancing authorities, 2023 to 2025: the median hourly load of the days of each kind, with the spread of the other days behind it. Local time of each BA, demand as reported to Form EIA-930.</p>
+    <div class="legend">
+      <span><i class="sw median"></i>median day</span>
+      <span><i class="sw inner"></i>25th to 75th percentile</span>
+      <span><i class="sw outer"></i>10th to 90th percentile</span>
+      <span><i class="sw night"></i>night, 22:00 to 06:00</span>
+    </div>
+  </header>
+
+  <div class="controls" role="group" aria-label="View">
+    <div class="group" id="season-group"><span class="lbl">Season</span></div>
+    <div class="group" id="kind-group"><span class="lbl">Day</span></div>
+    <div class="group" id="scale-group"><span class="lbl">Scale</span></div>
+    <div class="group" id="sort-group"><span class="lbl">Order</span></div>
+  </div>
+
+  <p class="hint">Click a BA to see its four kinds of day side by side and the other seasons.</p>
+  <div class="grid" id="grid"></div>
+
+  <footer>Source: hourly demand of Form EIA-930 (U.S. Energy Information Administration), on the days the forecasting study scored (days with reporting faults left out). Seasons: winter December to February, summer June to August, shoulder the other months. Holidays are the special days the forecasting study marks (the main federal holidays and the eves and bridge days around them); weekdays, Saturdays and Sundays exclude them. Percent scale divides each hour by the mean load of the same group of days. Part of Cardinal Grid, an independent open initiative.</footer>
+</div>
+
+<dialog id="dlg"><div class="detail" id="detail"></div></dialog>
+
+<script>
+const DATA = /*PROFILES_JSON*/null;
+const SEASON_LABEL = { all: "All year", winter: "Winter", summer: "Summer", shoulder: "Shoulder" };
+const KIND_LABEL = { weekday: "Weekday", saturday: "Saturday", sunday: "Sunday", holiday: "Holiday" };
+const state = { season: "all", kind: "weekday", scale: "mw", sort: "size" };
+try { Object.assign(state, JSON.parse(localStorage.getItem("atlas-state") || "{}")); } catch (e) {}
+
+function chips(groupId, options, key, onChange) {
+  const g = document.getElementById(groupId);
+  options.forEach(([value, label]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.textContent = label; b.id = `${key}-${value}`;
+    b.setAttribute("aria-pressed", String(state[key] === value));
+    b.addEventListener("click", () => {
+      state[key] = value;
+      g.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c === b)));
+      try { localStorage.setItem("atlas-state", JSON.stringify(state)); } catch (e) {}
+      onChange();
+    });
+    g.appendChild(b);
+  });
+}
+
+function fmtLoad(mw) {
+  if (mw >= 10000) return (mw / 1000).toFixed(0) + " GW";
+  if (mw >= 1000) return (mw / 1000).toFixed(1) + " GW";
+  return mw.toFixed(0) + " MW";
+}
+
+function niceTicks(lo, hi, n) {
+  const span = hi - lo, raw = span / n, p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * p).find(s => span / s <= n + 0.5) || 10 * p;
+  const out = []; for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(6)); return out;
+}
+
+function series(group, scale) {
+  const f = scale === "pct" ? 100 / group.mean : 1;
+  return group.q.map(row => row.map(v => v * f));
+}
+
+// One chart: q = [q10, q25, q50, q75, q90] arrays of 24 values; range = [lo, hi] shared when given.
+function chart(q, scale, range, w = 300, h = 150, label = true) {
+  const padL = 34, padR = 8, padT = 8, padB = 18;
+  const lo = range ? range[0] : Math.min(...q[0]), hi = range ? range[1] : Math.max(...q[4]);
+  const span = (hi - lo) || 1;
+  const x = i => padL + (i + 0.5) / 24 * (w - padL - padR);
+  const y = v => padT + (1 - (v - lo) / span) * (h - padT - padB);
+  const area = (top, bot) => "M" + top.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("L") + "L" + bot.map((v, i) => `${x(23 - i).toFixed(1)},${y(v).toFixed(1)}`).join("L") + "Z";
+  const line = arr => "M" + arr.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("L");
+  const ticks = niceTicks(lo, hi, 4);
+  const parts = [`<svg class="chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="daily load curve">`];
+  parts.push(`<rect class="night" x="${padL}" y="${padT}" width="${(x(5.5) - padL).toFixed(1)}" height="${h - padT - padB}"/>`);
+  parts.push(`<rect class="night" x="${x(21.5).toFixed(1)}" y="${padT}" width="${(w - padR - x(21.5)).toFixed(1)}" height="${h - padT - padB}"/>`);
+  ticks.forEach(t => {
+    parts.push(`<line class="gridline" x1="${padL}" x2="${w - padR}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}"/>`);
+    if (label) parts.push(`<text x="${padL - 4}" y="${(y(t) + 3).toFixed(1)}" text-anchor="end">${scale === "pct" ? t.toFixed(0) + "%" : (t >= 1000 ? (t / 1000).toFixed(t % 1000 ? 1 : 0) + "k" : t)}</text>`);
+  });
+  if (scale === "pct") parts.push(`<path class="ref" d="M${padL},${y(100).toFixed(1)}L${w - padR},${y(100).toFixed(1)}"/>`);
+  parts.push(`<path class="outer" d="${area(q[4], q[0])}"/>`);
+  parts.push(`<path class="inner" d="${area(q[3], q[1])}"/>`);
+  parts.push(`<path class="median" d="${line(q[2])}"/>`);
+  [0, 6, 12, 18].forEach(hh => parts.push(`<text x="${x(hh - 0.5).toFixed(1)}" y="${h - 5}" text-anchor="middle">${String(hh).padStart(2, "0")}</text>`));
+  parts.push(`<text x="${(w - padR).toFixed(1)}" y="${h - 5}" text-anchor="end">24h</text>`);
+  parts.push("</svg>");
+  return parts.join("");
+}
+
+function renderGrid() {
+  const grid = document.getElementById("grid");
+  const bas = DATA.bas.slice();
+  if (state.sort === "alpha") bas.sort((a, b) => a.ba.localeCompare(b.ba));
+  else if (state.sort === "peak") bas.sort((a, b) => peakHour(b) - peakHour(a));
+  grid.innerHTML = "";
+  bas.forEach(d => {
+    const g = d.groups[`${state.season}|${state.kind}`];
+    const card = document.createElement("div");
+    card.className = "card"; card.tabIndex = 0; card.setAttribute("role", "button");
+    card.setAttribute("aria-label", `${d.ba}, ${d.name}`);
+    const tag = d.comparable ? d.set : d.set + " · DF n/c";
+    card.innerHTML = `<div class="top"><span class="code">${d.ba}</span><span class="tag">${tag}</span></div>` +
+      `<div class="name" title="${d.name}">${d.name}</div>` +
+      (g ? chart(series(g, state.scale), state.scale) : `<div class="empty">fewer than 3 days of this kind</div>`) +
+      `<div class="meta"><span>${g ? g.n : 0} days</span><span>mean ${g ? fmtLoad(g.mean) : "–"}</span><span>peak ${g ? fmtLoad(Math.max(...g.q[2])) : "–"} at ${g ? String(g.q[2].indexOf(Math.max(...g.q[2]))).padStart(2, "0") + "h" : "–"}</span></div>`;
+    const open = () => openDetail(d);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+    grid.appendChild(card);
+  });
+}
+
+function peakHour(d) {
+  const g = d.groups[`${state.season}|${state.kind}`];
+  return g ? g.q[2].indexOf(Math.max(...g.q[2])) : -1;
+}
+
+function openDetail(d) {
+  const dlg = document.getElementById("dlg"), box = document.getElementById("detail");
+  const kinds = DATA.day_types, seasons = DATA.seasons;
+  const sel = kinds.map(k => d.groups[`${state.season}|${k}`]).filter(Boolean);
+  const all = seasons.map(s => d.groups[`${s}|${state.kind}`]).filter(Boolean);
+  const rangeOf = gs => { const ss = gs.map(g => series(g, state.scale)); return [Math.min(...ss.map(q => Math.min(...q[0]))), Math.max(...ss.map(q => Math.max(...q[4])))]; };
+  const r1 = rangeOf(sel), r2 = rangeOf(all);
+  const cell = (title, g, range) => `<div class="dcell"><div class="ttl"><span>${title}</span><span><b>${g.n}</b> days · mean <b>${fmtLoad(g.mean)}</b></span></div>${chart(series(g, state.scale), state.scale, range, 300, 170)}</div>`;
+  box.innerHTML = `<div class="head"><h2>${d.ba}<small>${d.name}</small></h2><button class="close" type="button" id="close-btn">Close</button></div>` +
+    `<div class="sub">${d.days} scored days, 2023 to 2025 · mean load ${fmtLoad(d.mean_mw)} · ${d.set === "development" ? "development set of the forecaster" : "one weather station"}${d.comparable ? "" : " · published forecast not comparable with demand (EIA)"}</div>` +
+    `<div class="sub">${SEASON_LABEL[state.season]}, by kind of day (same vertical scale)</div><div class="dgrid">` +
+    kinds.map(k => d.groups[`${state.season}|${k}`] ? cell(KIND_LABEL[k], d.groups[`${state.season}|${k}`], r1) : "").join("") + `</div>` +
+    `<div class="sub">${KIND_LABEL[state.kind]}s, by season (same vertical scale)</div><div class="dgrid">` +
+    seasons.map(s => d.groups[`${s}|${state.kind}`] ? cell(SEASON_LABEL[s], d.groups[`${s}|${state.kind}`], r2) : "").join("") + `</div>`;
+  document.getElementById("close-btn").addEventListener("click", () => dlg.close());
+  dlg.showModal();
+}
+
+chips("season-group", DATA.seasons.map(s => [s, SEASON_LABEL[s]]), "season", renderGrid);
+chips("kind-group", DATA.day_types.map(k => [k, KIND_LABEL[k]]), "kind", renderGrid);
+chips("scale-group", [["mw", "MW"], ["pct", "% of group mean"]], "scale", renderGrid);
+chips("sort-group", [["size", "by size"], ["alpha", "A to Z"], ["peak", "by peak hour"]], "sort", renderGrid);
+document.getElementById("dlg").addEventListener("click", e => { if (e.target.id === "dlg") e.target.close(); });
+renderGrid();
+</script>
