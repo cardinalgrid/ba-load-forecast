@@ -313,7 +313,7 @@ class Loader:
                  nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None,
                  gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0,
                  model_weight_cold_days: int = 0, model_weight_cold_threshold_f: float = 25.0,
-                 gfs_cold_quantile: float = 0.0, nbm_spread_dir: Path | None = None):
+                 gfs_cold_quantile: float = 0.0, nbm_spread_dir: Path | None = None, oracle_temperature: bool = False):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -364,6 +364,10 @@ class Loader:
         # nbm_spread_dir: the NBM blend spread of the 2 m temperature (tempstddev, F; nbm.extract with nbm_tempstd_f); the mean over
         # the target day's hours and the BA's stations, from the run at the cut-off, is the day's nbm_spread_f (intervals, A24c)
         self.nbm_spread_dir = Path(nbm_spread_dir) if nbm_spread_dir else None
+        # oracle_temperature=True (A29, a diagnostic, never a forecast): every hour of each station's temperature path,
+        # from the cut-off to the end of the target day, is replaced by the temperature observed at that station where
+        # known. It separates the error that comes from the weather forecast from the error of the load model.
+        self.oracle_temperature = bool(oracle_temperature)
         self._nbm_spread: dict[str, pd.DataFrame] = {}
         self._model_errors: dict[tuple[str, str], dict[str, pd.Series]] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
@@ -866,6 +870,12 @@ class Loader:
             if self.temp_bias_days and run is not None and len(rows):
                 paths[icao] = apply_hour_bias(paths[icao], path_ts, self.hour_bias(ba, icao, day))
         path_frame = pd.DataFrame(paths, index=path_ts)
+        if self.oracle_temperature:
+            for icao in stations:
+                observed = (self._years(ba, day - timedelta(days=2), day, lambda b, y, i=icao: self.station_temperature(i, b, y))
+                            if len(stations) > 1 else temp)
+                obs = observed.reindex(path_ts).to_numpy(dtype=float)
+                path_frame[icao] = np.where(np.isfinite(obs), obs, path_frame[icao].to_numpy(dtype=float))
         temp_path = path_frame.mean(axis=1, skipna=False).to_numpy() if len(stations) > 1 else path_frame.iloc[:, 0].to_numpy()
         temp_fc = temp_path[-24:]
         stations_hist = None
