@@ -144,7 +144,8 @@ def main(argv=None) -> int:
         plt.close(fig)
 
     lines = ["# Calibration of the issued quantiles, by stratum", "",
-             f"Models: {', '.join(a.models)}. BAs: {', '.join(used)}; the days every model scored, pooled over the BAs "
+             f"Models: {', '.join(m.split('@', 1)[0] + '@<runs>:' + m.rsplit(':', 1)[1] if '@' in m else m for m in a.models)}. "
+             f"BAs: {', '.join(used)}; the days every model scored, pooled over the BAs "
              f"(hours weighted equally). A quantile at nominal level q is calibrated when the actual load falls at or below it a "
              f"share q of the hours; the mean absolute calibration error averages |empirical - nominal| over the issued levels.", "",
              "## Summary", "", markdown_table(summary), ""]
