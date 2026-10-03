@@ -269,6 +269,10 @@ The margin grows where the published forecast is weak (WACM, NEVP, PNM, PSCO, CI
 
 ![The recipe against each BA's forecast, 43 BAs, 2023 to 2025](docs/figures/scoreboard_43_bas.png)
 
+## Phase Q: a second stage for the daily peak, not adopted
+
+A second stage that rescales the forecast around its peak (`docs/methods.md`, section 8o; `docs/phase_q_peak_strata.md`) was tried on the eleven development BAs, 2020 to 2022, against a rule fixed before the run. Rescaling by the members' own maxima lifted the peak on the event days and the coldest mornings in 8 of the 11 BAs without changing MAPE, CRPS or coverage, but left the 30 largest peaks of each BA unchanged; two learned ratios worsened those peaks in 10 of the 11 BAs. None is adopted. The flattening of the ensemble mean is real but small; the under-forecast on the extreme days comes from the weather input or the model's response beyond its training range.
+
 ## Layout
 
 | Module | Responsibility |

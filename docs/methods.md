@@ -361,6 +361,25 @@ Stacked on the cold-day level and tail, the spread factor widens too far: covera
 
 **What this says about generalisation.** The recipe was built on eleven large systems and transfers to 27 others with one station each with the same qualitative result as on the eleven: ahead of `DF` on the year and in each season, by a margin that grows where the published forecast is weak and vanishes where it is strong, and behind at the peak of the extreme days. A single station is a thin description of a system like WACM or PACE; the station map and the per-BA losses are the first places to look in a second round.
 
+## 8o. Phase Q: a second stage for the daily peak, not adopted
+
+**Question.** On the 43 BAs the recipe under-forecasts the daily peak by less than the BAs' own forecasts on ordinary days and by more on the extreme days (section 8n). One candidate cause: the point is a weighted mean of members whose peaks fall at different hours, and the mean of misaligned curves has a lower maximum than its members.
+
+**Candidates** (`src/ba_load_forecast/forecasters/peak.py`, `PeakStage`; group `peak_q`). Each multiplies the whole band of `final10s` by a Gaussian bump of 2.5 h centred on the hour of the forecast peak, so that the forecast peak is scaled by a ratio and the hours far from it do not move; each keeps its own copy of the adaptive band so that the adaptive level follows the band it issues. `final11m`: the ratio is the mean of the members' own daily maxima over the issued maximum, never below 1. `final11r`: a ridge regression, refitted every day on the known days, of log(actual / issued) at the hour of the actual peak, on features known at the cut-off (the members' flattening and disagreement at the peak, how far the forecast maximum and minimum sit beyond the station's known extremes, the NBM spread, day type, special day, and the median target of the last 14 known days); raw temperatures were left out after a smoke test showed the linear fit extrapolating them across seasons. `final11x`: `final11r` only on days of extreme forecast temperature.
+
+**Rule fixed before the run.** Adopt a candidate only if the peak under-forecast improves both on the event days and on the 30 largest peaks of each BA in at least 7 of the 11 BAs, the yearly MAPE does not worsen by more than 0.02 point, the yearly CRPS does not worsen, and the yearly coverage stays between 88 and 91 %.
+
+**Result** (11 development BAs, 2020-12-02 to 2022-12-31, 8277 BA-days, `docs/phase_q_peak.md`, `docs/phase_q_peak_strata.md`; peak under-forecast in percent of the actual peak):
+
+| Stratum | `final10s` | `final11m` | `final11r` | `final11x` |
+|---|---|---|---|---|
+| year | −1.23 | −1.20 | −1.24 | −1.25 |
+| event days | −2.76 | −2.67 (8 BAs better, 0 worse) | −2.92 | −2.91 |
+| 30 coldest mornings | −2.08 | −2.01 (8 better, 0 worse) | −2.28 | −2.27 |
+| 30 largest peaks | −1.25 | −1.25 (3 better, 8 unchanged) | −1.52 (10 worse) | −1.53 (10 worse) |
+
+MAPE, CRPS and coverage of `final11m` equal those of `final10s` in every stratum. None is adopted: the learned ratios worsen the largest peaks in 10 of the 11 BAs, and the members' maxima, harmless and slightly helpful in the winter strata, leave the largest peaks unchanged. **What it says about the cause:** the flattening of the mean is real but small, and it sits in the winter days with two daily peaks on which the members disagree; on the largest peaks, mostly summer afternoons, the issued maximum (already read at the 60th percentile near the peak) is above the members' maxima, so there is nothing to undo. The under-forecast on the extreme days comes from elsewhere: the weather input or the model's response at temperatures beyond its training days, which a run with observed temperature would separate.
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a

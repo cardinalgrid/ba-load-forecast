@@ -114,8 +114,9 @@ un_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and
 | 66. The scoreboard against each BA's forecast | `python scripts/scoreboard_43.py --results results/b4_2023_2025 --doc docs/scoreboard_43_bas.md` | `docs/scoreboard_43_bas.md`, `results/b4_2023_2025/scoreboard.csv` and `scoreboard_aggregates.csv`, `docs/figures/scoreboard_43_bas.{pdf,png}` | seconds |
 | 67. Errors by part of the day, per BA | `python scripts/daypart_43.py --runs <runs>` (hourly outputs of the 43-BA run; only the days `results/b4_2023_2025/rows.parquet` scored) | `docs/daypart_43_bas.md`, `results/b4_2023_2025/daypart.csv` | a minute |
 | 68. Load profile atlas | `python scripts/load_profiles.py --runs <runs>` (hourly actuals of the 43-BA run, scored days; template `scripts/load_profiles_template.html`) | `docs/load_profiles_43_bas.html` (one page, data embedded), `results/b4_2023_2025/profiles.json` | a minute |
+| 69. Phase Q, a second stage for the daily peak | `python scripts/run_phase_e.py --groups peak_q --bas <the 11 development BAs> --out <runs>` (any number of processes, disjoint BA lists), then `--report-only`; `python scripts/compare_events.py --candidate peak_q@<runs>:final11m peak_q@<runs>:final11r peak_q@<runs>:final11x --reference peak_q@<runs>:final10s --bas <the 11> --doc docs/phase_q_peak_strata.md` | `docs/phase_q_peak.md`, `docs/phase_q_peak_strata.md` | ~80 min per BA and process |
 
-Tests: `pytest -q` (135 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (141 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 
