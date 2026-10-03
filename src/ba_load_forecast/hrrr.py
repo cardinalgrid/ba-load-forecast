@@ -15,6 +15,7 @@ per station.
 from __future__ import annotations
 
 import json
+import os
 import time
 from collections.abc import Callable, Iterable
 from datetime import date, datetime, timedelta
@@ -171,6 +172,19 @@ def run_file(out_dir: Path, day: date, init_hour: int) -> Path:
     return Path(out_dir) / "runs" / f"{day.strftime('%Y%m%d')}_{init_hour:02d}z.parquet"
 
 
+def write_run(f: Path, frame: pd.DataFrame) -> None:
+    """Write a run file through a temporary file named after this process, so that two extractors covering the same
+    days never share a temporary file; when a twin finished the run first, its file stands and ours is dropped."""
+    tmp = f.with_name(f"{f.stem}.{os.getpid()}.tmp")
+    frame.to_parquet(tmp, index=False)
+    try:
+        tmp.replace(f)
+    except PermissionError:
+        if not f.exists():
+            raise
+        tmp.unlink(missing_ok=True)
+
+
 def days_between(start: date, end: date) -> Iterable[date]:
     d = start
     while d <= end:
@@ -202,9 +216,7 @@ def extract(points: dict[str, GridPoint], start: date, end: date, out_dir: Path,
                 frame = pd.DataFrame({c: pd.Series(dtype=t) for c, t in
                                       zip([*KEYS, field], ["object", "datetime64[ns]", "int16", "datetime64[ns]", "float32"], strict=True)})
                 log(f"{day} {h:02d}Z: run not in the archive")
-            tmp = f.with_suffix(".tmp")
-            frame.to_parquet(tmp, index=False)
-            tmp.replace(f)
+            write_run(f, frame)
             fetched += 1
             if fetched % 20 == 0:
                 log(f"{day} {h:02d}Z: {fetched} runs fetched")

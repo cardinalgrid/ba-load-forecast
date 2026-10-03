@@ -1,7 +1,9 @@
 from datetime import date, datetime
+from pathlib import Path
 
 import fsspec
 import numpy as np
+import pandas as pd
 import pytest
 import zarr
 from numcodecs import Blosc
@@ -131,3 +133,29 @@ def test_with_retries_gives_up_and_never_retries_missing_objects():
     assert len(calls) == 3
     with pytest.raises(FileNotFoundError):
         with_retries(lambda: raise_(FileNotFoundError("gone")), "x", log=lambda m: None, waits=(0,))
+
+
+def test_write_run_names_its_temporary_file_after_the_process_and_yields_to_a_twin(tmp_path, monkeypatch):
+    from ba_load_forecast.hrrr import write_run
+
+    f = tmp_path / "runs" / "20240116_12z.parquet"
+    f.parent.mkdir()
+    frame = pd.DataFrame({"icao": ["KAAA"], "init_utc": [datetime(2024, 1, 16, 12)], "lead_h": [1],
+                          "valid_utc": [datetime(2024, 1, 16, 13)], "temp_f": [30.0]})
+    write_run(f, frame)
+    assert f.exists()
+    assert list(f.parent.glob("*.tmp")) == []
+    # a twin finished the same run while this process wrote its temporary file: the twin's file stands
+    twin = f.read_bytes()
+
+    def locked(self, target):
+        raise PermissionError(32, "being used by another process")
+
+    monkeypatch.setattr(Path, "replace", locked)
+    write_run(f, frame.assign(temp_f=99.0))
+    assert f.read_bytes() == twin
+    assert list(f.parent.glob("*.tmp")) == []
+    # the same error with no file in place is a real failure
+    f.unlink()
+    with pytest.raises(PermissionError):
+        write_run(f, frame)

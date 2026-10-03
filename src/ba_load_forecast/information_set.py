@@ -397,7 +397,6 @@ class Loader:
         self.stations = stations
         self._series: dict[tuple, pd.Series] = {}
         self._hrrr: dict[str, pd.DataFrame] = {}
-        self._station_table: pd.DataFrame | None = None
         # sky=True attaches the sun's elevation and the HRRR cloud cover as seen at each day's cut-off
         self.sky = sky
         self.pv = pv                          # with sky=True: scale the sun by the installed PV capacity (sky.PV_COLUMNS)
@@ -539,12 +538,13 @@ class Loader:
     def field_rows(self, field: str, icao: str) -> pd.DataFrame:
         return self._cached(("frows", field, icao), lambda: load_station(self.field_dir(field), icao))
 
+    def station_record(self, icao: str) -> pd.Series:
+        """The ISD record (USAF, WBAN, name, state, lat, lon) of one station, looked up when first needed."""
+        return self._cached(("station", icao), lambda: station_table_for([icao], self.isd_dir).iloc[0])
+
     def station_field_series(self, icao: str, ba: str, year: int, field: str) -> pd.Series:
         def read():
-            if self._station_table is None:
-                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v} | set(BA_STATION.values())),
-                                                        self.isd_dir).set_index("icao")
-            st = self._station_table.loc[icao]
+            st = self.station_record(icao)
             return station_field(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir, field,
                                  supplement_file=[f for f in (supplement_path(icao, d) for d in self.supplement_dirs) if f])
 
@@ -582,10 +582,7 @@ class Loader:
 
     def station_temperature(self, icao: str, ba: str, year: int) -> pd.Series:
         def read():
-            if self._station_table is None:
-                self._station_table = station_table_for(sorted({i for v in BA_STATIONS_MULTI.values() for i in v} | set(BA_STATION.values())),
-                                                        self.isd_dir).set_index("icao")
-            st = self._station_table.loc[icao]
+            st = self.station_record(icao)
             return station_temperature_f(st["usaf"], st["wban"], ba, year, self.tidy_dir, self.isd_dir,
                                          supplement_file=[f for f in (supplement_path(icao, d) for d in self.supplement_dirs) if f])
 
