@@ -1,6 +1,6 @@
 # Calibration of the issued quantiles, by stratum
 
-Models: frozen8@~/ba-load-forecast-runs/phase_e_ghcnh:final8q, frozen10@~/ba-load-forecast-runs/phase_e_ghcnh:final10a2t, frozen10sa@~/ba-load-forecast-runs/phase_e_ghcnh:final10s. BAs: PJM, MISO, SWPP, DUK, TVA, FPL, ERCO, CISO, NYIS, ISNE, BPAT; the days every model scored, pooled over the BAs (hours weighted equally). A quantile at nominal level q is calibrated when the actual load falls at or below it a share q of the hours; the mean absolute calibration error averages |empirical - nominal| over the issued levels.
+Models: frozen8@<runs>:final8q, frozen10@<runs>:final10a2t, frozen10sa@<runs>:final10s. BAs: PJM, MISO, SWPP, DUK, TVA, FPL, ERCO, CISO, NYIS, ISNE, BPAT; the days every model scored, pooled over the BAs (hours weighted equally). A quantile at nominal level q is calibrated when the actual load falls at or below it a share q of the hours; the mean absolute calibration error averages |empirical - nominal| over the issued levels.
 
 ## Summary
 

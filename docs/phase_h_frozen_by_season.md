@@ -1,4 +1,4 @@
-# frozen4@~/ba-load-forecast-runs/phase_e_ghcnh:final4 against frozen3@~/ba-load-forecast-runs/phase_e_ghcnh:final3, on the days both scored
+# frozen4@<runs>:final4 against frozen3@<runs>:final3, on the days both scored
 
 Demand-weighted mean of the per-BA MAPE (percent) and of the peak under-forecast (percent of the actual peak); gap < 0 is better than the reference; winter is December to February, summer June to September.
 

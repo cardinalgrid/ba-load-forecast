@@ -1,0 +1,5 @@
+set,bas,mape_weighted,mape_df_weighted,mape_median,mape_df_median,better,worse,better_p05,worse_p05,coverage_90
+"all 43 BAs, forecaster only",43,2.4426,3.5915,2.8831,3.5221,30,13,28,12,0.8917
+38 comparable BAs,38,2.4096,3.1565,2.8646,3.4045,26,12,24,11,0.8917
+11 development BAs,11,2.2065,2.8952,2.3979,2.6259,7,4,6,4,0.8915
+27 new comparable BAs,27,3.1766,4.1427,3.0715,4.2883,19,8,18,7,0.8923

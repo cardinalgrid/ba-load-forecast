@@ -4,8 +4,9 @@ Day-ahead load forecasting for US balancing authorities (BAs) with public data o
 BA's own day-ahead forecast. Part of [Cardinal Grid](https://cardinalgrid.com), an independent open
 initiative.
 
-> Status: **0.1.0, data layer.** The information cut-off, the archived weather forecasts and the
-> loaders exist and are tested; no forecasting model yet.
+> Status: **recipe fixed after phase O and run once on the 43 BAs of the station map** (2023 to 2025,
+> 9 a.m. cut-off, protocol v2): ahead of the BAs' own forecasts in 26 of the 38 comparable BAs, behind at
+> the peak of the extreme days. The phases below record how it got there; nothing is tuned after phase O.
 
 Documentation: `docs/methods.md` (every rule, model and parameter, with the reason), `docs/reproduce.md`
 (inputs and commands in order), and one report per phase (`docs/phase_b.md`, `docs/phase_c.md`,
@@ -254,6 +255,20 @@ The temperature path became the mean of the HRRR, the NBM and the GFS weighted, 
 
 A boosting member fitted on the coldest decile of days and used on such days only was tried against the phase N recipe on six winter BAs and not adopted: the event days move by 0.007 and the peak under-forecast deepens (`docs/methods.md`, section 8m). The band was then reworked on the cold-decile days: the adaptive level is read at a quarter of its value and the outer quantiles come from an exponential tail fitted beyond the pool's 10th and 90th percentiles, so that the band can pass the largest error seen in the 40 nearest days. The NBM's own spread (the standard deviation of its blend) was then tried as a width factor and won on its own: on 2023 to 2025 the 90 % interval covers the event days at 89.6 % (82.0 % before) and the 30 coldest mornings at 88.6 % (84.4 %) with a lower Winkler score in both, for 0.4 % of Winkler over the three years; the point forecast does not change (`docs/phase_o_frozen_band_spread_alone_strata.md`). The recipe's band is now `final10s`; the cold-day level and tail (`final10a2t`) stay as the alternative without the NBM spread. The calibration of the 23 quantiles (`docs/calibration_curves.md`) shows what is left: on the event days the whole distribution sits low, a shift of location that no widening repairs.
 
+## Phase P: the recipe on the 43 BAs of the station map
+
+The recipe of phase O, unchanged, was run once on every BA of the station map with data on 2023 to 2025: the eleven development BAs and 32 others with one station each (`docs/methods.md`, section 8n; reports `docs/evaluation_43_bas.md`, `docs/scoreboard_43_bas.md`, `docs/evaluation_43_bas_strata.md`). Five BAs (AVA, FPC, LGEE, PSEI, TEPC) publish a forecast the EIA lists as not comparable with their demand; they stay in the evaluation and leave the scoreboard against `DF`.
+
+| 2023 to 2025, days both scored | BAs | MAPE recipe, weighted | MAPE `DF`, weighted | median BA, recipe | median BA, `DF` | BAs better | BAs worse |
+|---|---|---|---|---|---|---|---|
+| comparable BAs | 38 | 2.41 % | 3.16 % | 2.86 % | 3.40 % | 26 | 12 |
+| of which never seen in development | 27 | 3.18 % | 4.14 % | 3.07 % | 4.29 % | 19 | 8 |
+| development BAs | 11 | 2.21 % | 2.90 % | 2.40 % | 2.63 % | 7 | 4 |
+
+The margin grows where the published forecast is weak (WACM, NEVP, PNM, PSCO, CISO, SWPP) and turns into a loss where it is very good (PGE, SOCO, NWMT, ISNE, BANC, TPWR) and at AECI. MAPE is lower than `DF` in every stratum, event days included (3.30 % against 3.63 %), but at the daily peak of the event days and of the 30 largest peaks of each BA the recipe under-forecasts more than `DF` does (−2.43 % against −2.33 %, −1.83 % against −1.41 %). The 90 % band covers 88 to 90 % of the hours in every BA.
+
+![The recipe against each BA's forecast, 43 BAs, 2023 to 2025](docs/figures/scoreboard_43_bas.png)
+
 ## Layout
 
 | Module | Responsibility |
@@ -301,7 +316,7 @@ Cardinal Grid Note 2 and of [grid-data-sentinel](https://github.com/cardinalgrid
 
 ## Limitations
 
-One to six stations per BA. The 9 a.m. cut-off is an assumption about when BAs run their forecasts. The HRRR is a
+One to six stations per BA on the eleven development BAs and a single station on the other 32, which is a thin description of a large or scattered system. The recipe is behind the BAs' own forecasts at the daily peak of the extreme days. The 9 a.m. cut-off is an assumption about when BAs run their forecasts. The HRRR is a
 weather model with its own error, not the forecast any BA used, and the 2 h availability lag is a
 convention. Nothing here describes the internal process of any operator.
 

@@ -1,6 +1,6 @@
 # Calibration of the issued quantiles, by stratum
 
-Models: band_ast@~/ba-load-forecast-runs/phase_e:final10ast, band_cs@~/ba-load-forecast-runs/phase_e:final10cs. BAs: PJM, MISO, SWPP, DUK, TVA, ERCO; the days every model scored, pooled over the BAs (hours weighted equally). A quantile at nominal level q is calibrated when the actual load falls at or below it a share q of the hours; the mean absolute calibration error averages |empirical - nominal| over the issued levels.
+Models: band_ast@<runs>:final10ast, band_cs@<runs>:final10cs. BAs: PJM, MISO, SWPP, DUK, TVA, ERCO; the days every model scored, pooled over the BAs (hours weighted equally). A quantile at nominal level q is calibrated when the actual load falls at or below it a share q of the hours; the mean absolute calibration error averages |empirical - nominal| over the issued levels.
 
 ## Summary
 

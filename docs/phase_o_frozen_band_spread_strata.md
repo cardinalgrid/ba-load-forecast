@@ -1,4 +1,4 @@
-# frozen10s@~/ba-load-forecast-runs/phase_e_ghcnh:final10ast against frozen10@~/ba-load-forecast-runs/phase_e_ghcnh:final10a2t, by stratum
+# frozen10s@<runs>:final10ast against frozen10@<runs>:final10a2t, by stratum
 
 Demand-weighted means over the BAs on the days every model scored. MAPE, CRPS and Winkler in percent of the actual; peak under-forecast and peak error in percent of the actual peak; coverage of the 90 % band. Strata: the year, winter (December to February), summer (June to September), the rest, the winter-event days, the 30 coldest mornings of each BA (observed minimum) and the 30 days of largest actual peak of each BA. Gap < 0 is better than the reference.
 
