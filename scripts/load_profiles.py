@@ -90,6 +90,26 @@ def main(argv=None) -> int:
     files = sorted(glob.glob(str(a.runs / f"{a.group}_*_hourly.parquet")))
     data = [profiles(Path(f), rows) for f in files]
     data.sort(key=lambda d: -d["mean_mw"])
+    # the scoreboard (scripts/scoreboard_43.py) and the errors by part of the day (scripts/daypart_43.py), when present
+    sb = a.results / "scoreboard.csv"
+    dp = a.results / "daypart.csv"
+    if sb.exists() and dp.exists():
+        s = pd.read_csv(sb).set_index("ba")
+        p = pd.read_csv(dp).set_index("ba")
+        for d in data:
+            ba = d["ba"]
+            if ba not in s.index or ba not in p.index:
+                continue
+            r, q = s.loc[ba], p.loc[ba]
+            d["score"] = {
+                "day": [round(float(r["mape"]), 2), round(float(r["mape_df"]), 2)],
+                **{part: [round(float(q[f"{part}_recipe"]), 2), round(float(q[f"{part}_df"]), 2)]
+                   for part in ("night", "morning", "midday", "evening", "late")},
+                "peak_err": [round(float(q["peak_err_recipe"]), 2), round(float(q["peak_err_df"]), 2)],
+                "peak_under": [round(float(q["peak_under_share_recipe"]), 3), round(float(q["peak_under_share_df"]), 3)],
+                "coverage": round(float(r["coverage_90"]), 3), "winkler": round(float(r["winkler_90"]), 2),
+                "dm": round(float(r["dm_stat"]), 1), "dm_p": float(r["dm_p"]), "days": int(r["days"]),
+            }
     payload = {"period": "2023-01-01 to 2025-12-31", "quantiles": list(QS), "seasons": list(SEASONS), "day_types": list(DAY_TYPES), "bas": data}
     (a.results / "profiles.json").write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     html = a.template.read_text(encoding="utf-8").replace("/*PROFILES_JSON*/null", json.dumps(payload, separators=(",", ":")))

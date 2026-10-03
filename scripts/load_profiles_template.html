@@ -79,6 +79,28 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
 .dcell .ttl { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
 .dcell .ttl b { color: var(--ink); font-weight: 500; }
 .hint { font-size: 12px; color: var(--muted); margin: 0; }
+.section { margin-top: 44px; display: grid; gap: 10px; }
+.section h2 { font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 24px; margin: 0; text-wrap: balance; }
+.section .lede { font-size: 13.5px; max-width: 80ch; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); }
+th { position: sticky; top: 0; background: var(--panel); color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; user-select: none; }
+th:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+th[aria-sort="ascending"]::after { content: " ▲"; } th[aria-sort="descending"]::after { content: " ▼"; }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: var(--panel); }
+td.pair { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 12px; }
+td.pair .r { color: var(--accent); font-weight: 500; } td.pair .d { color: var(--muted); }
+td.pair.win .r { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+td.pair.loss .d { color: var(--ink); font-weight: 500; }
+td .code { font-size: 13px; }
+tr.nc td { color: var(--muted); }
+tfoot td { font-size: 11.5px; color: var(--muted); white-space: normal; text-align: left; padding: 8px 9px; }
+.detail .scorerow { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px 14px; font-size: 12px; }
+.detail .scorerow div { display: grid; gap: 1px; }
+.detail .scorerow .k { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; }
+.detail .scorerow .v { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; font-size: 13px; }
+.detail .scorerow .v .r { color: var(--accent); font-weight: 500; } .detail .scorerow .v .d { color: var(--muted); }
 footer { margin-top: 36px; color: var(--muted); font-size: 12px; max-width: 80ch; }
 @media (prefers-reduced-motion: no-preference) { .card { transition: border-color 120ms ease; } .card:hover { border-color: var(--accent); } }
 </style>
@@ -104,6 +126,12 @@ footer { margin-top: 36px; color: var(--muted); font-size: 12px; max-width: 80ch
 
   <p class="hint">Click a BA to see its four kinds of day side by side and the other seasons.</p>
   <div class="grid" id="grid"></div>
+
+  <section class="section" id="scores" hidden>
+    <h2>How well each day is forecast</h2>
+    <p class="lede">Mean absolute error of the hourly forecast in percent of the actual load, 2023 to 2025, on the days both forecasts scored. Each cell reads <span class="code" style="color:var(--accent)">recipe</span> / <span style="color:var(--muted)">DF</span>: the open day-ahead forecaster of this initiative, built from public load and public weather forecasts at a 9 a.m. cut-off the day before, against the forecast each BA itself reports to the EIA. Underlined where the recipe is better. Click a column header to sort.</p>
+    <div class="tablewrap"><table id="scoretable"></table></div>
+  </section>
 
   <footer>Source: hourly demand of Form EIA-930 (U.S. Energy Information Administration), on the days the forecasting study scored (days with reporting faults left out). Seasons: winter December to February, summer June to August, shoulder the other months. Holidays are the special days the forecasting study marks (the main federal holidays and the eves and bridge days around them); weekdays, Saturdays and Sundays exclude them. Percent scale divides each hour by the mean load of the same group of days. Part of Cardinal Grid, an independent open initiative.</footer>
 </div>
@@ -215,6 +243,11 @@ function openDetail(d) {
   const cell = (title, g, range) => `<div class="dcell"><div class="ttl"><span>${title}</span><span><b>${g.n}</b> days · mean <b>${fmtLoad(g.mean)}</b></span></div>${chart(series(g, state.scale), state.scale, range, 300, 170)}</div>`;
   box.innerHTML = `<div class="head"><h2>${d.ba}<small>${d.name}</small></h2><button class="close" type="button" id="close-btn">Close</button></div>` +
     `<div class="sub">${d.days} scored days, 2023 to 2025 · mean load ${fmtLoad(d.mean_mw)} · ${d.set === "development" ? "development set of the forecaster" : "one weather station"}${d.comparable ? "" : " · published forecast not comparable with demand (EIA)"}</div>` +
+    (d.score ? `<div class="sub">Forecast error 2023 to 2025, <span class="code" style="color:var(--accent)">recipe</span> / DF, MAPE in percent</div><div class="scorerow">` +
+      [["day", "whole day"], ["night", "night"], ["morning", "morning"], ["midday", "midday"], ["evening", "evening"], ["late", "late"]].map(([k, l]) =>
+        `<div><span class="k">${l}</span><span class="v"><span class="r">${d.score[k][0].toFixed(2)}</span> / <span class="d">${d.score[k][1].toFixed(2)}</span></span></div>`).join("") +
+      `<div><span class="k">error at the peak</span><span class="v"><span class="r">${(d.score.peak_err[0] > 0 ? "+" : "") + d.score.peak_err[0].toFixed(1)}</span> / <span class="d">${(d.score.peak_err[1] > 0 ? "+" : "") + d.score.peak_err[1].toFixed(1)}</span></span></div>` +
+      `<div><span class="k">band coverage</span><span class="v">${(100 * d.score.coverage).toFixed(1)}%</span></div></div>` : "") +
     `<div class="sub">${SEASON_LABEL[state.season]}, by kind of day (same vertical scale)</div><div class="dgrid">` +
     kinds.map(k => d.groups[`${state.season}|${k}`] ? cell(KIND_LABEL[k], d.groups[`${state.season}|${k}`], r1) : "").join("") + `</div>` +
     `<div class="sub">${KIND_LABEL[state.kind]}s, by season (same vertical scale)</div><div class="dgrid">` +
@@ -229,4 +262,48 @@ chips("scale-group", [["mw", "MW"], ["pct", "% of group mean"]], "scale", render
 chips("sort-group", [["size", "by size"], ["alpha", "A to Z"], ["peak", "by peak hour"]], "sort", renderGrid);
 document.getElementById("dlg").addEventListener("click", e => { if (e.target.id === "dlg") e.target.close(); });
 renderGrid();
+
+// ---- the scoreboard table: recipe / DF per BA and part of the day ----
+const COLS = [
+  ["ba", "BA", "text"], ["mean_mw", "Mean load", "load"], ["days", "Days", "int"],
+  ["day", "Whole day", "pair"], ["night", "Night 00–05", "pair"], ["morning", "Morning 06–10", "pair"], ["midday", "Midday 11–15", "pair"],
+  ["evening", "Evening 16–21", "pair"], ["late", "Late 22–23", "pair"], ["peak_err", "Error at the peak", "signed"],
+  ["peak_under", "Days under at the peak", "share"], ["coverage", "Band coverage", "cov"], ["dm", "DM", "dm"],
+];
+const sortState = { key: "mean_mw", dir: -1 };
+function scoreValue(d, key) {
+  if (key === "ba") return d.ba; if (key === "mean_mw") return d.mean_mw;
+  const s = d.score; if (!s) return null;
+  if (key === "days") return s.days; if (key === "coverage") return s.coverage; if (key === "dm") return s.dm;
+  const v = s[key]; return Array.isArray(v) ? v[0] - v[1] : v;   // pairs sort by the gap, recipe minus DF
+}
+function pairCell(v, fmt, lowerIsBetter = true) {
+  const [r, d] = v, better = lowerIsBetter ? Math.abs(r) < Math.abs(d) : Math.abs(r) > Math.abs(d);
+  const cls = better ? "win" : (Math.abs(r) > Math.abs(d) ? "loss" : "");
+  return `<td class="pair ${cls}"><span class="r">${fmt(r)}</span> / <span class="d">${fmt(d)}</span></td>`;
+}
+function renderScores() {
+  const rows = DATA.bas.filter(d => d.score);
+  if (!rows.length) return;
+  document.getElementById("scores").hidden = false;
+  rows.sort((a, b) => { const x = scoreValue(a, sortState.key), y = scoreValue(b, sortState.key); return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortState.dir; });
+  const f2 = v => v.toFixed(2), fs = v => (v > 0 ? "+" : "") + v.toFixed(1), fp = v => (100 * v).toFixed(0) + "%";
+  const head = "<thead><tr>" + COLS.map(([k, label]) => `<th scope="col" tabindex="0" data-key="${k}" aria-sort="${sortState.key === k ? (sortState.dir > 0 ? "ascending" : "descending") : "none"}">${label}</th>`).join("") + "</tr></thead>";
+  const body = "<tbody>" + rows.map(d => {
+    const s = d.score;
+    return `<tr class="${d.comparable ? "" : "nc"}"><td><span class="code">${d.ba}</span>${d.comparable ? "" : " <span class=\"tag\">DF n/c</span>"}</td><td>${fmtLoad(d.mean_mw)}</td><td>${s.days}</td>` +
+      pairCell(s.day, f2) + pairCell(s.night, f2) + pairCell(s.morning, f2) + pairCell(s.midday, f2) + pairCell(s.evening, f2) + pairCell(s.late, f2) +
+      pairCell(s.peak_err, fs) + `<td class="pair"><span class="r">${fp(s.peak_under[0])}</span> / <span class="d">${fp(s.peak_under[1])}</span></td>` +
+      `<td>${(100 * s.coverage).toFixed(1)}%</td><td>${(s.dm > 0 ? "+" : "") + s.dm.toFixed(0)}${s.dm_p < 0.05 ? "*" : ""}</td></tr>`;
+  }).join("") + "</tbody>";
+  const foot = `<tfoot><tr><td colspan="${COLS.length}">Parts of the day in local time. Error at the peak: signed error at the hour of the actual daily peak, in percent of the peak (negative is under). Days under at the peak: share of days the forecast sat below the actual at that hour. Band coverage: share of hours inside the recipe's 90 % prediction interval (target 90 %). DM: Diebold–Mariano statistic of the daily MAPE, recipe against DF; negative favours the recipe, * marks p &lt; 0.05. "DF n/c": the EIA lists this BA's published forecast as not comparable with its demand.</td></tr></tfoot>`;
+  const table = document.getElementById("scoretable");
+  table.innerHTML = head + body + foot;
+  table.querySelectorAll("th").forEach(th => {
+    const go = () => { const k = th.dataset.key; sortState.dir = sortState.key === k ? -sortState.dir : (k === "ba" ? 1 : -1); sortState.key = k; renderScores(); };
+    th.addEventListener("click", go);
+    th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
+}
+renderScores();
 </script>
