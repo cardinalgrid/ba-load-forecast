@@ -159,7 +159,11 @@ def main(argv=None) -> int:
         return 1
     s = summary(t, a.candidate)
     e = per_event(a.runs, a.candidate, a.reference, a.bas)
-    lines = [f"# {', '.join(a.candidate)} against {a.reference}, by stratum", "",
+    def short(spec: str) -> str:
+        """``group@folder:model`` -> ``group@<runs>:model``: no local path in a report."""
+        return spec if "@" not in spec else spec.split("@", 1)[0] + "@<runs>:" + spec.rsplit(":", 1)[1]
+
+    lines = [f"# {', '.join(short(c) for c in a.candidate)} against {short(a.reference)}, by stratum", "",
              "Demand-weighted means over the BAs on the days every model scored. MAPE, CRPS and Winkler in percent of the "
              "actual; peak under-forecast and peak error in percent of the actual peak; coverage of the 90 % band. "
              f"Strata: the year, winter (December to February), summer (June to September), the rest, the winter-event days, "
