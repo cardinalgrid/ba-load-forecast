@@ -380,6 +380,21 @@ Stacked on the cold-day level and tail, the spread factor widens too far: covera
 
 MAPE, CRPS and coverage of `final11m` equal those of `final10s` in every stratum. None is adopted: the learned ratios worsen the largest peaks in 10 of the 11 BAs, and the members' maxima, harmless and slightly helpful in the winter strata, leave the largest peaks unchanged. **What it says about the cause:** the flattening of the mean is real but small, and it sits in the winter days with two daily peaks on which the members disagree; on the largest peaks, mostly summer afternoons, the issued maximum (already read at the 60th percentile near the peak) is above the members' maxima, so there is nothing to undo. The under-forecast on the extreme days comes from elsewhere: the weather input or the model's response at temperatures beyond its training days, which a run with observed temperature would separate.
 
+## 8p. Phase R: the recipe with the observed temperature, a diagnostic
+
+**Question.** Is the under-forecast on the extreme days a weather-forecast error or a load-model error? A run of the recipe in which every hour of each station's temperature path, from the cut-off to the end of the target day, is the temperature observed at that station (`Loader(oracle_temperature=True)`, group `oracle`, candidate `final10so`) answers it: what remains with a perfect temperature forecast belongs to the load model. Dew point, wind and the NBM spread stay forecast. Not a forecast; eleven development BAs, 2020-12-02 to 2022-12-31, compared with `final10s` of the phase Q run on the same 8277 BA-days (`docs/phase_r_oracle.md`, `docs/phase_r_oracle_strata.md`). Run on a second machine (`docs/reproduce.md`, step 70).
+
+| Stratum | MAPE, forecast temperature | MAPE, observed temperature | Under-forecast at the peak, forecast | Under-forecast at the peak, observed | BAs where the peak improves |
+|---|---|---|---|---|---|
+| year | 2.27 | 2.01 | −1.23 | −1.08 | 10 of 11 |
+| winter | 2.47 | 2.17 | −1.48 | −1.23 | |
+| summer | 2.35 | 1.98 | −0.93 | −0.81 | 9 |
+| winter-storm days | 4.26 | 3.83 | −2.76 | −1.97 | 10 |
+| 30 coldest mornings | 3.25 | 2.72 | −2.08 | −1.43 | 9 |
+| 30 largest peaks | 2.20 | 1.77 | −1.25 | −1.40 | 4 (6 worse) |
+
+**Reading.** A perfect temperature forecast takes about a ninth of the yearly error away (2.27 % to 2.01 %, better in 10 of 11 BAs): most of the error is the load model's, not the weather's. On the winter-storm days and the coldest mornings it closes about 30 % of the under-forecast at the peak: there the weather forecast matters. On the 30 largest peaks of each BA, mostly summer afternoons, the whole-day error falls (2.20 % to 1.77 %) but the under-forecast at the peak grows (−1.25 % to −1.40 %, worse in 6 of 11; the signed error at the peak goes from +0.13 to −0.65 % at PJM, +0.74 to −0.42 % at MISO, +0.03 to −1.27 % at NYISO): with the real temperature the models answer the hottest afternoons with too little load. The forecast temperatures had been hiding that by erring warm on those days. **The gap on the largest peaks is the load model's response at the top of its training range** (idea A30), and on the winter storms it is split between the weather (about a third) and the model (two thirds).
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a

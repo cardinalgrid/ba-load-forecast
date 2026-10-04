@@ -273,6 +273,10 @@ The margin grows where the published forecast is weak (WACM, NEVP, PNM, PSCO, CI
 
 A second stage that rescales the forecast around its peak (`docs/methods.md`, section 8o; `docs/phase_q_peak_strata.md`) was tried on the eleven development BAs, 2020 to 2022, against a rule fixed before the run. Rescaling by the members' own maxima lifted the peak on the event days and the coldest mornings in 8 of the 11 BAs without changing MAPE, CRPS or coverage, but left the 30 largest peaks of each BA unchanged; two learned ratios worsened those peaks in 10 of the 11 BAs. None is adopted. The flattening of the ensemble mean is real but small; the under-forecast on the extreme days comes from the weather input or the model's response beyond its training range.
 
+## Phase R: how much of the error is the weather's?
+
+The recipe was run with the observed temperature in place of the forecast on the eleven development BAs, 2020 to 2022 (`docs/methods.md`, section 8p): a diagnostic, not a forecast. A perfect temperature forecast takes about a ninth of the yearly error away (2.27 % to 2.01 %) and about 30 % of the under-forecast at the peak of the winter-storm days and the coldest mornings, but none of it on the 30 largest peaks of each BA, where the under-forecast grows (−1.25 % to −1.40 %): there the load models answer the hottest afternoons with too little load.
+
 ## Layout
 
 | Module | Responsibility |
