@@ -281,6 +281,10 @@ The recipe was run with the observed temperature in place of the forecast on the
 
 With the observed temperature every member under-forecasts the largest peaks; the recipe's correction can move the curve but not stretch it. Two other ways of choosing the comparable days for that correction, and a linear recalibration per hour that stretches the curve, were tried on the eleven development BAs against a rule fixed before the runs (`docs/methods.md`, section 8q): the first two lower the largest peaks further, the third raises the peaks of the storm days but worsens the yearly error in every BA. None is adopted.
 
+## How much a later cut-off is worth
+
+The published forecasts may be made later than this study's 9 a.m. cut-off. Run at 3 p.m. and 9 p.m. of the day before, with more of the day's load and the newer HRRR runs, the recipe's error on the eleven development BAs over 2023 to 2025 goes from 2.21 % to 2.15 % and 2.08 % (published forecasts 2.90 %), and its under-forecast at the peak from -1.18 % to -1.09 % (published -1.10 %): an evening forecast holds about a tenth of a point of advantage over the 9 a.m. comparison (`docs/methods.md`, section 8r).
+
 ## Layout
 
 | Module | Responsibility |

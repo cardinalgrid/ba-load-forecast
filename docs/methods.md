@@ -409,6 +409,18 @@ MAPE, CRPS and coverage of `final11m` equal those of `final10s` in every stratum
 
 None is adopted. Choosing the comparable days otherwise moves the whole curve and cannot stretch it; a linear recalibration stretches it, and the error of the ordinary days with it. The members' shrinkage at the top of their range remains the open problem of the recipe; the next candidates would act on the members themselves (training weights on the high days, a loss that penalises under-forecasting the peak, or a model of the daily peak in its own right).
 
+## 8r. How much a later cut-off is worth
+
+**Why.** Form EIA-930 does not record when a BA makes the day-ahead forecast it reports; the deadline is 7 a.m. Eastern of the target day. The published forecast of CAISO matches the CAISO day-ahead market forecast issued the morning before, about the time of this study's 9 a.m. cut-off; for other BAs the forecast may be made later. To put a number on the information a later forecast has, the recipe was run unchanged on the eleven development BAs over 2023 to 2025 at a 3 p.m. and a 9 p.m. cut-off, first with more of the day before's load and the same weather runs, then also with the HRRR 18 and 00 UTC runs for the temperature (extracted for the 49 stations, `docs/cutoff_stage1.md`, `docs/cutoff_stage2.md`; run on a second machine).
+
+| 11 BAs, 2023 to 2025, weighted | 9 a.m. | 3 p.m., load | 3 p.m., load and weather | 9 p.m., load | 9 p.m., load and weather | published `DF` |
+|---|---|---|---|---|---|---|
+| MAPE | 2.21 | 2.16 | 2.15 | 2.11 | 2.08 | 2.90 |
+| BAs ahead of `DF` | 7 | 7 | 7 | 9 | 10 | |
+| under-forecast at the peak | -1.18 | | -1.17 | | -1.09 | -1.10 |
+
+**Reading.** Twelve more hours of information are worth about a tenth of a point of MAPE (2.21 % to 2.08 %), two thirds of it from the load of the afternoon and evening and one third from the newer weather runs; at the peak they bring the recipe level with the published forecasts. A published forecast made the evening before therefore holds an advantage of that order over the 9 a.m. comparison, small next to the distance to the published forecasts as reported (2.90 %) and comparable to the distance to the same forecasts with their hourly bias removed. At 9 p.m. the recipe is ahead of the published forecast in ten of the eleven BAs; ISO-NE stays behind (3.37 % against 2.56 %), so its gap is not a matter of timing.
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
