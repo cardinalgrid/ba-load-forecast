@@ -4,8 +4,8 @@
 
 The base data root (``BA_LOAD_FORECAST_DATA``) is copied to ``--out`` once (never modified). For every station file of
 ``--late`` (``<ICAO>.parquet``, written by ``extract_hrrr.py --consolidate`` for the 18 and 00 UTC runs), the rows are
-appended to the station's file in the copy, in the folder the Loader reads it from (``hrrr/`` first, then
-``hrrr_multi/``, as ``Loader.hrrr`` does), duplicates dropped on (icao, init_utc, lead_h). A run of the forecaster
+appended to the station's file in the copy, in the folder the Loader reads it from (``hrrr/`` first, then the
+sibling ``hrrr_*`` folders in name order, as ``Loader.hrrr`` does), duplicates dropped on (icao, init_utc, lead_h). A run of the forecaster
 pointed at the new root with ``BA_LOAD_FORECAST_HRRR_INIT_HOURS="0 18 12 6"`` and a late
 ``BA_LOAD_FORECAST_CUTOFF_HOUR`` then reads the newest HRRR temperature run available at its cut-off, and every other
 input at its usual runs.
@@ -37,7 +37,8 @@ def main(argv=None) -> int:
     merged = 0
     for f in sorted(a.late.glob("*.parquet")):
         icao = f.stem
-        target = next((d / f.name for d in (a.out / "hrrr", a.out / "hrrr_multi") if (d / f.name).exists()), None)
+        folders = [a.out / "hrrr", *sorted(p for p in a.out.glob("hrrr_*") if p.is_dir())]   # the Loader's order
+        target = next((d / f.name for d in folders if (d / f.name).exists()), None)
         if target is None:
             print("no base file for", icao, "- skipped")
             continue
