@@ -395,6 +395,20 @@ MAPE, CRPS and coverage of `final11m` equal those of `final10s` in every stratum
 
 **Reading.** A perfect temperature forecast takes about a ninth of the yearly error away (2.27 % to 2.01 %, better in 10 of 11 BAs): most of the error is the load model's, not the weather's. On the winter-storm days and the coldest mornings it closes about 30 % of the under-forecast at the peak: there the weather forecast matters. On the 30 largest peaks of each BA, mostly summer afternoons, the whole-day error falls (2.20 % to 1.77 %) but the under-forecast at the peak grows (−1.25 % to −1.40 %, worse in 6 of 11; the signed error at the peak goes from +0.13 to −0.65 % at PJM, +0.74 to −0.42 % at MISO, +0.03 to −1.27 % at NYISO): with the real temperature the models answer the hottest afternoons with too little load. The forecast temperatures had been hiding that by erring warm on those days. **The gap on the largest peaks is the load model's response at the top of its training range** (idea A30), and on the winter storms it is split between the weather (about a third) and the model (two thirds).
 
+## 8q. Phase S: the models' response at the extremes, nothing adopted
+
+**Diagnosis.** With the observed temperature (section 8p) every member under-forecasts the 30 largest peaks of each BA (additive −5.5 %, boosting −3.3 %, recency regression −3.5 %, ensemble −3.9 % at the hour of the actual peak): the members shrink toward the mean, the additive model most. The recipe's correction, the median of the recent relative errors on the 40 known days nearest in forecast minimum temperature, brings the point to −1.2 %.
+
+**Candidates and rule.** `final12r` and `final12p` measure "nearest" otherwise (`AdaptiveIntervals(nearest_by=...)`): on the temperature that drives the day's regime (the forecast maximum on cooling days, the minimum on heating days, the mean on mild days) or on the level the ensemble forecasts the day at. `final12l` adds, under the same band, a linear recalibration of the ensemble per hour of the day (`forecasters/recalibrate.py`): the load regressed on the ensemble over the last 365 known days of the same regime, slope clipped to 0.8–1.5, which stretches the high days; it was added after a first look at four BAs of the first two, under the same rule. Rule fixed before the runs: the peak under-forecast improves on the 30 largest peaks in at least 7 of the 11 BAs and does not worsen on the event days; yearly MAPE no more than 0.02 point worse; yearly CRPS not worse; coverage 88–91 %. Eleven development BAs, 2020-12-02 to 2022-12-31 (`docs/phase_s_a30*.md`), run on a second machine.
+
+| | `final10s` | `final12r` | `final12p` | `final12l` |
+|---|---|---|---|---|
+| yearly MAPE | 2.27 | 2.27 | 2.28 | 2.40 (worse in 11 of 11) |
+| under-forecast, 30 largest peaks | −1.25 | −1.33 (3 better, 7 worse) | −1.32 (1 better, 9 worse) | −1.30 (6 better, 5 worse) |
+| under-forecast, event days | −2.76 | −2.76 | −2.72 | −2.19 (8 better, 3 worse) |
+
+None is adopted. Choosing the comparable days otherwise moves the whole curve and cannot stretch it; a linear recalibration stretches it, and the error of the ordinary days with it. The members' shrinkage at the top of their range remains the open problem of the recipe; the next candidates would act on the members themselves (training weights on the high days, a loss that penalises under-forecasting the peak, or a model of the daily peak in its own right).
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a

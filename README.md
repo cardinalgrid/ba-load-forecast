@@ -277,6 +277,10 @@ A second stage that rescales the forecast around its peak (`docs/methods.md`, se
 
 The recipe was run with the observed temperature in place of the forecast on the eleven development BAs, 2020 to 2022 (`docs/methods.md`, section 8p): a diagnostic, not a forecast. A perfect temperature forecast takes about a ninth of the yearly error away (2.27 % to 2.01 %) and about 30 % of the under-forecast at the peak of the winter-storm days and the coldest mornings, but none of it on the 30 largest peaks of each BA, where the under-forecast grows (−1.25 % to −1.40 %): there the load models answer the hottest afternoons with too little load.
 
+## Phase S: the models' response at the extremes, nothing adopted
+
+With the observed temperature every member under-forecasts the largest peaks; the recipe's correction can move the curve but not stretch it. Two other ways of choosing the comparable days for that correction, and a linear recalibration per hour that stretches the curve, were tried on the eleven development BAs against a rule fixed before the runs (`docs/methods.md`, section 8q): the first two lower the largest peaks further, the third raises the peaks of the storm days but worsens the yearly error in every BA. None is adopted.
+
 ## Layout
 
 | Module | Responsibility |
