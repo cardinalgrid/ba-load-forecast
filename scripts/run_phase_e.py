@@ -60,6 +60,7 @@ of ``DF`` and the outcome. A BA whose station forecasts are not extracted yet is
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 import time
@@ -68,6 +69,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from ba_load_forecast.cutoff import DEFAULT_INIT_HOURS
 from ba_load_forecast.evaluate import evaluate
 from ba_load_forecast.forecasters.additive import AdditiveModel
 from ba_load_forecast.forecasters.base import Cached
@@ -133,9 +135,15 @@ def nbm_options(group: str) -> dict:
 
 def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0,
            fields: tuple[str, ...] = (), field_bias_days: int = 0, second_run: bool = False, nbm: dict | None = None) -> Loader:
+    # BA_LOAD_FORECAST_HRRR_INIT_HOURS (late cut-off study): the HRRR temperature runs that may be chosen, e.g. "0 18 12 6";
+    # every other input stays on the default extracted runs
+    extra = {}
+    hours = os.environ.get("BA_LOAD_FORECAST_HRRR_INIT_HOURS")
+    if hours:
+        extra = dict(init_hours=tuple(int(h) for h in hours.split()), aux_init_hours=DEFAULT_INIT_HOURS)
     return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
                   temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields, field_bias_days=field_bias_days,
-                  second_run=second_run, **(nbm or {}))
+                  second_run=second_run, **extra, **(nbm or {}))
 
 
 def fields_ready(ld: Loader, ba: str) -> bool:

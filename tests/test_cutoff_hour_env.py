@@ -42,3 +42,14 @@ def test_out_of_range_is_refused(bad):
     out = probe(bad)
     assert out.returncode != 0
     assert "BA_LOAD_FORECAST_CUTOFF_HOUR" in out.stderr
+
+
+def test_aux_runs_default_to_the_hrrr_runs(tmp_path):
+    """Without aux_init_hours every input reads the same runs as the HRRR temperature (the recipe unchanged)."""
+    from ba_load_forecast.information_set import Loader
+
+    ld = Loader(tmp_path, tmp_path, tmp_path)
+    assert ld.aux_init_hours == tuple(ld.init_hours)
+    late = Loader(tmp_path, tmp_path, tmp_path, init_hours=(0, 18, 12, 6), aux_init_hours=(12, 6))
+    assert late.init_hours == (0, 18, 12, 6)
+    assert late.aux_init_hours == (12, 6)

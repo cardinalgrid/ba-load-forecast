@@ -313,7 +313,8 @@ class Loader:
                  nbm_field_dirs: dict[str, Path] | None = None, nbm_dswrf_dir: Path | None = None,
                  gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0,
                  model_weight_cold_days: int = 0, model_weight_cold_threshold_f: float = 25.0,
-                 gfs_cold_quantile: float = 0.0, nbm_spread_dir: Path | None = None, oracle_temperature: bool = False):
+                 gfs_cold_quantile: float = 0.0, nbm_spread_dir: Path | None = None, oracle_temperature: bool = False,
+                 aux_init_hours: tuple[int, ...] | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
         looked up in ``hrrr_dirs`` (default: ``hrrr_dir`` and its sibling ``hrrr_multi``). ``cleaning="sentinel"``
@@ -397,6 +398,11 @@ class Loader:
                           else [self.hrrr_dir, *sorted(p for p in self.hrrr_dir.parent.glob(f"{self.hrrr_dir.name}_*") if p.is_dir())])
         self.history_days = history_days
         self.init_hours = init_hours
+        # aux_init_hours: the runs every input other than the HRRR temperature is read from (NBM, its spread and daily
+        # products, the HRRR dew point, wind and cloud fields). By default the same as init_hours. A late cut-off study
+        # extracts the 18 and 00 UTC HRRR temperature alone and keeps the other inputs at their extracted runs, so that
+        # only the temperature forecast gets newer (cutoff.py, BA_LOAD_FORECAST_CUTOFF_HOUR).
+        self.aux_init_hours = tuple(aux_init_hours) if aux_init_hours else tuple(init_hours)
         self.gross_guard = gross_guard
         self.stations = stations
         self._series: dict[tuple, pd.Series] = {}
@@ -456,7 +462,7 @@ class Loader:
                     v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
                     return float(off.median()) if np.isnan(v) else float(v)
 
-                cache[ba] = forecast_as_seen(tables, all_days(first, last), offset_of_day, self.init_hours)
+                cache[ba] = forecast_as_seen(tables, all_days(first, last), offset_of_day, self.aux_init_hours)
         return cache[ba]
 
     def temp_seen_series(self, ba: str, icao: str) -> pd.Series | None:
@@ -500,7 +506,7 @@ class Loader:
                     v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
                     return float(off.median()) if np.isnan(v) else float(v)
 
-                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.init_hours)
+                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.aux_init_hours)
         return cache[key]
 
     def field_hour_bias(self, ba: str, icao: str, field: str, day: date) -> np.ndarray:
@@ -666,7 +672,7 @@ class Loader:
                     v = off.get(pd.Timestamp(d) + pd.Timedelta(hours=12), np.nan)
                     return float(off.median()) if np.isnan(v) else float(v)
 
-                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.init_hours)
+                cache[key] = forecast_as_seen([table], all_days(first, last), offset_of_day, self.aux_init_hours)
         return cache[key]
 
     def nbm_cold_bias(self, ba: str, icao: str, day: date) -> float:
@@ -828,6 +834,9 @@ class Loader:
         if not np.isnan(off_cutoff):
             run = run_for_day(day, float(off_cutoff), self.init_hours)
         run2 = previous_run(run, self.init_hours) if (self.second_run and run is not None) else None
+        aux = run
+        if run is not None and self.aux_init_hours != tuple(self.init_hours):
+            aux = run_for_day(day, float(off_cutoff), self.aux_init_hours)
         paths = {}
         for icao in stations:
             rows = self.hrrr(icao)
@@ -839,7 +848,7 @@ class Loader:
             if self.nbm_mode and run is not None:
                 nrows = self.nbm(icao)
                 if len(nrows):
-                    npath = nbm_path(nrows, day, off_path, run)
+                    npath = nbm_path(nrows, day, off_path, aux)
                     if self.nbm_cold_bias_days:
                         npath = apply_cold_bias(npath, self.nbm_cold_bias(ba, icao, day), self.nbm_cold_threshold_f)
                     if self.nbm_mode == "blend":
@@ -887,7 +896,7 @@ class Loader:
             temp = pd.concat([self._years(ba, start, day, lambda b, y, i=icao: self.station_temperature(i, b, y)) for icao in stations],
                              axis=1).mean(axis=1)
 
-        weather = self.weather_frame(ba, start, day, history_index, path_ts, off_path, run, run2)
+        weather = self.weather_frame(ba, start, day, history_index, path_ts, off_path, aux, run2 if aux == run else None)
 
         nbm_spread = np.nan
         if self.nbm_spread_dir is not None and run is not None:
@@ -895,14 +904,14 @@ class Loader:
             for icao in stations:
                 srows = self.nbm_spread_rows(icao)
                 if len(srows):
-                    sp = nbm_path(srows, day, off_path, run, column="nbm_tempstd_f")[-24:]
+                    sp = nbm_path(srows, day, off_path, aux, column="nbm_tempstd_f")[-24:]
                     if np.isfinite(sp).sum() >= 12:
                         per_station.append(float(np.nanmean(sp)))
             if per_station:
                 nbm_spread = float(np.mean(per_station))
         nbm_daily = None
         if self.nbm_daily_dir is not None and run is not None:
-            per_station = [daily_at_cutoff(self.nbm_daily_rows(icao), run) for icao in stations]
+            per_station = [daily_at_cutoff(self.nbm_daily_rows(icao), aux) for icao in stations]
             per_station = [d for d in per_station if d]
             if per_station:
                 keys = set().union(*per_station)
