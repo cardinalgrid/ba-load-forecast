@@ -98,7 +98,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO, "a30": FINAL10S, "frozen12": FINAL10S}
 
 
 def nbm_options(group: str) -> dict:
@@ -504,6 +504,23 @@ def peak_q_models(ba: str | None) -> list:
             PeakStage(band, members=members, mode="learned_extreme", name="final11x")]
 
 
+def a30_models(ba: str | None) -> list:
+    """Phase S (A30): the recipe (``final10s``) and two other meanings of "nearest" for the pool of known days whose errors
+    correct the point and set the band: the temperature that drives the regime (``final12r``) and the level the base
+    forecast puts the day at (``final12p``). Same ensemble, same members: only the pool changes."""
+    import copy
+
+    models = _final3_models(ba, FINAL10S, "final10s")
+    band = models[-1]
+    out = [*models]
+    for tag, by in (("final12r", "regime"), ("final12p", "peak")):
+        other = copy.deepcopy(band, memo={id(band.base): band.base})
+        other.name = tag
+        other.nearest_by = by
+        out.append(other)
+    return out
+
+
 def oracle_models(ba: str | None) -> list:
     """A29: the recipe fed with the temperature observed on the target day instead of the forecast (a diagnostic)."""
     return _final3_models(ba, FINAL10SO, "final10so")
@@ -586,7 +603,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models, "a30": a30_models, "frozen12": a30_models,
     "tbias": final2_models,
 }
 
@@ -676,7 +693,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -1026,6 +1043,16 @@ def main(argv=None) -> int:
                     "target day, replaced by the temperature observed at that station: what the recipe would do with a perfect "
                     "temperature forecast. Dew point, wind and the NBM spread stay forecast. Not a forecast; compare with "
                     "`peak_q:final10s` (same days) to split the error into its weather and its model parts.")
+    a30 = report({"a30"}, a.results.parent / "phase_s_a30", a.doc.parent / "phase_s_a30.md",
+                 "Phase S (A30): the pool of comparable days measured on what drives the peak", g_common +
+                 "`final10s` measures the 40 nearest known days on the forecast daily minimum temperature; `final12r` on the "
+                 "temperature that drives the day's regime (the forecast maximum on cooling days, the minimum on heating days, "
+                 "the mean on mild days); `final12p` on the level the ensemble puts the day at (its forecast daily maximum, "
+                 "relative). The pool corrects the point at each hour and sets the band; members and ensemble are shared.")
+    frozen12 = report({"frozen12"}, a.results.parent / "frozen12_2023_2025", a.doc.parent / "phase_s_frozen_a30.md",
+                      "Phase S on 2023 to 2025: the pool of comparable days measured on what drives the peak",
+                      "Development BAs: " + common +
+                      "The phase S candidates on 2023 to 2025 under protocol v2, run once after the choice on 2020 to 2022.")
     frozen11 = report({"frozen11"}, a.results.parent / "frozen11_2023_2025", a.doc.parent / "phase_q_frozen_peak.md",
                       "Phase Q on 2023 to 2025: the second stage for the daily peak",
                       "Development BAs: " + common +
@@ -1083,7 +1110,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as, band_ast, frozen10, frozen10s, frozen10sa, band_c, band_c2, band_ct, band_cs, band_scs, b4, peak_q, frozen11, oracle)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as, band_ast, frozen10, frozen10s, frozen10sa, band_c, band_c2, band_ct, band_cs, band_scs, b4, peak_q, frozen11, oracle, a30, frozen12)):
         log("no rows to report")
         return 1
     if waiting:

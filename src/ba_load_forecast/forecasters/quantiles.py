@@ -24,7 +24,7 @@ from ..features import rows_for_days, target_temperature, training_days
 from ..information_set import InformationSet
 from .base import Forecaster, ForecastError
 from .boosting import Boosting
-from .profile import regime
+from .profile import COOLING, HEATING, regime
 
 QUANTILES = (0.05, 0.5, 0.95)
 
@@ -93,6 +93,9 @@ class EmpiricalIntervals:
         self._stored: dict[date, np.ndarray] = {}
         self._regime: dict[date, int | None] = {}
         self._tmin: dict[date, float] = {}
+        self._tmax_f: dict[date, float] = {}       # forecast daily maximum temperature
+        self._tmean_f: dict[date, float] = {}      # forecast daily mean temperature
+        self._pmax: dict[date, float] = {}         # maximum of the base forecast (the level the day is forecast at)
 
     @staticmethod
     def regime_of(info: InformationSet) -> int | None:
@@ -104,10 +107,17 @@ class EmpiricalIntervals:
         self._stored[info.day] = p
         self._regime[info.day] = self.regime_of(info)
         self._tmin[info.day] = float(np.nanmin(info.temp_forecast_f)) if np.isfinite(info.temp_forecast_f).any() else np.nan
+        tf = np.asarray(info.temp_forecast_f, dtype=float)
+        self._tmax_f[info.day] = float(np.nanmax(tf)) if np.isfinite(tf).any() else np.nan
+        self._tmean_f[info.day] = float(np.nanmean(tf)) if np.isfinite(tf).sum() >= 18 else np.nan
+        self._pmax[info.day] = float(np.nanmax(p)) if np.isfinite(p).any() else np.nan
         for d in [d for d in self._stored if d < info.day - timedelta(days=self.window_days + 40)]:
             del self._stored[d]
             self._regime.pop(d, None)
             self._tmin.pop(d, None)
+            self._tmax_f.pop(d, None)
+            self._tmean_f.pop(d, None)
+            self._pmax.pop(d, None)
         return p
 
     def known_days(self, info: InformationSet, only_regime: int | None = None) -> list[date]:
@@ -203,7 +213,7 @@ class AdaptiveIntervals(EmpiricalIntervals):
                  cold_by_max: bool = False, cold_source: str = "path", cold_level: str | None = None,
                  cold_alpha_scale: float = 0.5, cold_gamma: float = 0.10, spread_beta: float = 0.0,
                  spread_bounds: tuple[float, float] = (0.7, 2.0), cold_tail: bool = False, cold_shift: float = 0.0,
-                 cold_shift_mode: str = "levels", cold_shift_scale_f: float = 0.0):
+                 cold_shift_mode: str = "levels", cold_shift_scale_f: float = 0.0, nearest_by: str = "tmin"):
         super().__init__(base, window_days=window_days, min_days=min_days, name=name or f"aci_{base.name}",
                          by_regime=by_regime)
         # cold_level: the band on the coldest days (is_cold_day). "scale": the day's level is alpha * cold_alpha_scale (a wider
@@ -233,6 +243,14 @@ class AdaptiveIntervals(EmpiricalIntervals):
         # degrees the day's forecast minimum sits below the cold-decile threshold (zero at the threshold, capped at twice
         # cold_shift), so that an ordinary cold-decile day is barely moved and a storm is moved in full
         self.cold_shift_scale_f = cold_shift_scale_f
+        # nearest_by (A30): what "nearest" means for the pool of known days whose errors correct the point and set the band.
+        # "tmin": forecast daily minimum temperature (the recipe until phase R); "regime": the temperature that drives the load
+        # in the day's regime (the maximum on cooling days, the minimum on heating days, the mean on mild days); "peak": the
+        # level the base forecast puts the day at (its daily maximum, relative), so that the correction is learned on days
+        # forecast as high as the target day, where the members' shrinkage toward the mean is largest.
+        if nearest_by not in ("tmin", "regime", "peak"):
+            raise ValueError("nearest_by must be 'tmin', 'regime' or 'peak'")
+        self.nearest_by = nearest_by
         self._cold: set[date] = set()
         self._spread: dict[date, float] = {}
         self.target = target
@@ -293,13 +311,32 @@ class AdaptiveIntervals(EmpiricalIntervals):
         days = super().pool_days(info)
         if self.nearest is None:
             return days
-        tmin = self._tmin.get(info.day, np.nan)
-        if np.isfinite(tmin) and len(days) > self.nearest:
-            def distance(d):
-                t = self._tmin.get(d, np.nan)
-                return abs(t - tmin) if np.isfinite(t) else np.inf
+        key = self.nearest_key(info.day)
+        x0 = key.get(info.day, np.nan)
+        if np.isfinite(x0) and len(days) > self.nearest:
+            if self.nearest_by == "peak":
+                def distance(d):
+                    t = key.get(d, np.nan)
+                    return abs(np.log(t / x0)) if np.isfinite(t) and t > 0 and x0 > 0 else np.inf
+            else:
+                def distance(d):
+                    t = key.get(d, np.nan)
+                    return abs(t - x0) if np.isfinite(t) else np.inf
             days = sorted(days, key=distance)[: self.nearest]
         return days
+
+    def nearest_key(self, day: date) -> dict[date, float]:
+        """The per-day values the nearest-day pool is measured on (see ``nearest_by``)."""
+        if self.nearest_by == "peak":
+            return self._pmax
+        if self.nearest_by == "regime":
+            r = self._regime.get(day)
+            if r == COOLING:
+                return self._tmax_f
+            if r == HEATING:
+                return self._tmin
+            return self._tmean_f
+        return self._tmin
 
     def band(self, p: np.ndarray, e: np.ndarray, levels: tuple[float, ...], tail: bool | None = None) -> np.ndarray:
         q = super().band(p, e, levels)

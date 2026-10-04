@@ -12,16 +12,25 @@ For a target day ``D`` of a balancing authority:
 
 Offsets follow the EIA-930 convention: hours behind UTC, positive in the United States (5 for Eastern
 standard time, 4 for Eastern daylight time).
+
+The cut-off hour is 9 unless the environment variable ``BA_LOAD_FORECAST_CUTOFF_HOUR`` sets another hour of the day
+before (1 to 23), read once when this module is imported, so that one run process uses one cut-off throughout: the
+known load, the start of the temperature path, the weather run chosen and the lags of the features all follow it. It
+exists for one question, how much a later cut-off is worth (a published forecast may be made later than 9 a.m.); the
+weather runs that qualify are still only the extracted ones (``DEFAULT_INIT_HOURS``).
 """
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
 
-CUTOFF_LOCAL_HOUR = 9
+CUTOFF_LOCAL_HOUR = int(os.environ.get("BA_LOAD_FORECAST_CUTOFF_HOUR", "9"))
+if not 1 <= CUTOFF_LOCAL_HOUR <= 23:
+    raise ValueError(f"BA_LOAD_FORECAST_CUTOFF_HOUR must be an hour from 1 to 23, not {CUTOFF_LOCAL_HOUR}")
 AVAILABILITY_LAG_H = 2
 DEFAULT_INIT_HOURS = (12, 6)
 HOURS = np.arange(24)
@@ -117,7 +126,7 @@ def lead_hours(day: date, offset_h, init: tuple[date, int]) -> np.ndarray:
     return ((valid_utc_for_day(day, offset_h) - init_utc) / np.timedelta64(1, "h")).astype(int)
 
 
-PATH_HOURS = 24 - CUTOFF_LOCAL_HOUR + 24   # from 09:00 of D-1 to 23:00 of D: 39 hours
+PATH_HOURS = 24 - CUTOFF_LOCAL_HOUR + 24   # from the cut-off hour of D-1 to 23:00 of D (39 hours at the 9 a.m. cut-off)
 
 
 def path_timestamps(day: date) -> pd.DatetimeIndex:
