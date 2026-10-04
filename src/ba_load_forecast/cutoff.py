@@ -52,7 +52,7 @@ def run_for_day(day: date, offset_h: float, init_hours: tuple[int, ...] = DEFAUL
     """The latest HRRR run (initialisation date and UTC hour) available at the cut-off for target day ``day``."""
     limit = cutoff_utc(day, offset_h, cutoff_hour)
     candidates = []
-    for back in (1, 2):
+    for back in (0, 1, 2):              # a run of day D itself (00 UTC) can precede a late cut-off in the Americas
         d = day - timedelta(days=back)
         for h in init_hours:
             init = datetime(d.year, d.month, d.day, h)
