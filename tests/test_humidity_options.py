@@ -9,6 +9,7 @@ from ba_load_forecast.features import apparent_series, rows_for_days
 from ba_load_forecast.forecasters.additive import AdditiveModel
 from ba_load_forecast.forecasters.base import ForecastError
 from ba_load_forecast.forecasters.boosting import Boosting
+from ba_load_forecast.forecasters.quantiles import QuantileBoosting
 from ba_load_forecast.weather_extra import HUMIDITY_COLUMNS, WIND_COLUMNS
 from tests.test_direct_models import perfect_weather_info
 from tests.test_recency import world
@@ -62,3 +63,15 @@ def test_models_use_the_weather_frame_and_refuse_without_it():
     assert not np.allclose(r, plain)                                          # the linear humidity terms change the fit
     with pytest.raises(ForecastError, match="humidity"):
         AdditiveModel(train_days=300, extra=("humidity",)).predict(perfect_weather_info(load, temp, date(2023, 1, 20)))
+
+
+def test_quantile_boosting_uses_the_weather_frame():
+    load, temp = world(days=400)
+    info = perfect_weather_info(load, temp, date(2023, 1, 20))
+    with pytest.raises(ForecastError, match="humidity"):
+        QuantileBoosting(train_days=300, max_iter=30, extra=("humidity",)).predict_quantiles(info)
+    info.weather = weather_for(temp)
+    qb = QuantileBoosting(train_days=300, max_iter=30, extra=("humidity", "wind"))
+    q = qb.predict_quantiles(info)
+    assert q.shape == (3, 24)
+    assert set(HUMIDITY_COLUMNS + WIND_COLUMNS) <= set(qb.columns)

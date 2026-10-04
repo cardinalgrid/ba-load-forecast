@@ -42,7 +42,7 @@ class QuantileBoosting(Boosting):
     def fit(self, info: InformationSet) -> None:
         days = training_days(info.day - timedelta(days=2), self.train_days)
         rows = rows_for_days(info.load_history, info.temp_history_f, days, self._station_frames(info, target=False),
-                             labels=self.day_labels(info))
+                             labels=self.day_labels(info), sky=info.sky if self.sky else None, weather=self._weather(info))
         rows = rows[rows["y"] > 0].dropna(subset=["y"])
         if len(rows) < 24 * self.min_train_days:
             raise ForecastError(f"only {len(rows) // 24} days of history to fit on")
@@ -66,7 +66,8 @@ class QuantileBoosting(Boosting):
         if self.needs_fit(info):
             self.fit(info)
         rows = rows_for_days(info.load_history, target_temperature(info), [info.day], self._station_frames(info, target=True),
-                             labels=self.day_labels(info, target=True))
+                             labels=self.day_labels(info, target=True), sky=info.sky if self.sky else None,
+                             weather=self._weather(info))
         x = rows[self.columns].to_numpy(dtype=float)
         q = np.vstack([self.models[qq].predict(x) for qq in self.quantiles])
         return np.sort(q, axis=0)                       # quantile crossing removed by sorting
