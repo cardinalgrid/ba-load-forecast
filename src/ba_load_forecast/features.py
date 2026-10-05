@@ -200,6 +200,32 @@ def cold_weights(rows_index: pd.DatetimeIndex, temp: pd.Series, alpha: float, de
     return 1.0 + alpha * excess / scale_f
 
 
+def peak_weights(rows_index: pd.DatetimeIndex, load: pd.Series, alpha: float, quantile: float = 0.80,
+                 scale: float = 0.05, hours: int | None = None) -> np.ndarray:
+    """A35: one weight per training row, 1 plus ``alpha`` for every ``scale`` (relative) by which the row's day has its
+    observed daily peak above the ``quantile`` of the daily peaks of the training days (1 on every other day). With
+    ``hours``, only the rows within that many hours of the day's own peak hour get the extra weight. The members
+    shrink toward the mean on the highest days; weighting those days counters it with the history known at the fit."""
+    idx = pd.DatetimeIndex(rows_index)
+    days = idx.normalize()
+    hist = load.loc[(load.index >= days.min()) & (load.index < days.max() + pd.Timedelta(days=1))]
+    by_day = hist.groupby(hist.index.normalize())
+    peak = by_day.max().reindex(days.unique())
+    if peak.notna().sum() == 0:
+        return np.ones(len(idx))
+    threshold = float(np.nanquantile(peak.to_numpy(dtype=float), quantile))
+    row_peak = peak.reindex(days).to_numpy(dtype=float)
+    excess = np.where(np.isfinite(row_peak), np.maximum(0.0, row_peak / threshold - 1.0), 0.0)
+    w = 1.0 + alpha * excess / scale
+    if hours is not None:
+        peak_hour = by_day.idxmax().reindex(days.unique())
+        ph = pd.DatetimeIndex(peak_hour.reindex(days).to_numpy()).hour.to_numpy()
+        near = np.abs(idx.hour.to_numpy() - ph) <= hours
+        near &= np.isfinite(row_peak)
+        w = np.where(near, w, 1.0)
+    return w
+
+
 def cold_threshold(rows_index: pd.DatetimeIndex, temp: pd.Series, decile: float = 0.10) -> float:
     """The ``decile`` quantile of the observed daily minima over the training days (NaN when unknown)."""
     days = pd.DatetimeIndex(rows_index).normalize()

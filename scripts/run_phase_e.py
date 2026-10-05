@@ -100,7 +100,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO, "a30": FINAL10S, "frozen12": FINAL10S, "a30b": FINAL10S, "frozen12b": FINAL10S, "n4_sens": FINAL10S, "n4_b43": FINAL10S, "art_base": FINAL10S}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO, "a30": FINAL10S, "frozen12": FINAL10S, "a30b": FINAL10S, "frozen12b": FINAL10S, "n4_sens": FINAL10S, "n4_b43": FINAL10S, "art_base": FINAL10S, "a35": FINAL10S}
 
 
 def nbm_options(group: str) -> dict:
@@ -362,10 +362,10 @@ def _final3_models(ba: str | None, c: dict, tag: str) -> list:
     add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
                                irradiance=solar and c.get("irradiance", False),
                                apparent=c.get("apparent", False), apparent_wind=c.get("apparent_wind", True), **c["additive"],
-                               cold_weight=c.get("cold_weight", 0.0), name=f"{tag}_additive"))
+                               cold_weight=c.get("cold_weight", 0.0), **c.get("both", {}), name=f"{tag}_additive"))
     boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
-                          target="ratio" if c["ratio"] else "level", **c["boosting"], cold_weight=c.get("cold_weight", 0.0),
-                          name=f"{tag}_boosting"))
+                          target="ratio" if c["ratio"] else "level", **{**c["boosting"], **c.get("boosting_only", {})},
+                          cold_weight=c.get("cold_weight", 0.0), **c.get("both", {}), name=f"{tag}_boosting"))
     members = [add, boo]
     if c.get("storm"):                                                # A9: members fitted on the coldest decile of days, answering on such days only
         members.append(Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
@@ -601,6 +601,17 @@ def art_base_models(ba: str | None) -> list:
     return [VanillaBenchmark(), SameTypeMean(weeks=2), SameWeekdayLastWeek(), LastKnownDay()]
 
 
+A35W = dict(FINAL10S, both=dict(peak_weight=1.0))                                          # A35: high-peak days weigh more
+A35H = dict(FINAL10S, both=dict(peak_weight=1.0, peak_weight_hours=3))                     # A35: only the hours near the day's peak
+A35Q = dict(FINAL10S, boosting_only=dict(loss="quantile", loss_quantile=0.55))             # A35: the boosting fits the 55th percentile
+
+
+def a35_models(ba: str | None) -> list:
+    """A35: act on the members against their shrinkage at the peak; the recipe beside it on the same days."""
+    return [*_final3_models(ba, FINAL10S, "final10s"), *_final3_models(ba, A35W, "a35w"),
+            *_final3_models(ba, A35H, "a35h"), *_final3_models(ba, A35Q, "a35q")]
+
+
 def oracle_models(ba: str | None) -> list:
     """A29: the recipe fed with the temperature observed on the target day instead of the forecast (a diagnostic)."""
     return _final3_models(ba, FINAL10SO, "final10so")
@@ -683,7 +694,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models, "a30": a30_models, "frozen12": a30_models, "a30b": a30b_models, "frozen12b": a30b_models, "n4_sens": n4_sens_models, "n4_b43": n4_b43_models, "art_base": art_base_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models, "a30": a30_models, "frozen12": a30_models, "a30b": a30b_models, "frozen12b": a30b_models, "n4_sens": n4_sens_models, "n4_b43": n4_b43_models, "art_base": art_base_models, "a35": a35_models,
     "tbias": final2_models,
 }
 
@@ -773,7 +784,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base", "a35") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group))
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
@@ -1153,6 +1164,12 @@ def main(argv=None) -> int:
                     "All BAs of the station map, 2023-01-01 to 2025-12-31, protocol v2: the spread band (`final10s`), the band without "
                     "the spread factor (`n4_nospread`), the cold-day level and tail (`n4_a2t`) and a plain adaptive interval "
                     "(`n4_aci_plain`), all on the same ensemble.")
+    a35 = report({"a35"}, a.results.parent / "phase_t_a35", a.doc.parent / "phase_t_a35.md",
+                 "Phase T: the members against their shrinkage at the peak (A35)",
+                 g_common + "Three variants of `final10s`, each refitting its members: the days whose observed "
+                 "daily peak is above the 80th percentile of the training days weigh 1 + (excess / 5 %) in both members "
+                 "(`a35w`), the same weight on the hours within 3 h of the day's peak only (`a35h`), and the boosting fitted to the "
+                 "55th percentile instead of the mean (`a35q`).")
     art_base = report({"art_base"}, a.results.parent / "article_baselines", a.doc.parent / "article_baselines.md",
                       "Main article: reference forecasts on the 43 BAs, 2023 to 2025",
                       "All BAs of the station map, 2023-01-01 to 2025-12-31, protocol v2: the vanilla regression of Hong (2010) on "
@@ -1217,7 +1234,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as, band_ast, frozen10, frozen10s, frozen10sa, band_c, band_c2, band_ct, band_cs, band_scs, b4, peak_q, frozen11, oracle, a30, frozen12, a30b, frozen12b, n4_sens, n4_b43, art_base)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as, band_ast, frozen10, frozen10s, frozen10sa, band_c, band_c2, band_ct, band_cs, band_scs, b4, peak_q, frozen11, oracle, a30, frozen12, a30b, frozen12b, n4_sens, n4_b43, art_base, a35)):
         log("no rows to report")
         return 1
     if waiting:

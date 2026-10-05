@@ -28,6 +28,7 @@ from ..features import (
     apparent_series,
     cold_only_weights,
     cold_weights,
+    peak_weights,
     rows_for_days,
     target_temperature,
     training_days,
@@ -63,7 +64,11 @@ class AdditiveModel:
                  min_train_days: int = 120, special_days: bool = False, label_column: str = "day_type",
                  labels=None, name: str | None = None, extremes: bool = False, pv: bool = False, irradiance: bool = False,
                  extra: tuple[str, ...] = (), apparent: bool = False, apparent_wind: bool = True, cold_weight: float = 0.0,
-                 cold_only: float = 0.0, min_cold_days: int = 40):
+                 cold_only: float = 0.0, min_cold_days: int = 40, peak_weight: float = 0.0, peak_weight_quantile: float = 0.80,
+                 peak_weight_hours: int | None = None):
+        self.peak_weight = peak_weight        # A35, > 0: rows of the highest-peak days weighted by features.peak_weights (alpha)
+        self.peak_weight_quantile = peak_weight_quantile
+        self.peak_weight_hours = peak_weight_hours
         self.cold_weight = cold_weight        # > 0: training rows of cold days weighted by features.cold_weights (alpha)
         self.cold_only = cold_only            # > 0: a storm member, as in Boosting (fitted on and answering for the cold decile only)
         self.min_cold_days = min_cold_days
@@ -192,6 +197,10 @@ class AdditiveModel:
         y_all = rows["y"].to_numpy(dtype=float)
         hours = rows["hour"].to_numpy()
         weights = cold_weights(rows.index, info.temp_history_f, self.cold_weight) if self.cold_weight > 0 else None
+        if self.peak_weight > 0:
+            pw = peak_weights(rows.index, info.load_history, self.peak_weight, self.peak_weight_quantile,
+                              hours=self.peak_weight_hours)
+            weights = pw if weights is None else weights * pw
         if self.cold_only > 0:
             weights, self.cold_threshold_f = cold_only_weights(rows.index, info.temp_history_f, self.cold_only)
             keep = weights > 0

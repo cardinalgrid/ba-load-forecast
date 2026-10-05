@@ -22,6 +22,7 @@ from ..features import (
     FEATURE_COLUMNS,
     cold_only_weights,
     cold_weights,
+    peak_weights,
     rows_for_days,
     target_temperature,
     training_days,
@@ -38,7 +39,12 @@ class Boosting:
                  special_days: bool = True, label_column: str = "day_type", labels=None, name: str | None = None,
                  extremes: bool = False, sky: bool = False, extra: tuple[str, ...] = (), min_samples_leaf: int = 20,
                  l2: float = 0.0, target: str = "level", loss: str = "squared_error", cold_weight: float = 0.0,
-                 cold_only: float = 0.0, min_cold_days: int = 40):
+                 cold_only: float = 0.0, min_cold_days: int = 40, peak_weight: float = 0.0, peak_weight_quantile: float = 0.80,
+                 peak_weight_hours: int | None = None, loss_quantile: float = 0.5):
+        self.peak_weight = peak_weight        # A35, > 0: rows of the highest-peak days weighted by features.peak_weights (alpha)
+        self.peak_weight_quantile = peak_weight_quantile
+        self.peak_weight_hours = peak_weight_hours
+        self.loss_quantile = loss_quantile    # with loss="quantile": the quantile fitted (above 0.5 leans against under-forecasting)
         self.cold_weight = cold_weight        # > 0: training rows of cold days weighted by features.cold_weights (alpha)
         # cold_only > 0: a storm member. Fitted on the days whose observed minimum is in the coldest cold_only quantile of the
         # training days alone (at least min_cold_days of them), and answering only on a target day whose forecast minimum
@@ -135,6 +141,10 @@ class Boosting:
             keep = np.isfinite(base) & (base > 0)
             rows, y = rows[keep], y[keep] / base[keep]
         weights = cold_weights(rows.index, info.temp_history_f, self.cold_weight) if self.cold_weight > 0 else None
+        if self.peak_weight > 0:
+            pw = peak_weights(rows.index, info.load_history, self.peak_weight, self.peak_weight_quantile,
+                              hours=self.peak_weight_hours)
+            weights = pw if weights is None else weights * pw
         if self.cold_only > 0:
             weights, self.cold_threshold_f = cold_only_weights(rows.index, info.temp_history_f, self.cold_only)
             keep = weights > 0
@@ -144,7 +154,7 @@ class Boosting:
         self.model = HistGradientBoostingRegressor(
             max_iter=self.max_iter, learning_rate=self.learning_rate, max_leaf_nodes=self.max_leaf_nodes,
             min_samples_leaf=self.min_samples_leaf, l2_regularization=self.l2, loss=self.loss,
-            early_stopping=True, validation_fraction=0.1, n_iter_no_change=20, random_state=self.seed,
+            **({"quantile": self.loss_quantile} if self.loss == "quantile" else {}), early_stopping=True, validation_fraction=0.1, n_iter_no_change=20, random_state=self.seed,
         ).fit(rows[self.columns].to_numpy(dtype=float), y, sample_weight=weights)
         self.fitted_on = info.day
         self.fitted_ba = info.ba
