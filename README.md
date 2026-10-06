@@ -281,6 +281,10 @@ The recipe was run with the observed temperature in place of the forecast on the
 
 With the observed temperature every member under-forecasts the largest peaks; the recipe's correction can move the curve but not stretch it. Two other ways of choosing the comparable days for that correction, and a linear recalibration per hour that stretches the curve, were tried on the eleven development BAs against a rule fixed before the runs (`docs/methods.md`, section 8q): the first two lower the largest peaks further, the third raises the peaks of the storm days but worsens the yearly error in every BA. None is adopted.
 
+## Phase T: weights and loss on the members, not adopted
+
+The last cheap candidates against the members' shrinkage at the peak: training weights on the days with the highest peaks (on every hour, or only near the peak hour) and a quantile loss for the boosting. On the eleven development BAs the weights raise the largest peaks in 7 of 11 BAs by a few hundredths of a point and worsen the yearly error in 10 of 11 (2.26 % to 2.34 %); the quantile loss lowers the peaks. None is adopted (`docs/methods.md`, section 8s; `docs/phase_t_a35.md`).
+
 ## How much a later cut-off is worth
 
 The published forecasts may be made later than this study's 9 a.m. cut-off. Run at 3 p.m. and 9 p.m. of the day before, with more of the day's load and the newer HRRR runs, the recipe's error on the eleven development BAs over 2023 to 2025 goes from 2.21 % to 2.15 % and 2.08 % (published forecasts 2.90 %), and its under-forecast at the peak from -1.18 % to -1.09 % (published -1.10 %): an evening forecast holds about a tenth of a point of advantage over the 9 a.m. comparison (`docs/methods.md`, section 8r).

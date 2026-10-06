@@ -421,6 +421,20 @@ None is adopted. Choosing the comparable days otherwise moves the whole curve an
 
 **Reading.** Twelve more hours of information are worth about a tenth of a point of MAPE (2.21 % to 2.08 %), two thirds of it from the load of the afternoon and evening and one third from the newer weather runs; at the peak they bring the recipe level with the published forecasts. A published forecast made the evening before therefore holds an advantage of that order over the 9 a.m. comparison, small next to the distance to the published forecasts as reported (2.90 %) and comparable to the distance to the same forecasts with their hourly bias removed. At 9 p.m. the recipe is ahead of the published forecast in ten of the eleven BAs; ISO-NE stays behind (3.37 % against 2.56 %), so its gap is not a matter of timing.
 
+## 8s. Phase T: weights and loss on the members against their shrinkage, not adopted
+
+**Candidates.** The three ways section 8q left open of acting on the members themselves, each refitting both members of `final10s` (`features.peak_weights`, `Boosting(loss="quantile")`): `a35w` weighs the training rows of the days whose observed daily peak is above the 80th percentile of the training days by 1 + (excess over that percentile / 5 %), in the additive model and the boosting; `a35h` gives the same weight only to the hours within 3 h of each day's own peak hour; `a35q` fits the boosting to the 55th percentile instead of the mean, a loss that leans against under-forecasting. Rule: the one of phase S, fixed before the runs. Eleven development BAs, 2020-12-02 to 2022-12-31 (`docs/phase_t_a35.md`), run on a second machine.
+
+| | `final10s` | `a35w` | `a35h` | `a35q` |
+|---|---|---|---|---|
+| yearly MAPE | 2.26 | 2.34 (better in 1 of 11) | 2.34 (3 of 11) | 2.27 (3 of 11) |
+| under-forecast, 30 largest peaks | −1.80 | −1.78 (7 better, 4 worse) | −1.79 (7 better, 4 worse) | −1.86 (3 better, 8 worse) |
+| under-forecast, event days (22 BA-events) | −2.64 | −2.59 (13 better, 9 worse) | −2.62 | −2.83 |
+| CRPS | 1.607 | 1.642 | 1.637 | 1.613 |
+| error of the peak hour (h) | 1.12 | 1.27 | 1.27 | 1.13 |
+
+None is adopted. Weighting the high days moves their peaks by a few hundredths of a point and costs eight hundredths of yearly MAPE, and it blurs the shape of the day (the peak hour misses by a quarter of an hour more): the members learn the high days better at the expense of the others without learning to extrapolate beyond them. The quantile loss on the boosting alone changes the ensemble little, and what it changes goes the wrong way at the peak, because the ensemble weights and the correction of section 8a already absorb a constant lean. Together with phases Q, R and S this closes the cheap candidates: the under-forecast of the largest peaks is a property of members fitted on six years in which such days are rare, and what is left is a different kind of member (a model of the daily peak with its own extrapolation) or a different input (section 8q, A31).
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
