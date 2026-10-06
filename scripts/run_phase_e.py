@@ -100,7 +100,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO, "a30": FINAL10S, "frozen12": FINAL10S, "a30b": FINAL10S, "frozen12b": FINAL10S, "n4_sens": FINAL10S, "n4_b43": FINAL10S, "art_base": FINAL10S, "a35": FINAL10S, "n4_qb": FINAL10S}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO, "a30": FINAL10S, "frozen12": FINAL10S, "a30b": FINAL10S, "frozen12b": FINAL10S, "n4_sens": FINAL10S, "n4_b43": FINAL10S, "art_base": FINAL10S, "a35": FINAL10S, "n4_qb": FINAL10S, "abl": FINAL10S, "abl_hrrr": ABL_HRRR, "abl_1st": FINAL10S}
 
 
 def nbm_options(group: str) -> dict:
@@ -134,14 +134,15 @@ def nbm_options(group: str) -> dict:
 
 
 def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0,
-           fields: tuple[str, ...] = (), field_bias_days: int = 0, second_run: bool = False, nbm: dict | None = None) -> Loader:
+           fields: tuple[str, ...] = (), field_bias_days: int = 0, second_run: bool = False, nbm: dict | None = None,
+           stations: str = "multi") -> Loader:
     # BA_LOAD_FORECAST_HRRR_INIT_HOURS (late cut-off study): the HRRR temperature runs that may be chosen, e.g. "0 18 12 6";
     # every other input stays on the default extracted runs
     extra = {}
     hours = os.environ.get("BA_LOAD_FORECAST_HRRR_INIT_HOURS")
     if hours:
         extra = dict(init_hours=tuple(int(h) for h in hours.split()), aux_init_hours=DEFAULT_INIT_HOURS)
-    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations="multi", sky=sky, pv=pv, irradiance=irradiance,
+    return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations=stations, sky=sky, pv=pv, irradiance=irradiance,
                   temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields, field_bias_days=field_bias_days,
                   second_run=second_run, **extra, **(nbm or {}))
 
@@ -359,13 +360,14 @@ def _final3_models(ba: str | None, c: dict, tag: str) -> list:
     from ba_load_forecast.forecasters.recency import RecencyRegression
 
     solar = ba in PV_BAS
-    add = Cached(AdditiveModel(train_days=c["train_days"], special_days=True, pv=solar, extra=c["extra_additive"],
+    add = Cached(AdditiveModel(train_days=c["train_days"], special_days=c.get("special_days", True), pv=solar, extra=c["extra_additive"],
                                irradiance=solar and c.get("irradiance", False),
                                apparent=c.get("apparent", False), apparent_wind=c.get("apparent_wind", True), **c["additive"],
                                cold_weight=c.get("cold_weight", 0.0), **c.get("both", {}), name=f"{tag}_additive"))
     boo = Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
                           target="ratio" if c["ratio"] else "level", **{**c["boosting"], **c.get("boosting_only", {})},
-                          cold_weight=c.get("cold_weight", 0.0), **c.get("both", {}), name=f"{tag}_boosting"))
+                          cold_weight=c.get("cold_weight", 0.0), special_days=c.get("special_days", True), **c.get("both", {}),
+                          name=f"{tag}_boosting"))
     members = [add, boo]
     if c.get("storm"):                                                # A9: members fitted on the coldest decile of days, answering on such days only
         members.append(Cached(Boosting(train_days=c["train_days"], sky=solar or c["sun_everywhere"], extra=c["extra_boosting"],
@@ -616,6 +618,33 @@ A35H = dict(FINAL10S, both=dict(peak_weight=1.0, peak_weight_hours=3))          
 A35Q = dict(FINAL10S, boosting_only=dict(loss="quantile", loss_quantile=0.55))             # A35: the boosting fits the 55th percentile
 
 
+# Main article, ablation: the recipe with one piece taken out at a time, on the same days (2023 to 2025)
+ABL_NOSPEC = dict(FINAL10S, special_days=False)                                              # no special-day labels
+ABL_NOEXTRA = dict(FINAL10S, extra_additive=(), extra_boosting=(), apparent=False)           # no extra feature blocks
+ABL_NOREC = dict(FINAL10S, third_member=False)                                               # two members, no recency regression
+ABL_MEAN = dict(FINAL10S, weighting="mean")                                                  # equal ensemble weights
+ABL_2Y = dict(FINAL10S, train_days=730)                                                      # two years of training instead of six
+ABL_HRRR = dict(FINAL10S, nbm_mode=None, gfs=False, model_weights=0, gfs_cold_quantile=0.0, nbm_spread=False,
+                intervals=dict(FINAL10S["intervals"], spread_beta=0.0))                      # the HRRR alone, no NBM or GFS
+
+
+def abl_models(ba: str | None) -> list:
+    """Ablation, shared weather input: the recipe and five variants; the ensemble before the correction comes with each."""
+    return [*_final3_models(ba, FINAL10S, "final10s"), *_final3_models(ba, ABL_NOSPEC, "abl_nospec"),
+            *_final3_models(ba, ABL_NOEXTRA, "abl_noextra"), *_final3_models(ba, ABL_NOREC, "abl_norec"),
+            *_final3_models(ba, ABL_MEAN, "abl_mean"), *_final3_models(ba, ABL_2Y, "abl_2y")]
+
+
+def abl_hrrr_models(ba: str | None) -> list:
+    """Ablation: the weather input reduced to the HRRR at the same stations (its own loader)."""
+    return _final3_models(ba, ABL_HRRR, "abl_hrrr")
+
+
+def abl_1st_models(ba: str | None) -> list:
+    """Ablation: the recipe on the first station of each BA only (its own loader)."""
+    return _final3_models(ba, FINAL10S, "abl_1st")
+
+
 def a35_models(ba: str | None) -> list:
     """A35: act on the members against their shrinkage at the peak; the recipe beside it on the same days."""
     return [*_final3_models(ba, FINAL10S, "final10s"), *_final3_models(ba, A35W, "a35w"),
@@ -704,7 +733,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models, "a30": a30_models, "frozen12": a30_models, "a30b": a30b_models, "frozen12b": a30b_models, "n4_sens": n4_sens_models, "n4_b43": n4_b43_models, "art_base": art_base_models, "a35": a35_models, "n4_qb": n4_qb_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models, "a30": a30_models, "frozen12": a30_models, "a30b": a30b_models, "frozen12b": a30b_models, "n4_sens": n4_sens_models, "n4_b43": n4_b43_models, "art_base": art_base_models, "a35": a35_models, "n4_qb": n4_qb_models, "abl": abl_models, "abl_hrrr": abl_hrrr_models, "abl_1st": abl_1st_models,
     "tbias": final2_models,
 }
 
@@ -794,9 +823,10 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base", "a35", "n4_qb") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base", "a35", "n4_qb", "abl", "abl_hrrr", "abl_1st") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
-                            second_run=group == "extremes2", nbm=nbm_options(group))
+                            second_run=group == "extremes2", nbm=nbm_options(group),
+                            stations="single" if group == "abl_1st" else "multi")
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -1175,6 +1205,14 @@ def main(argv=None) -> int:
                     "All BAs of the station map, 2023-01-01 to 2025-12-31, protocol v2: the spread band (`final10s`), the band without "
                     "the spread factor (`n4_nospread`), the cold-day level and tail (`n4_a2t`) and a plain adaptive interval "
                     "(`n4_aci_plain`), all on the same ensemble.")
+    abl = report({"abl", "abl_hrrr", "abl_1st"}, a.results.parent / "article_ablation", a.doc.parent / "article_ablation.md",
+                 "Main article: the recipe with one piece taken out at a time",
+                 "Development BAs, 2023-01-01 to 2025-12-31, protocol v2, the days every model scored. `final10s` is the recipe; "
+                 "each `abl_*` takes one piece out and refits: special-day labels (`abl_nospec`), the extra feature blocks of "
+                 "load, temperature and humidity (`abl_noextra`), the third member (`abl_norec`), the error-weighted ensemble "
+                 "(`abl_mean`, equal weights), six years of training (`abl_2y`, two), the NBM and GFS in the temperature "
+                 "(`abl_hrrr`, HRRR alone, band without the spread factor) and the extra stations (`abl_1st`, the first station "
+                 "of each BA). `*_ensemble` is each one before the correction from the 40 nearest known days.")
     a35 = report({"a35"}, a.results.parent / "phase_t_a35", a.doc.parent / "phase_t_a35.md",
                  "Phase T: the members against their shrinkage at the peak (A35)",
                  g_common + "Three variants of `final10s`, each refitting its members: the days whose observed "
@@ -1245,7 +1283,7 @@ def main(argv=None) -> int:
                      "Development BAs: " + common +
                      "The phase F recipe (`final2`) on 2023 to 2025 scored under protocol v2, the reference for `docs/frozen_evaluation_v2.md` "
                      "(same days, same rules).")
-    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as, band_ast, frozen10, frozen10s, frozen10sa, band_c, band_c2, band_ct, band_cs, band_scs, b4, peak_q, frozen11, oracle, a30, frozen12, a30b, frozen12b, n4_sens, n4_b43, art_base, a35)):
+    if all(t is None for t in (main, sky, pv, iv2, pv2, final, iv3, peak, irr, final2, frozen, proto, feat, hp, ens2, final3, frozen3, tbias, final3b, frozen2, humid, humid_h, humid_l, humid_p, frozen4, humid_b, events, final5, frozen5, extremes, extremes2, nbm_blend, nbm_replace, nbm_cold, frozen6, blendw, blendc, blendwc, nbmfld, nbmirr, gfs3, frozen7, mw3, mw2, mw3c, mw3q, frozen8, storm, storm2, band_a, band_a2, band_a2t, band_b, band_s, band_as, band_ast, frozen10, frozen10s, frozen10sa, band_c, band_c2, band_ct, band_cs, band_scs, b4, peak_q, frozen11, oracle, a30, frozen12, a30b, frozen12b, n4_sens, n4_b43, art_base, a35, abl)):
         log("no rows to report")
         return 1
     if waiting:
