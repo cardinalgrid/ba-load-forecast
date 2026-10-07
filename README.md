@@ -285,6 +285,10 @@ With the observed temperature every member under-forecasts the largest peaks; th
 
 The last cheap candidates against the members' shrinkage at the peak: training weights on the days with the highest peaks (on every hour, or only near the peak hour) and a quantile loss for the boosting. On the eleven development BAs the weights raise the largest peaks in 7 of 11 BAs by a few hundredths of a point and worsen the yearly error in 10 of 11 (2.26 % to 2.34 %); the quantile loss lowers the peaks. None is adopted (`docs/methods.md`, section 8s; `docs/phase_t_a35.md`).
 
+## The recipe piece by piece
+
+Each piece of the recipe taken out in turn, every member refitted, eleven BAs over 2023 to 2025 on the same days (`docs/methods.md`, section 8t; `docs/article_ablation_strata.md`). From 2.21 % with everything: one weather station per BA instead of several 2.85 %, the HRRR alone instead of HRRR, NBM and GFS weighted per station 2.38 %, the ensemble without the correction from the 40 nearest known days 2.37 %, no extra feature blocks 2.28 %, two years of training instead of six 2.28 %, two members instead of three 2.23 %, equal ensemble weights 2.23 %, no special-day labels 2.22 % (on the holidays themselves 3.63 % instead of 3.29 %). The weather input is most of the recipe.
+
 ## How much a later cut-off is worth
 
 The published forecasts may be made later than this study's 9 a.m. cut-off. Run at 3 p.m. and 9 p.m. of the day before, with more of the day's load and the newer HRRR runs, the recipe's error on the eleven development BAs over 2023 to 2025 goes from 2.21 % to 2.15 % and 2.08 % (published forecasts 2.90 %), and its under-forecast at the peak from -1.18 % to -1.09 % (published -1.10 %): an evening forecast holds about a tenth of a point of advantage over the 9 a.m. comparison (`docs/methods.md`, section 8r).

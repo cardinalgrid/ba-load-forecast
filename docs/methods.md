@@ -435,6 +435,24 @@ None is adopted. Choosing the comparable days otherwise moves the whole curve an
 
 None is adopted. Weighting the high days moves their peaks by a few hundredths of a point and costs eight hundredths of yearly MAPE, and it blurs the shape of the day (the peak hour misses by a quarter of an hour more): the members learn the high days better at the expense of the others without learning to extrapolate beyond them. The quantile loss on the boosting alone changes the ensemble little, and what it changes goes the wrong way at the peak, because the ensemble weights and the correction of section 8a already absorb a constant lean. Together with phases Q, R and S this closes the cheap candidates: the under-forecast of the largest peaks is a property of members fitted on six years in which such days are rare, and what is left is a different kind of member (a model of the daily peak with its own extrapolation) or a different input (section 8q, A31).
 
+## 8t. The recipe piece by piece: an ablation on 2023 to 2025
+
+**Design.** The recipe (`final10s`) and seven variants, each with one piece taken out and every member refitted, on the eleven development BAs over 2023 to 2025 under protocol v2, on the days every model scored (11 950 BA-days; `docs/article_ablation.md`, `docs/article_ablation_strata.md`; groups `abl`, `abl_hrrr` and `abl_1st`, run on a second machine). The ensemble of each run before the correction from the 40 nearest known days comes with it. This is an attribution, not a choice: nothing was selected on these numbers.
+
+| Taken out (demand-weighted, 11 BAs) | MAPE, three years | gap | BAs worse | MAPE, winter | MAPE, summer | MAPE, event days | under-forecast, 30 largest peaks |
+|---|---|---|---|---|---|---|---|
+| nothing (`final10s`) | 2.206 | | | 2.379 | 2.173 | 3.093 | −1.61 |
+| the extra stations (first station only) | 2.853 | +0.647 | 11 | 2.856 | 3.171 | 3.768 | −3.31 |
+| the NBM and GFS (HRRR alone, band without the spread factor) | 2.382 | +0.176 | 11 | 2.524 | 2.392 | 3.279 | −1.48 |
+| the correction from the 40 nearest days (the ensemble alone) | 2.373 | +0.167 | 11 | 2.424 | 2.487 | 3.510 | −3.24 |
+| the extra feature blocks (load, temperature, humidity) | 2.284 | +0.078 | 10 | 2.430 | 2.267 | 3.100 | −1.49 |
+| six years of training (two instead) | 2.279 | +0.073 | 11 | 2.474 | 2.245 | 3.257 | −1.71 |
+| the third member (recency regression) | 2.234 | +0.029 | 7 | 2.387 | 2.230 | 3.131 | −1.99 |
+| the error-weighted ensemble (equal weights) | 2.225 | +0.020 | 8 | 2.399 | 2.182 | 3.104 | −1.58 |
+| the special-day labels | 2.217 | +0.011 | 9 | 2.400 | 2.175 | 3.125 | −1.58 |
+
+**Reading.** The weather input carries most of the recipe: the temperature at several stations per BA is worth 0.65 point over the three years and a full point in summer, and the second and third weather models another 0.18; together they are more than the gap between the recipe and the published forecasts. The correction from the nearest known days is worth 0.17 point and is what keeps the peak (−3.2 % without it on the largest peaks, −1.6 % with it). The rest are small and regular: the extra feature blocks and the training length about 0.07 each, the third member 0.03 (and 0.4 point of under-forecast on the largest peaks), the ensemble weights 0.02. The special-day labels are worth 0.01 point over the year because the days they touch are few; on the 341 holiday and bridge BA-days of the period they take the error from 3.30 % to 3.10 % (holidays alone 3.63 % to 3.29 %).
+
 ## 9. Limitations
 
 One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
