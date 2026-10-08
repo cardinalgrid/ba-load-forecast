@@ -16,7 +16,7 @@ from pathlib import Path
 from grid_sentinel.weather import fetch_isd_lite
 
 from ba_load_forecast.paths import ISD
-from ba_load_forecast.stations_multi import all_icaos, station_table_for
+from ba_load_forecast.stations_multi import all_icaos, extra_icaos, station_table_for
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,8 +30,9 @@ def main(argv=None) -> int:
     ap.add_argument("--isd-dir", type=Path, default=ISD)
     ap.add_argument("--years", type=int, nargs=2, default=[2015, 2025])
     ap.add_argument("--rounds", type=int, default=30)
+    ap.add_argument("--extra", action="store_true", help="also the candidate stations of stations_multi.BA_STATIONS_EXTRA")
     a = ap.parse_args(argv)
-    table = station_table_for(all_icaos(), a.isd_dir)
+    table = station_table_for(all_icaos() + (extra_icaos() if a.extra else []), a.isd_dir)
     years = range(a.years[0], a.years[1] + 1)
     absent: set[tuple[str, int]] = set()
     for round_ in range(1, a.rounds + 1):
