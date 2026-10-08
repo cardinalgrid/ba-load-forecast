@@ -47,7 +47,7 @@ from .cutoff import (
 from .hrrr import load_station
 from .nbm import daily_at_cutoff, load_daily, nbm_path
 from .sky import all_days, forecast_as_seen, pv_capacity, run_table, sky_frame
-from .stations_multi import BA_STATIONS_MULTI, station_table_for
+from .stations_multi import BA_STATIONS_EXTRA, BA_STATIONS_MULTI, station_table_for
 from .weather_extra import read_isd_lite_field
 
 
@@ -538,7 +538,9 @@ class Loader:
         return rolling_hour_bias(self._bias_tables[key], day, self.temp_bias_days)
 
     def stations_of(self, ba: str) -> list[str]:
-        if self.stations == "multi" and ba in BA_STATIONS_MULTI:
+        if self.stations == "extra" and ba in BA_STATIONS_EXTRA:         # phase U candidate: the BA's station and the extra ones
+            return [BA_STATION[ba], *BA_STATIONS_EXTRA[ba]]
+        if self.stations in ("multi", "extra") and ba in BA_STATIONS_MULTI:
             return list(BA_STATIONS_MULTI[ba])
         return [BA_STATION[ba]]
 

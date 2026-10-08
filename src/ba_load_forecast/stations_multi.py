@@ -31,6 +31,36 @@ BA_STATIONS_MULTI: dict[str, tuple[str, ...]] = {
     "FPL": ("KMIA", "KPBI", "KMLB", "KRSW", "KSRQ", "KPNS"),
 }
 
+# Phase U (ideas A28 and A32): a candidate table for twelve BAs evaluated so far on one station, the ones where the recipe
+# trails the published forecast or under-forecasts the daily peak most often, and those whose footprint one airport
+# describes badly. The BA's own station comes first; the others are the main airports of its other load centres.
+# Used only with ``Loader(stations="extra")`` until a run on the development period decides.
+BA_STATIONS_EXTRA: dict[str, tuple[str, ...]] = {
+    "LDWP": ("KBUR", "KVNY", "KCQT"),            # the San Fernando Valley and downtown, inland of the coastal KLAX
+    "WALC": ("KNYL", "KIGM", "KBLH"),            # Yuma, Kingman, Blythe
+    "NEVP": ("KVGT", "KHND"),                    # North Las Vegas, Henderson
+    "PSCO": ("KCOS", "KBJC", "KGJT", "KPUB"),    # Colorado Springs, Broomfield, Grand Junction, Pueblo
+    "WACM": ("KCYS", "KCPR", "KGXY"),            # Cheyenne, Casper, Greeley
+    "PACE": ("KOGD", "KPVU", "KIDA", "KRKS"),    # Ogden, Provo, Idaho Falls, Rock Springs
+    "NWMT": ("KGTF", "KMSO", "KHLN", "KBZN"),    # Great Falls, Missoula, Helena, Bozeman
+    "AECI": ("KCOU", "KJLN", "KIRK", "KPOF"),    # Columbia, Joplin, Kirksville, Poplar Bluff
+    "SOCO": ("KBHM", "KMOB", "KSAV", "KMCN", "KMGM"),  # Birmingham, Mobile, Savannah, Macon, Montgomery
+    "PGE": ("KSLE", "KHIO"),                     # Salem, Hillsboro
+    "BANC": ("KSAC", "KRDD"),                    # Sacramento Executive, Redding
+    "TPWR": ("KTIW", "KTCM"),                    # Tacoma Narrows, McChord
+}
+
+
+def extra_icaos() -> list[str]:
+    """The stations of ``BA_STATIONS_EXTRA`` that no other table has, in order and without repeats."""
+    known = set(all_icaos()) | set(BA_STATION.values())
+    out: list[str] = []
+    for icaos in BA_STATIONS_EXTRA.values():
+        for icao in icaos:
+            if icao not in known and icao not in out:
+                out.append(icao)
+    return out
+
 
 def all_icaos() -> list[str]:
     """Every station in the multi-station table, the single-station ones included, without repeats."""

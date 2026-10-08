@@ -28,8 +28,8 @@ def log(msg: str) -> None:
     print(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {msg}", flush=True)
 
 
-def stations() -> pd.DataFrame:
-    frames = [pd.read_csv(ROOT / "docs" / f) for f in ("stations_grid.csv", "stations_grid_multi.csv")]
+def stations(tables: list[Path] | None = None) -> pd.DataFrame:
+    frames = [pd.read_csv(t) for t in tables] if tables else [pd.read_csv(ROOT / "docs" / f) for f in ("stations_grid.csv", "stations_grid_multi.csv")]
     return pd.concat(frames, ignore_index=True).drop_duplicates("icao")[["icao", "lat", "lon"]]
 
 
@@ -40,13 +40,15 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=DATA / "gfs")
     ap.add_argument("--init-hours", type=int, nargs="+", default=[6, 12])
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--stations", type=Path, nargs="+", default=None,
+                    help="station tables (icao, lat, lon) in place of docs/stations_grid.csv and docs/stations_grid_multi.csv")
     ap.add_argument("--consolidate", action="store_true")
     a = ap.parse_args(argv)
     if a.consolidate:
         counts = consolidate(a.out, log=log)
         log(f"{len(counts)} stations, {sum(counts.values())} rows")
         return 0
-    cells = station_cells(stations())
+    cells = station_cells(stations(a.stations))
     log(f"{len(cells)} stations; {a.start} to {a.end}, runs {a.init_hours}")
     n = extract(cells, a.start, a.end, a.out, init_hours=tuple(a.init_hours), workers=a.workers, log=log)
     log(f"ALL_DONE {n} runs written")
