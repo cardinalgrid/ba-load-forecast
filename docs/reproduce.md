@@ -27,7 +27,7 @@ environment variable `BA_LOAD_FORECAST_DATA` to a folder makes them read everyth
 flat layout (`tidy/`, `isd/`, `hrrr/`, `hrrr_multi/`, `hrrr_fpl/`, `cloud/`, `dswrf/`, `dewpoint/`, `wind/`,
 `asos/`, `ghcnh/`, `pv/`; see `src/ba_load_forecast/paths.py`). The study moved its inputs to such a folder on a
 local disk after a synchronised drive dropped four times during long runs; outputs of long runs go to
-`%USERPROFILE%a-load-forecast-runs\` for the same reason.
+`%USERPROFILE%\ba-load-forecast-runs\` for the same reason.
 
 Python 3.11 on Windows 11; `pip install -e ".[hrrr,dev]"` plus `grid-data-sentinel[pandas]` 0.4.0
 installed from its repository (the 0.4 API: `Sentinel`, `Repairer`, `Context`; the 0.3 release does not have
