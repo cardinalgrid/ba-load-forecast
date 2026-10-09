@@ -453,9 +453,25 @@ None is adopted. Weighting the high days moves their peaks by a few hundredths o
 
 **Reading.** The weather input carries most of the recipe: the temperature at several stations per BA is worth 0.65 point over the three years and a full point in summer, and the second and third weather models another 0.18; together they are more than the gap between the recipe and the published forecasts. The correction from the nearest known days is worth 0.17 point and is what keeps the peak (−3.2 % without it on the largest peaks, −1.6 % with it). The rest are small and regular: the extra feature blocks and the training length about 0.07 each, the third member 0.03 (and 0.4 point of under-forecast on the largest peaks), the ensemble weights 0.02. The special-day labels are worth 0.01 point over the year because the days they touch are few; on the 341 holiday and bridge BA-days of the period they take the error from 3.30 % to 3.10 % (holidays alone 3.63 % to 3.29 %).
 
+## 8u. Phase U: more stations for the single-station BAs
+
+**Question.** The ablation of section 8t says the stations weigh most in the recipe, and 32 of the 43 BAs of section 8n run on one airport, among them several that trail their own published forecast (AECI, PGE, SOCO, NWMT, BANC, TPWR) or under-forecast the peak most (LDWP, WALC, PSCO, NEVP). Phase U added the main airports of the other load centres of twelve of them (`stations_multi.BA_STATIONS_EXTRA_TESTED`, 35 stations, each with ISD-Lite hours from 2015 to 2025 and an HRRR grid point within 1.82 km; `docs/stations_grid_extra.csv`). Two stations were dropped before any result of the candidate, for missing observed hours: KCQT (downtown Los Angeles, hours only in 2021) and KBJC (Broomfield, about half the hours).
+
+**Design.** The NBM and GFS archives are read as whole national files, so their cost does not fall with the number of stations; the decision was therefore taken on the recipe with the HRRR alone, the configuration `abl_hrrr` of the ablation, in both arms: `u_hrrr_1` on the BA's station (group `st1h`) against `u_hrrr_x` with the extra stations (group `st2h`), the extra stations entering the temperature only (`Loader(stations="extra_u", extra_fields=False)`; humidity and wind stay on the BA's station). Rule fixed before the run: per BA, yearly MAPE better by at least 0.03 point and the peak under-forecast not worse by more than 0.10 point on the event days, the 30 coldest mornings and the 30 largest peaks; adopted if the weighted MAPE improves and at least 7 of the 12 BAs pass. Development period 2020-12-02 to 2022-12-31 (`docs/phase_u_dev.md`), then 2023 to 2025 as a confirmation (`docs/phase_u_2023_2025.md`).
+
+| 12 BAs, weighted | development, one station | development, extra | 2023 to 2025, one station | 2023 to 2025, extra |
+|---|---|---|---|---|
+| MAPE | 3.53 | 3.23 (better at 12) | 3.41 | 3.19 (better at 10) |
+| under-forecast at the peak, event days | −3.58 | −3.09 | −3.78 | −3.11 |
+| under-forecast at the peak, 30 coldest mornings | −3.06 | −2.59 | −3.84 | −3.03 |
+| under-forecast at the peak, 30 largest peaks | −2.54 | −2.23 | −3.27 | −2.57 |
+| BAs passing the per-BA rule | | 6 of 12 | | 5 of 12 |
+
+**Reading and decision.** The gain is broad: the MAPE falls at every BA in development and at ten of twelve on 2023 to 2025, and the aggregate under-forecast at the peak improves in every hard stratum of both periods (January 2025 −4.74 % to −3.19 %; Gerri and Heather −3.05 % to −3.13 %). The per-BA rule fails in both periods, almost entirely on its peak clause, which is read on strata of 30 days or of about ten event days at small BAs; most of those per-BA losses change sign between the periods. Two BAs lose consistently: PSCO (MAPE 0.02 point worse on 2023 to 2025, peak worse in every hard stratum of both periods) and WALC (MAPE unchanged, event-day peak −2.58 points). By the rule fixed before the run phase U is not adopted, and that is the result this section reports as the test. On 9 October 2026, after both periods had been seen, the extra stations were adopted for the temperature of the ten BAs whose MAPE improved on 2023 to 2025 (`stations_multi.BA_STATIONS_EXTRA`, `Loader(stations="extra")`); PSCO and WALC keep their one station. Because that choice was made on numbers already seen, January to September 2026 is its first clean test. The confirmation with the full recipe (NBM and GFS at the new stations, and humidity and wind there) is pending.
+
 ## 9. Limitations
 
-One to five stations per BA. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
+One to six stations per BA; 22 of the 43 BAs of section 8n still on one. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
 description of any operator's process. The HRRR and the NBM are weather models with their own errors and not the
 forecasts any BA used; the BAs' forecasters have vendor weather and internal information this study
 does not have. Special days, events and the ten BAs are choices of the study. Prediction intervals

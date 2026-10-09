@@ -841,7 +841,7 @@ def main(argv=None) -> int:
                             fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base", "a35", "n4_qb", "abl", "abl_hrrr", "abl_1st", "st1", "st2", "fst2", "st1h", "st2h") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group),
-                            stations="single" if group == "abl_1st" else "extra" if group in ("st2", "fst2", "st2h") else "multi",
+                            stations="single" if group == "abl_1st" else "extra_u" if group in ("st2", "fst2", "st2h") else "multi",
                             extra_fields=group != "st2h")
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")

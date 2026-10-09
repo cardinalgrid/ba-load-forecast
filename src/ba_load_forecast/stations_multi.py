@@ -34,8 +34,12 @@ BA_STATIONS_MULTI: dict[str, tuple[str, ...]] = {
 # Phase U (ideas A28 and A32): a candidate table for twelve BAs evaluated so far on one station, the ones where the recipe
 # trails the published forecast or under-forecasts the daily peak most often, and those whose footprint one airport
 # describes badly. The BA's own station comes first; the others are the main airports of its other load centres.
-# Used only with ``Loader(stations="extra")`` until a run on the development period decides.
-BA_STATIONS_EXTRA: dict[str, tuple[str, ...]] = {
+# The table as tested in phase U is ``BA_STATIONS_EXTRA_TESTED`` (``Loader(stations="extra_u")``, kept so that the phase U
+# runs can be reproduced); ``BA_STATIONS_EXTRA`` (``Loader(stations="extra")``) is the table adopted on 9 October 2026,
+# for the temperature only: the ten BAs whose weighted MAPE improved with the extra stations on 2023 to 2025. PSCO
+# (0.02 point worse) and WALC (no change) keep their one station; both also under-forecast the peak more with the extra
+# stations in both periods.
+BA_STATIONS_EXTRA_TESTED: dict[str, tuple[str, ...]] = {
     "LDWP": ("KBUR", "KVNY"),                    # the San Fernando Valley, inland of the coastal KLAX (KCQT, downtown: ISD hours missing outside 2021)
     "WALC": ("KNYL", "KIGM", "KBLH"),            # Yuma, Kingman, Blythe
     "NEVP": ("KVGT", "KHND"),                    # North Las Vegas, Henderson
@@ -50,12 +54,21 @@ BA_STATIONS_EXTRA: dict[str, tuple[str, ...]] = {
     "TPWR": ("KTIW", "KTCM"),                    # Tacoma Narrows, McChord
 }
 
+EXTRA_NOT_ADOPTED = ("PSCO", "WALC")
+BA_STATIONS_EXTRA: dict[str, tuple[str, ...]] = {
+    ba: icaos for ba, icaos in BA_STATIONS_EXTRA_TESTED.items() if ba not in EXTRA_NOT_ADOPTED}
+
+
+def extra_table(stations: str) -> dict[str, tuple[str, ...]]:
+    """The extra-station table a ``Loader(stations=...)`` mode uses: ``extra_u`` the one tested, ``extra`` the adopted one."""
+    return BA_STATIONS_EXTRA_TESTED if stations == "extra_u" else BA_STATIONS_EXTRA if stations == "extra" else {}
+
 
 def extra_icaos() -> list[str]:
-    """The stations of ``BA_STATIONS_EXTRA`` that no other table has, in order and without repeats."""
+    """The stations of ``BA_STATIONS_EXTRA_TESTED`` that no other table has, in order and without repeats."""
     known = set(all_icaos()) | set(BA_STATION.values())
     out: list[str] = []
-    for icaos in BA_STATIONS_EXTRA.values():
+    for icaos in BA_STATIONS_EXTRA_TESTED.values():
         for icao in icaos:
             if icao not in known and icao not in out:
                 out.append(icao)

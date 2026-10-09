@@ -54,7 +54,7 @@ def test_extra_stations_add_temperature_and_can_leave_the_fields_alone(public_da
     """Phase U: stations="extra" puts the BA's station first and the extra ones after it; extra_fields=False keeps the
     humidity and wind fields on the BA's own station."""
     tidy, isd, hrrr = public_data
-    monkeypatch.setattr(mod, "BA_STATIONS_EXTRA", {"PJM": ("KTST",)})
+    monkeypatch.setattr(mod, "extra_table", lambda stations: {"PJM": ("KTST",)} if stations in ("extra", "extra_u") else {})
     monkeypatch.setattr(mod, "BA_STATIONS_MULTI", {})
     both = mod.Loader(tidy, isd, hrrr, history_days=30, stations="extra")
     own = mod.Loader(tidy, isd, hrrr, history_days=30, stations="extra", extra_fields=False)
@@ -62,3 +62,13 @@ def test_extra_stations_add_temperature_and_can_leave_the_fields_alone(public_da
     assert both.field_stations_of("PJM") == ["KPHL", "KTST"]
     assert own.field_stations_of("PJM") == ["KPHL"]
     assert mod.Loader(tidy, isd, hrrr, history_days=30, stations="multi", extra_fields=False).field_stations_of("PJM") == ["KPHL"]
+
+
+def test_adopted_extra_table_leaves_out_psco_and_walc():
+    """Phase U adoption (9 October 2026): the ten BAs whose MAPE improved; the tested table keeps all twelve."""
+    from ba_load_forecast import stations_multi as sm
+    assert set(sm.BA_STATIONS_EXTRA_TESTED) - set(sm.BA_STATIONS_EXTRA) == {"PSCO", "WALC"}
+    assert len(sm.BA_STATIONS_EXTRA) == 10
+    assert sm.extra_table("extra") is sm.BA_STATIONS_EXTRA
+    assert sm.extra_table("extra_u") is sm.BA_STATIONS_EXTRA_TESTED
+    assert sm.extra_table("multi") == {}

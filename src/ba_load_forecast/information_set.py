@@ -47,7 +47,7 @@ from .cutoff import (
 from .hrrr import load_station
 from .nbm import daily_at_cutoff, load_daily, nbm_path
 from .sky import all_days, forecast_as_seen, pv_capacity, run_table, sky_frame
-from .stations_multi import BA_STATIONS_EXTRA, BA_STATIONS_MULTI, station_table_for
+from .stations_multi import BA_STATIONS_MULTI, extra_table, station_table_for
 from .weather_extra import read_isd_lite_field
 
 
@@ -370,7 +370,7 @@ class Loader:
         # from the cut-off to the end of the target day, is replaced by the temperature observed at that station where
         # known. It separates the error that comes from the weather forecast from the error of the load model.
         self.oracle_temperature = bool(oracle_temperature)
-        # extra_fields=False (phase U): with stations="extra", the humidity and wind fields come from the BA's own
+        # extra_fields=False (phase U): with stations="extra" or "extra_u", the humidity and wind fields come from the BA's own
         # station(s) only and the extra stations add the temperature
         self.extra_fields = bool(extra_fields)
         self._nbm_spread: dict[str, pd.DataFrame] = {}
@@ -542,17 +542,18 @@ class Loader:
         return rolling_hour_bias(self._bias_tables[key], day, self.temp_bias_days)
 
     def stations_of(self, ba: str) -> list[str]:
-        if self.stations == "extra" and ba in BA_STATIONS_EXTRA:         # phase U candidate: the BA's station and the extra ones
-            return [BA_STATION[ba], *BA_STATIONS_EXTRA[ba]]
-        if self.stations in ("multi", "extra") and ba in BA_STATIONS_MULTI:
+        extra = extra_table(self.stations)
+        if ba in extra:                                                   # phase U: the BA's station and the extra ones
+            return [BA_STATION[ba], *extra[ba]]
+        if self.stations in ("multi", "extra", "extra_u") and ba in BA_STATIONS_MULTI:
             return list(BA_STATIONS_MULTI[ba])
         return [BA_STATION[ba]]
 
     def field_stations_of(self, ba: str) -> list[str]:
         """The stations whose humidity and wind enter the fields: all of ``stations_of`` unless ``extra_fields`` is off."""
         stations = self.stations_of(ba)
-        if self.stations == "extra" and not self.extra_fields:
-            stations = [s for s in stations if s not in BA_STATIONS_EXTRA.get(ba, ())]
+        if not self.extra_fields:
+            stations = [s for s in stations if s not in extra_table(self.stations).get(ba, ())]
         return stations
 
     def field_dir(self, field: str) -> Path:
