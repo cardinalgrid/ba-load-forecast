@@ -135,7 +135,7 @@ def nbm_options(group: str) -> dict:
 
 def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, temp_bias_days: int = 0,
            fields: tuple[str, ...] = (), field_bias_days: int = 0, second_run: bool = False, nbm: dict | None = None,
-           stations: str = "multi") -> Loader:
+           stations: str = "multi", extra_fields: bool = True) -> Loader:
     # BA_LOAD_FORECAST_HRRR_INIT_HOURS (late cut-off study): the HRRR temperature runs that may be chosen, e.g. "0 18 12 6";
     # every other input stays on the default extracted runs
     extra = {}
@@ -144,12 +144,12 @@ def loader(a, sky: bool = False, pv: bool = False, irradiance: bool = False, tem
         extra = dict(init_hours=tuple(int(h) for h in hours.split()), aux_init_hours=DEFAULT_INIT_HOURS)
     return Loader(a.tidy, a.isd_dir, a.hrrr, history_days=HISTORY_DAYS, stations=stations, sky=sky, pv=pv, irradiance=irradiance,
                   temp_bias_days=temp_bias_days, supplement_dir=a.supplement_dir, fields=fields, field_bias_days=field_bias_days,
-                  second_run=second_run, **extra, **(nbm or {}))
+                  second_run=second_run, extra_fields=extra_fields, **extra, **(nbm or {}))
 
 
 def fields_ready(ld: Loader, ba: str) -> bool:
     """Every station of the BA has a consolidated extraction of every field the loader was asked for."""
-    return all(len(ld.field_rows(f, icao)) for f in ld.fields for icao in ld.stations_of(ba))
+    return all(len(ld.field_rows(f, icao)) for f in ld.fields for icao in ld.field_stations_of(ba))
 
 
 def corrected_ensemble():
@@ -841,7 +841,8 @@ def main(argv=None) -> int:
                             fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base", "a35", "n4_qb", "abl", "abl_hrrr", "abl_1st", "st1", "st2", "fst2", "st1h", "st2h") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group),
-                            stations="single" if group == "abl_1st" else "extra" if group in ("st2", "fst2", "st2h") else "multi")
+                            stations="single" if group == "abl_1st" else "extra" if group in ("st2", "fst2", "st2h") else "multi",
+                            extra_fields=group != "st2h")
                 if not stations_ready(ld, ba) or not fields_ready(ld, ba):
                     log(f"{group} {ba}: station forecasts not extracted yet, skipped")
                     waiting.append((group, ba))
@@ -1306,8 +1307,9 @@ def main(argv=None) -> int:
     sth = report({"st1h", "st2h"}, a.results.parent / "phase_u_stations_hrrr", a.doc.parent / "phase_u_stations_hrrr.md",
                  "Phase U: extra stations for twelve single-station BAs, HRRR-only recipe, development period", g_common +
                  "Twelve BAs evaluated so far on one station (ideas A28 and A32), the recipe with the HRRR as its only weather "
-                 "model (the configuration of the ablation's `abl_hrrr`): `u_hrrr_1` on the BA's station, `u_hrrr_x` on that "
-                 "station and the extra ones of `stations_multi.BA_STATIONS_EXTRA`. The NBM and GFS at the 37 new stations are "
+                 "model (the configuration of the ablation's `abl_hrrr`): `u_hrrr_1` on the BA's station, `u_hrrr_x` adds the "
+                 "temperature of the extra stations of `stations_multi.BA_STATIONS_EXTRA` (humidity and wind stay on the BA's "
+                 "station: `Loader(extra_fields=False)`). The NBM and GFS at the 37 new stations are "
                  "about 250 GB of national files, more than a night's download; the decision on the stations is taken on this pair.")
     fst2 = report({"fst2"}, a.results.parent / "phase_u_stations_2023_2025", a.doc.parent / "phase_u_stations_2023_2025.md",
                   "Phase U on 2023 to 2025: extra stations for twelve single-station BAs",

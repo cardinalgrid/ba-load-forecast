@@ -314,6 +314,7 @@ class Loader:
                  gfs_dir: Path | None = None, gfs_lag_h: float = 5.0, model_weight_days: int = 0,
                  model_weight_cold_days: int = 0, model_weight_cold_threshold_f: float = 25.0,
                  gfs_cold_quantile: float = 0.0, nbm_spread_dir: Path | None = None, oracle_temperature: bool = False,
+                 extra_fields: bool = True,
                  aux_init_hours: tuple[int, ...] | None = None):
         """``stations="multi"`` uses every station of ``BA_STATIONS_MULTI`` for the BA: the temperature fields
         become the equal-weight mean across stations and the per-station series are attached; HRRR rows are
@@ -369,6 +370,9 @@ class Loader:
         # from the cut-off to the end of the target day, is replaced by the temperature observed at that station where
         # known. It separates the error that comes from the weather forecast from the error of the load model.
         self.oracle_temperature = bool(oracle_temperature)
+        # extra_fields=False (phase U): with stations="extra", the humidity and wind fields come from the BA's own
+        # station(s) only and the extra stations add the temperature
+        self.extra_fields = bool(extra_fields)
         self._nbm_spread: dict[str, pd.DataFrame] = {}
         self._model_errors: dict[tuple[str, str], dict[str, pd.Series]] = {}
         # nbm_daily_dir: the NBM daily products (nbm.extract_daily) of the target day, averaged over the BA's stations
@@ -544,6 +548,13 @@ class Loader:
             return list(BA_STATIONS_MULTI[ba])
         return [BA_STATION[ba]]
 
+    def field_stations_of(self, ba: str) -> list[str]:
+        """The stations whose humidity and wind enter the fields: all of ``stations_of`` unless ``extra_fields`` is off."""
+        stations = self.stations_of(ba)
+        if self.stations == "extra" and not self.extra_fields:
+            stations = [s for s in stations if s not in BA_STATIONS_EXTRA.get(ba, ())]
+        return stations
+
     def field_dir(self, field: str) -> Path:
         return self.field_dirs.get(field, self.hrrr_dir.parent / {"dewpoint_f": "dewpoint", "wind_ms": "wind"}.get(field, field))
 
@@ -568,7 +579,7 @@ class Loader:
         history and of the HRRR path from 09:00 of D-1 (NaN without a run)."""
         if not self.fields:
             return None
-        stations = self.stations_of(ba)
+        stations = self.field_stations_of(ba)
         index = history_index.union(path_ts)
         out = pd.DataFrame(index=index)
         for fld in self.fields:

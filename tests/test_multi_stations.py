@@ -48,3 +48,17 @@ def test_oracle_temperature_replaces_the_path_by_the_observed_temperature(public
     np.testing.assert_allclose(oracle.temp_forecast_f[ok], oracle.temp_observed_f[ok])
     assert not np.allclose(plain.temp_forecast_f[ok], plain.temp_observed_f[ok])      # the synthetic forecast differs
     np.testing.assert_array_equal(oracle.load_history.to_numpy(), plain.load_history.to_numpy())   # nothing else changes
+
+
+def test_extra_stations_add_temperature_and_can_leave_the_fields_alone(public_data, monkeypatch):
+    """Phase U: stations="extra" puts the BA's station first and the extra ones after it; extra_fields=False keeps the
+    humidity and wind fields on the BA's own station."""
+    tidy, isd, hrrr = public_data
+    monkeypatch.setattr(mod, "BA_STATIONS_EXTRA", {"PJM": ("KTST",)})
+    monkeypatch.setattr(mod, "BA_STATIONS_MULTI", {})
+    both = mod.Loader(tidy, isd, hrrr, history_days=30, stations="extra")
+    own = mod.Loader(tidy, isd, hrrr, history_days=30, stations="extra", extra_fields=False)
+    assert both.stations_of("PJM") == ["KPHL", "KTST"] == own.stations_of("PJM")
+    assert both.field_stations_of("PJM") == ["KPHL", "KTST"]
+    assert own.field_stations_of("PJM") == ["KPHL"]
+    assert mod.Loader(tidy, isd, hrrr, history_days=30, stations="multi", extra_fields=False).field_stations_of("PJM") == ["KPHL"]
