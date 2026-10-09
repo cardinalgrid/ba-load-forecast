@@ -36,10 +36,10 @@ BA_STATIONS_MULTI: dict[str, tuple[str, ...]] = {
 # describes badly. The BA's own station comes first; the others are the main airports of its other load centres.
 # Used only with ``Loader(stations="extra")`` until a run on the development period decides.
 BA_STATIONS_EXTRA: dict[str, tuple[str, ...]] = {
-    "LDWP": ("KBUR", "KVNY", "KCQT"),            # the San Fernando Valley and downtown, inland of the coastal KLAX
+    "LDWP": ("KBUR", "KVNY"),                    # the San Fernando Valley, inland of the coastal KLAX (KCQT, downtown: ISD hours missing outside 2021)
     "WALC": ("KNYL", "KIGM", "KBLH"),            # Yuma, Kingman, Blythe
     "NEVP": ("KVGT", "KHND"),                    # North Las Vegas, Henderson
-    "PSCO": ("KCOS", "KBJC", "KGJT", "KPUB"),    # Colorado Springs, Broomfield, Grand Junction, Pueblo
+    "PSCO": ("KCOS", "KGJT", "KPUB"),            # Colorado Springs, Grand Junction, Pueblo (KBJC, Broomfield: half the ISD hours missing)
     "WACM": ("KCYS", "KCPR", "KGXY"),            # Cheyenne, Casper, Greeley
     "PACE": ("KOGD", "KPVU", "KIDA", "KRKS"),    # Ogden, Provo, Idaho Falls, Rock Springs
     "NWMT": ("KGTF", "KMSO", "KHLN", "KBZN"),    # Great Falls, Missoula, Helena, Bozeman
