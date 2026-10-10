@@ -12,6 +12,9 @@ false alarms only.
 * ``asymmetric=True``: on a trigger day the median and the upper levels come from the candidate and the lower levels stay
   with the base, so that the lower tail does not rise with the point on the cold days that turn out ordinary (the
   reason the move of phase O raised the CRPS on every cold stratum); the levels are sorted hour by hour afterwards.
+* ``window``: when given, the candidate moves only the hours whose base median is within this fraction of the day's
+  forecast maximum (and half-way at their neighbours), the same window the recipe's peak quantile uses; the other hours
+  keep the base. ``None`` moves the whole day (phase V, V4c); the peak is one hour, so V4d moves only those around it.
 * ``Memo``: the bands keep adaptive state that advances once per call, so the switch must not call them a second time.
   Each band is wrapped in a ``Memo`` that is scored under its own name and remembers the day's quantiles.
 """
@@ -79,11 +82,13 @@ class Memo:
 
 
 class TriggerSwitch:
-    def __init__(self, base: Memo, candidate: Memo, trigger=cold_trigger, asymmetric: bool = True, name: str | None = None):
+    def __init__(self, base: Memo, candidate: Memo, trigger=cold_trigger, asymmetric: bool = True, name: str | None = None,
+                 window: float | None = None):
         self.base = base
         self.candidate = candidate
         self.trigger = trigger
         self.asymmetric = asymmetric
+        self.window = window
         self.name = name or f"switch_{candidate.name}"
         self.extra_levels = base.extra_levels
         self.last_extra = None
@@ -99,19 +104,31 @@ class TriggerSwitch:
             return qb
         qc = self.candidate.predict_quantiles(info)
         xc = self.candidate.last_extra
-        if not self.asymmetric:
+        if not self.asymmetric and self.window is None:
             self.last_extra = xc
             return qc
         levels = np.array([*self.extra_levels, 0.05, 0.5, 0.95]) if xb is not None and xc is not None else np.array([0.05, 0.5, 0.95])
-        lower = levels < 0.5
+        moved = levels >= 0.5 if self.asymmetric else np.ones(len(levels), bool)
         b = np.vstack([xb[1], qb]) if len(levels) > 3 else qb
         c = np.vstack([xc[1], qc]) if len(levels) > 3 else qc
-        mix = np.where(lower[:, None], b, c)
+        w = self.hours(qb[qb.shape[0] // 2])
+        mix = np.where(moved[:, None], b + w[None, :] * (c - b), b)
         order = np.argsort(levels)
         mix[order] = np.sort(mix[order], axis=0)
         n = len(levels) - 3
         self.last_extra = (info.day, mix[:n]) if n > 0 else None
         return mix[n:]
+
+    def hours(self, median: np.ndarray) -> np.ndarray:
+        """Weight of the candidate at each hour: 1 everywhere without a window; with one, 1 at the hours within it, 0.5 at
+        their neighbours, 0 elsewhere (as ``AdaptiveBand.peak_adjust``)."""
+        if self.window is None:
+            return np.ones(len(median))
+        inside = median >= self.window * np.nanmax(median)
+        w = inside.astype(float)
+        w[1:] = np.maximum(w[1:], 0.5 * inside[:-1])
+        w[:-1] = np.maximum(w[:-1], 0.5 * inside[1:])
+        return w
 
     def predict(self, info: InformationSet) -> np.ndarray:
         try:

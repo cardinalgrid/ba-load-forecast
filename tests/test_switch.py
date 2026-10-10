@@ -81,6 +81,18 @@ def test_switch_sorts_the_levels_when_the_mix_crosses():
     assert (np.diff(allq, axis=0) >= 0).all()
 
 
+def test_switch_with_a_window_moves_only_the_hours_around_the_peak():
+    shape = np.ones(24)
+    shape[17] = 1.2                                                    # the base median peaks at 17 h only
+    b = Band("base", np.vstack([90.0 * shape, 100.0 * shape, 110.0 * shape]))
+    c = Band("cand", np.vstack([96.0 * shape, 106.0 * shape, 116.0 * shape]))
+    sw = TriggerSwitch(Memo(b), Memo(c), trigger=lambda i: True, window=0.97)
+    q = sw.predict_quantiles(SimpleNamespace(day=DAY))
+    assert np.allclose(q[1, 17], 106.0 * 1.2)                          # the peak hour takes the candidate
+    assert np.allclose(q[1, [16, 18]], 103.0)                          # its neighbours half-way
+    assert np.allclose(q[1, 3], 100.0) and np.allclose(q[0], b.q[0])   # the rest, and the lower level, stay with the base
+
+
 def test_memo_remembers_a_forecast_error():
     class Failing(Band):
         def predict_quantiles(self, info):

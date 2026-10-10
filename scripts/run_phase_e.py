@@ -100,7 +100,7 @@ def nbm_group_options() -> dict:
     because the recipe dictionaries are defined further down."""
     return {"nbm_blend": dict(nbm_mode="blend"), "nbm_replace": dict(nbm_mode="replace"), "nbm_cold": dict(nbm_daily=True),
             "frozen6": FINAL6, "blendw": FINAL6W, "blendc": FINAL6C, "blendwc": FINAL6WC, "nbmfld": FINAL6F, "nbmirr": FINAL6I,
-            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO, "a30": FINAL10S, "frozen12": FINAL10S, "a30b": FINAL10S, "frozen12b": FINAL10S, "n4_sens": FINAL10S, "n4_b43": FINAL10S, "art_base": FINAL10S, "a35": FINAL10S, "n4_qb": FINAL10S, "abl": FINAL10S, "abl_hrrr": ABL_HRRR, "abl_1st": FINAL10S, "st1": FINAL10S, "st2": FINAL10S, "fst2": FINAL10S, "st1h": ABL_HRRR, "st2h": ABL_HRRR, "v4c": FINAL10S}
+            "gfs3": FINAL7, "frozen7": FINAL7, "mw3": FINAL8, "mw2": FINAL8B, "mw3c": FINAL8C, "mw3q": FINAL8Q, "frozen8": FINAL8Q, "storm": FINAL9, "storm2": FINAL9B, "band_a": FINAL10A, "band_a2": FINAL10A2, "band_a2t": FINAL10A2T, "band_b": FINAL10B, "band_s": FINAL10S, "band_as": FINAL10AS, "band_ast": FINAL10AST, "frozen10": FINAL10A2T, "frozen10s": FINAL10AST, "frozen10sa": FINAL10S, "band_c": FINAL10C, "band_c2": FINAL10C2, "band_ct": FINAL10CT, "band_cs": FINAL10CS, "band_scs": FINAL10SCS, "b4": FINAL10S, "peak_q": FINAL10S, "frozen11": FINAL10S, "oracle": FINAL10SO, "a30": FINAL10S, "frozen12": FINAL10S, "a30b": FINAL10S, "frozen12b": FINAL10S, "n4_sens": FINAL10S, "n4_b43": FINAL10S, "art_base": FINAL10S, "a35": FINAL10S, "n4_qb": FINAL10S, "abl": FINAL10S, "abl_hrrr": ABL_HRRR, "abl_1st": FINAL10S, "st1": FINAL10S, "st2": FINAL10S, "fst2": FINAL10S, "st1h": ABL_HRRR, "st2h": ABL_HRRR, "v4c": FINAL10S, "v4d": FINAL10S}
 
 
 def nbm_options(group: str) -> dict:
@@ -571,6 +571,21 @@ def v4c_models(ba: str | None) -> list:
             TriggerSwitch(base, sev, asymmetric=True, name="final15c"), TriggerSwitch(base, sev, asymmetric=False, name="final15c_s")]
 
 
+def v4d_models(ba: str | None) -> list:
+    """Phase V (V4d): as V4c, but on trigger days the candidate moves only the hours around the forecast peak (the hours whose
+    base median is within ``window`` of the day's maximum, half-way at their neighbours); the others keep the recipe.
+    ``final16c``/``final16l`` use the recipe's peak window (0.97), ``final16c_w``/``final16l_w`` a wider one (0.94);
+    ``final15c``/``final15l`` (whole day, V4c) are scored again in the same run for reference."""
+    from ba_load_forecast.forecasters.switch import TriggerSwitch
+
+    models = v4c_models(ba)
+    base, lin, sev = (next(m for m in models if m.name == n) for n in ("final10s", "final12l", "final10scs"))
+    keep = [m for m in models if m.name not in ("final15l_s", "final15c_s")]
+    return [*keep,
+            TriggerSwitch(base, lin, window=0.97, name="final16l"), TriggerSwitch(base, lin, window=0.94, name="final16l_w"),
+            TriggerSwitch(base, sev, window=0.97, name="final16c"), TriggerSwitch(base, sev, window=0.94, name="final16c_w")]
+
+
 def _band_variant(band, name: str, **params):
     """A copy of an AdaptiveIntervals band sharing its (cached) ensemble, with some parameters changed."""
     import copy
@@ -772,7 +787,7 @@ PER_BA_GROUPS = {          # groups whose members depend on the BA (solar featur
     "final5": final5_models, "frozen5": final5_models, "extremes": extremes_models, "extremes2": extremes2_models,
     "nbm_blend": nbm_blend_models, "nbm_replace": nbm_replace_models, "nbm_cold": nbm_cold_models, "frozen6": final6_models,
     "blendw": blendw_models, "blendc": blendc_models, "blendwc": blendwc_models, "nbmfld": nbmfld_models, "nbmirr": nbmirr_models,
-    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models, "a30": a30_models, "frozen12": a30_models, "a30b": a30b_models, "frozen12b": a30b_models, "n4_sens": n4_sens_models, "n4_b43": n4_b43_models, "art_base": art_base_models, "a35": a35_models, "n4_qb": n4_qb_models, "abl": abl_models, "abl_hrrr": abl_hrrr_models, "abl_1st": abl_1st_models, "st1": band_s_models, "st2": st2_models, "fst2": st2_models, "st1h": st1h_models, "st2h": st2h_models, "v4c": v4c_models,
+    "gfs3": gfs3_models, "frozen7": gfs3_models, "mw3": mw3_models, "mw2": mw2_models, "mw3c": mw3c_models, "mw3q": mw3q_models, "frozen8": mw3q_models, "storm": storm_models, "storm2": storm2_models, "band_a": band_a_models, "band_a2": band_a2_models, "band_a2t": band_a2t_models, "band_b": band_b_models, "band_s": band_s_models, "band_as": band_as_models, "band_ast": band_ast_models, "frozen10": band_a2t_models, "frozen10s": band_ast_models, "frozen10sa": band_s_models, "band_c": band_c_models, "band_c2": band_c2_models, "band_ct": band_ct_models, "band_cs": band_cs_models, "band_scs": band_scs_models, "b4": band_s_models, "peak_q": peak_q_models, "frozen11": peak_q_models, "oracle": oracle_models, "a30": a30_models, "frozen12": a30_models, "a30b": a30b_models, "frozen12b": a30b_models, "n4_sens": n4_sens_models, "n4_b43": n4_b43_models, "art_base": art_base_models, "a35": a35_models, "n4_qb": n4_qb_models, "abl": abl_models, "abl_hrrr": abl_hrrr_models, "abl_1st": abl_1st_models, "st1": band_s_models, "st2": st2_models, "fst2": st2_models, "st1h": st1h_models, "st2h": st2h_models, "v4c": v4c_models, "v4d": v4d_models,
     "tbias": final2_models,
 }
 
@@ -862,7 +877,7 @@ def main(argv=None) -> int:
                             irradiance=group in ("irradiance", "nbmirr") or (group == "final2" and ba in IRR_BAS),
                             temp_bias_days=30 if group == "tbias" else FINAL3B["temp_bias_days"] if group == "final3b"
                             else FINAL3["temp_bias_days"] if group in ("final3", "frozen3") else 0,
-                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base", "a35", "n4_qb", "abl", "abl_hrrr", "abl_1st", "st1", "st2", "fst2", "st1h", "st2h", "v4c") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
+                            fields=WEATHER_FIELDS if group in ("humid", "events", "final5", "frozen5", "extremes", "extremes2", "nbm_blend", "nbm_replace", "nbm_cold", "frozen6", "blendw", "blendc", "blendwc", "nbmfld", "nbmirr", "gfs3", "frozen7", "mw3", "mw2", "mw3c", "mw3q", "frozen8", "storm", "storm2", "band_a", "band_a2", "band_a2t", "band_b", "band_s", "band_as", "band_ast", "frozen10", "frozen10s", "frozen10sa", "band_c", "band_c2", "band_ct", "band_cs", "band_scs", "b4", "peak_q", "frozen11", "oracle", "a30", "frozen12", "a30b", "frozen12b", "n4_sens", "n4_b43", "art_base", "a35", "n4_qb", "abl", "abl_hrrr", "abl_1st", "st1", "st2", "fst2", "st1h", "st2h", "v4c", "v4d") else ("dewpoint_f",) if group in ("humid_h", "humid_l", "humid_p", "final4", "frozen4", "humid_b") else (),
                             field_bias_days=FINAL4B["field_bias_days"] if group == "humid_b" else 0,
                             second_run=group == "extremes2", nbm=nbm_options(group),
                             stations="single" if group == "abl_1st" else "extra_u" if group in ("st2", "fst2", "st2h") else "multi",
