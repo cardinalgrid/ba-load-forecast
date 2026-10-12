@@ -122,7 +122,7 @@ un_phase_e.cmd final` (eleven BAs, one run; needs steps 16 and 20 for ISO-NE and
 | 74. Note 4: the bands on the 43 BAs | `python scripts/run_phase_e.py --groups n4_b43 --start 2023-01-01 --end 2025-12-31 --bas <the 43 BAs> --out <runs>` (any number of processes, disjoint BA lists), then `--report-only` with all 43; `python scripts/compare_events.py --candidate n4_b43@<runs>:n4_nospread n4_b43@<runs>:n4_a2t n4_b43@<runs>:n4_aci_plain --reference n4_b43@<runs>:final10s --bas <the 43> --doc docs/note4_43_bas_strata.md` (the per-BA counts of section 8v are read from its "By BA and stratum" table) | `docs/note4_43_bas.md`, `docs/note4_43_bas_strata.md`, `results/note4_43_bas/` | 1 to 2 h per BA and process |
 | 75. The labels of the band's edges | `python scripts/check_quantile_labels.py --models frozen8@<runs>:final8q frozen10@<runs>:final10a2t frozen10sa@<runs>:final10s frozen10s@<runs>:final10ast --bas <the 11 development BAs>` (any group whose hourly outputs carry the 23 quantiles) | printed: the share of hours whose edge labelled 0.95 sits above the 0.98 quantile, and the CRPS as scored against the CRPS with 0.05 and 0.95 interpolated (section 8v) | about a minute per model |
 
-Tests: `pytest -q` (158 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
+Tests: `pytest -q` (171 tests on synthetic data, no network) and `python -m ruff check src tests scripts`.
 
 ## What is fixed, and what is not
 

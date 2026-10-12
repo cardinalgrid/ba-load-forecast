@@ -7,8 +7,8 @@ authors:
     given-names: Ricardo
     orcid: "https://orcid.org/0000-0001-6699-9951"
     affiliation: "Cardinal Grid (independent open initiative)"
-version: 0.1.0
-date-released: 2026-09-17
+version: 1.0.0
+date-released: 2026-10-12
 license: Apache-2.0
 repository-code: "https://github.com/cardinalgrid/ba-load-forecast"
 url: "https://cardinalgrid.com"

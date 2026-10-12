@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ba-load-forecast"
-version = "0.1.0"
+version = "1.0.0"
 description = "Day-ahead load forecasting for US balancing authorities with public data: EIA-930 load, NOAA observations and archived HRRR forecasts, under a 9 a.m. information cut-off, scored against each BA's own day-ahead forecast."
 readme = "README.md"
 requires-python = ">=3.10"
