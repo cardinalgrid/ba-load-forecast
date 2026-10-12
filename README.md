@@ -307,6 +307,10 @@ The published forecasts may be made later than this study's 9 a.m. cut-off. Run 
 
 The band is read at the adaptive level, while the evaluation scores its edges as the 0.05 and 0.95 quantiles in the CRPS and the pinball losses; on about 28 % of the hours the edge labelled 0.95 sits above the 0.98 quantile. Coverage and Winkler are unaffected; the CRPS moves by at most 0.002 over a year and 0.012 on the event days, and no decision changes (`docs/methods.md`, section 8v; `scripts/check_quantile_labels.py`).
 
+## Citation
+
+Guerra Filho, R. W. C. (2026). *ba-load-forecast: day-ahead load forecasting for U.S. balancing authorities with public data* (version 1.0.0). Zenodo. https://doi.org/10.5281/zenodo.23327586
+
 ## Layout
 
 | Module | Responsibility |
