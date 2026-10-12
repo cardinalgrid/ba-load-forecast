@@ -6,7 +6,9 @@ initiative.
 
 > Status: **recipe fixed after phase O and run once on the 43 BAs of the station map** (2023 to 2025,
 > 9 a.m. cut-off, protocol v2): ahead of the BAs' own forecasts in 26 of the 38 comparable BAs, behind at
-> the peak of the extreme days. The phases below record how it got there; nothing is tuned after phase O.
+> the peak of the extreme days. The phases below record how it got there. Nothing was tuned after phase O
+> except one change adopted with both periods already seen (more weather stations for ten single-station BAs,
+> phase U), so January to September 2026 is that change's first clean test.
 
 Documentation: `docs/methods.md` (every rule, model and parameter, with the reason), `docs/reproduce.md`
 (inputs and commands in order), and one report per phase (`docs/phase_b.md`, `docs/phase_c.md`,
@@ -285,6 +287,14 @@ With the observed temperature every member under-forecasts the largest peaks; th
 
 The last cheap candidates against the members' shrinkage at the peak: training weights on the days with the highest peaks (on every hour, or only near the peak hour) and a quantile loss for the boosting. On the eleven development BAs the weights raise the largest peaks in 7 of 11 BAs by a few hundredths of a point and worsen the yearly error in 10 of 11 (2.26 % to 2.34 %); the quantile loss lowers the peaks. None is adopted (`docs/methods.md`, section 8s; `docs/phase_t_a35.md`).
 
+## Phase U: more stations for the single-station BAs
+
+Extra airports for the temperature of twelve BAs that ran on one station (`docs/methods.md`, section 8u). The MAPE fell at all twelve in development and at ten of twelve on 2023 to 2025 (3.41 % to 3.19 %), and the aggregate under-forecast at the peak improved in every hard stratum, but the per-BA rule fixed before the run failed in both periods, almost entirely on its peak clause read on small strata. Not adopted by that rule; adopted afterwards for the ten BAs whose MAPE improved, which makes January to September 2026 its first clean test.
+
+## Phase V: mechanisms for the extremes switched on by a trigger, not adopted
+
+Mechanisms that help the peak of the storms but cost on ordinary days were made to act only on the days a cold trigger fires, computed at the cut-off, and judged on those days by a rule fixed before the runs (`docs/methods.md`, section 8w). Moving only the upper side near the forecast peak lifts the under-forecast on the development event days from −2.76 % to −2.35 % at no cost in MAPE, but improves 9 of the 22 BA-event pairs where the rule asks for 13. None is adopted. The same section records a defect of the runs: the cold-day rules need 100 forecast days of the same run, so they are inactive during the first 100 days of every run (through Winter Storm Uri in development); a final test needs a warm-up period.
+
 ## The recipe piece by piece
 
 Each piece of the recipe taken out in turn, every member refitted, eleven BAs over 2023 to 2025 on the same days (`docs/methods.md`, section 8t; `docs/article_ablation_strata.md`). From 2.21 % with everything: one weather station per BA instead of several 2.85 %, the HRRR alone instead of HRRR, NBM and GFS weighted per station 2.38 %, the ensemble without the correction from the 40 nearest known days 2.37 %, no extra feature blocks 2.28 %, two years of training instead of six 2.28 %, two members instead of three 2.23 %, equal ensemble weights 2.23 %, no special-day labels 2.22 % (on the holidays themselves 3.63 % instead of 3.29 %). The weather input is most of the recipe.
@@ -292,6 +302,10 @@ Each piece of the recipe taken out in turn, every member refitted, eleven BAs ov
 ## How much a later cut-off is worth
 
 The published forecasts may be made later than this study's 9 a.m. cut-off. Run at 3 p.m. and 9 p.m. of the day before, with more of the day's load and the newer HRRR runs, the recipe's error on the eleven development BAs over 2023 to 2025 goes from 2.21 % to 2.15 % and 2.08 % (published forecasts 2.90 %), and its under-forecast at the peak from -1.18 % to -1.09 % (published -1.10 %): an evening forecast holds about a tenth of a point of advantage over the 9 a.m. comparison (`docs/methods.md`, section 8r).
+
+## A caveat on the issued quantiles
+
+The band is read at the adaptive level, while the evaluation scores its edges as the 0.05 and 0.95 quantiles in the CRPS and the pinball losses; on about 28 % of the hours the edge labelled 0.95 sits above the 0.98 quantile. Coverage and Winkler are unaffected; the CRPS moves by at most 0.002 over a year and 0.012 on the event days, and no decision changes (`docs/methods.md`, section 8v; `scripts/check_quantile_labels.py`).
 
 ## Layout
 
