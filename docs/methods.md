@@ -507,6 +507,14 @@ Re-triggering the stored phase O and S candidates offline gave the same picture 
 
 **A defect of the runs, found on 11 October 2026.** The cold-day rules of `AdaptiveIntervals` (`is_cold_day`: the cold-day peak quantile of the recipe, the cold-day level and tail, the severity-scaled move) compare the day's forecast minimum with at least 100 forecast days already produced by the same run, and every run starts empty. They are therefore inactive during the first 100 days of each run: in development (runs from 2020-12-02) through the whole of Winter Storm Uri, at all eleven BAs; on 2023 to 2025 (runs from 2023-01-01) until about 10 April 2023, when 287 of the 1,290 coldest mornings of the 43 BAs occur. For `final16c` this means the 11 Uri pairs are ties by construction, and 9 of the 9 pairs where it could act improved. The rule was not changed after seeing this; a rerun with a warm-up period before each run, and the same rule, is the correct test, and any final test (January to September 2026) needs that warm-up. Not yet done.
 
+## 8x. The recipe frozen for the test on January to September 2026
+
+**What is frozen** (15 October 2026, before any forecast of 2026; full protocol in `docs/test_2026_protocol.md`). The recipe `final10s` of section 8n with the extra stations of section 8u for the temperature of ten BAs, and with the 5th and 95th percentiles issued at their fixed levels next to the band (group `t2026`, model `recipe2026`). The second change is the fix of the labels found in section 8v: the band is still read at the adaptive level and scored as the 90 % interval for coverage and the Winkler score, while the CRPS and the pinball losses at 0.05 and 0.95 now score quantiles read at those levels, with the same spread factor and peak shift as the band (`evaluate.FIXED_EDGES`; hourly outputs `<model>_q05f` and `<model>_q95f` next to the band's edges `<model>_q05` and `<model>_q95`). The point forecast and the band are unchanged. A model whose extra levels lack 0.05 and 0.95 is scored as before, so every earlier run keeps its numbers.
+
+**Warm-up.** The run starts on 2025-01-01 and only 2026 is scored, so the rules that need 100 of the run's own forecasts (section 8w) and the adaptive level have a year of history on the first day of the test.
+
+**Not changed.** No phase V mechanism, no other setting. The rule of lane 2 of phase V stays as written, ties included.
+
 ## 9. Limitations
 
 One to six stations per BA; 22 of the 43 BAs of section 8n still on one. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a

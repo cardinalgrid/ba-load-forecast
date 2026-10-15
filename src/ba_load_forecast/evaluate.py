@@ -20,6 +20,7 @@ from .information_set import InformationSet, Loader
 from .metrics import FIELDS, QUANTILE_FIELDS, crps_from_quantiles, day_metrics, quantile_metrics
 
 BA_MODEL = "DF"
+FIXED_EDGES = {0.05, 0.95}      # extra levels that, when issued, replace the band's edges in the CRPS and the pinball losses
 COLUMNS = ["ba", "day", "model", *FIELDS, *QUANTILE_FIELDS, "temp_min_f", "day_type", "special_day", "run_init", "error"]
 
 
@@ -41,6 +42,11 @@ def score_day(info: InformationSet, forecasters: Sequence[Forecaster], hourly: l
     ``actual``) are appended to it, and the 5th and 95th percentiles of quantile forecasters as
     ``<name>_q05`` and ``<name>_q95``. A quantile forecaster that cannot give an interval yet (not enough
     known errors) is asked for its point forecast instead.
+
+    The band's edges are read at the adaptive level, so they are the 5th and 95th percentiles only when that level is
+    0.10. A forecaster whose extra levels include 0.05 and 0.95 has its CRPS and its ``pinball_05``/``pinball_95`` scored
+    on those fixed-level quantiles (hourly ``<name>_q05f`` and ``<name>_q95f``); without them, the band's edges stand in
+    for 0.05 and 0.95, as in every run before the 2026 test (``docs/methods.md`` 8v).
     """
     blind = blind_copy(info)
     temp_min = float(np.nanmin(info.temp_observed_f)) if np.isfinite(info.temp_observed_f).any() else np.nan
@@ -63,8 +69,16 @@ def score_day(info: InformationSet, forecasters: Sequence[Forecaster], hourly: l
                     qm = quantile_metrics(q, actual)
                     extra = getattr(fc, "last_extra", None)
                     if extra is not None and extra[0] == info.day:
-                        levels = [*fc.extra_levels, 0.05, 0.5, 0.95]
-                        allq = np.vstack([extra[1], q])
+                        levels = list(fc.extra_levels)
+                        if FIXED_EDGES <= set(levels):
+                            # the 5th and 95th percentiles issued at their fixed levels: the CRPS and the pinball losses
+                            # score them, not the band's edges (read at the adaptive level); coverage and Winkler keep the band
+                            q05, q95 = extra[1][levels.index(0.05)], extra[1][levels.index(0.95)]
+                            fixed = quantile_metrics(np.vstack([q05, q[1], q95]), actual)
+                            qm["pinball_05"], qm["pinball_95"] = fixed["pinball_05"], fixed["pinball_95"]
+                            levels, allq = [*levels, 0.5], np.vstack([extra[1], q[1]])
+                        else:
+                            levels, allq = [*levels, 0.05, 0.5, 0.95], np.vstack([extra[1], q])
                         order = np.argsort(levels)
                         qm["crps"] = crps_from_quantiles(allq[order], np.asarray(levels)[order], actual)
                 except ForecastError:
@@ -83,7 +97,8 @@ def score_day(info: InformationSet, forecasters: Sequence[Forecaster], hourly: l
                 extra = getattr(fc, "last_extra", None)
                 if extra is not None and extra[0] == info.day:
                     for level, row in zip(fc.extra_levels, extra[1], strict=True):
-                        hourly.append(hourly_row(info, f"{fc.name}_q{round(level * 100):02d}", row))
+                        fixed = "f" if level in FIXED_EDGES else ""      # _q05f/_q95f, next to the band's edges _q05/_q95
+                        hourly.append(hourly_row(info, f"{fc.name}_q{round(level * 100):02d}{fixed}", row))
     rows.append({**common, "model": BA_MODEL, **day_metrics(info.ba_forecast, actual), **empty_q, "error": note})
     if hourly is not None:
         hourly.append(hourly_row(info, BA_MODEL, info.ba_forecast))
