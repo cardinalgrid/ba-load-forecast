@@ -73,3 +73,20 @@ separate from the test.
 - If a defect is found in the data or the code, it is reported with the result. A rerun after a fix is reported next
   to the first run, never in its place.
 - The protocol v2 exclusions are applied by the code as they stand; no BA-day is removed by hand.
+
+## Addendum, 15 October 2026, before the run: version 5.0 of the NBM
+
+Found while gathering the 2026 inputs, before any forecast of 2026 was produced. The NBM archive moved from version 4.3
+to version 5.0 in May 2026: the 4.3 tree ends with the runs of 5 May, the 5.0 tree starts that day, and 5 May is the only
+day both hold. The 5.0 files keep the grid, the projection and the encoding of 4.3 (same GeoTIFF keys, checked on both
+trees), so the stations are read at the same cells. The temperature keeps its name (`temp`); the spread of the 2 m
+temperature that sets the width factor of the band is published as `temppstddev` instead of `tempstddev`. On the
+two runs of 5 May, over the whole grid and the leads of a 9 a.m. cut-off, the 5.0 spread is about 0.9 times the 4.3
+spread (median ratio 0.85 to 0.95 by lead, correlation 0.82 to 0.86).
+
+Decision, taken now and not revisited after the run: the recipe reads the 5.0 tree as it is published, the spread
+included, with no rescaling. The width factor compares the day's spread with its median over the 40 nearest known days,
+which until May 2027 are mostly days of version 4.3; from May to September 2026 the factor can therefore sit about
+10 % lower than the same weather would have given under 4.3, and the band be narrower. This is reported with the result
+(coverage and Winkler score by month, May to September against January to April), and is a limitation of the test, not
+a reason to change it. `nbm.py` reads the 5.0 tree from commit `c60286b` on.

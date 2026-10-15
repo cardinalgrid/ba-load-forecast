@@ -515,6 +515,8 @@ Re-triggering the stored phase O and S candidates offline gave the same picture 
 
 **Not changed.** No phase V mechanism, no other setting. The rule of lane 2 of phase V stays as written, ties included.
 
+**The NBM version 5.0** (found on 15 October 2026, before the run). The archive moved to version 5.0 in May 2026 (the 4.3 tree ends on 5 May); grid and encoding are unchanged and the temperature spread is published as `temppstddev`, about 0.9 times the 4.3 `tempstddev` on the one day both trees hold. It is read as published, with no rescaling; the consequence for the band from May 2026 on is reported with the result (addendum of `docs/test_2026_protocol.md`).
+
 ## 9. Limitations
 
 One to six stations per BA; 22 of the 43 BAs of section 8n still on one. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
