@@ -2,7 +2,7 @@
 
 The archive keeps one GeoTIFF per element and forecast hour under
 ``blendv<version>/conus/<YYYY>/<MM>/<DD>/<HHMM>/<element>/blendv<version>_conus_<element>_<init>_<valid>.tif``
-(versions 3.2, 4.0, 4.1, 4.2 and 4.3 in separate trees, each covering its own months). The CONUS grid is a
+(versions 3.2, 4.0, 4.1, 4.2, 4.3 and 5.0 in separate trees, each covering its own months). The CONUS grid is a
 Lambert conformal conic on a sphere (radius 6 371 200 m, standard parallel and origin at 25 N, central
 meridian 95 W), 2345 by 1597 cells of 2 539.703 m, stored as tiled, LZW-compressed 16-bit integers with
 -9999 as no data; the ``temp`` element is the 2 m temperature in whole degrees Fahrenheit. Forecast hours are
@@ -34,9 +34,18 @@ import pandas as pd
 from .hrrr import days_between, run_file, with_retries
 
 BASE = "https://noaa-nbm-pds.s3.amazonaws.com/"
-VERSIONS = ("4.3", "4.2", "4.1", "4.0", "3.2")          # newest first: the first tree that has the run wins
+VERSIONS = ("5.0", "4.3", "4.2", "4.1", "4.0", "3.2")   # newest first: the first tree that has the run wins
 ELEMENTS = {"nbm_temp_f": "temp", "nbm_dewpoint_f": "dewpoint", "nbm_wind_mph": "windspd", "nbm_dswrf_wm2": "dswrf",
             "nbm_tempstd_f": "tempstddev"}                           # the blend spread of the 2 m temperature, F
+# Version 5.0 (from May 2026; the 4.3 tree ends with the runs of 5 May, the only day both trees hold) keeps the grid, the encoding and the ``temp`` element, and publishes
+# the spread of the 2 m temperature as ``temppstddev``; on the one run both trees hold it reads about 0.9 times the 4.3
+# ``tempstddev`` (docs/methods.md 8x)
+RENAMED = {("tempstddev", "5.0"): "temppstddev"}
+
+
+def element_in(element: str, version: str) -> str:
+    """The name of an element in the tree of one version."""
+    return RENAMED.get((element, version), element)
 NODATA = -9999
 
 # Lambert conformal conic of the CONUS grid, from the GeoTIFF keys
@@ -103,7 +112,7 @@ def _get_tiff(key: str) -> bytes:
 def list_run(day: date, init_hour: int, element: str, versions: tuple[str, ...] = VERSIONS) -> tuple[str, list[str]] | None:
     """The version tree holding the run and the keys of its files for one element (None when no tree has it)."""
     for v in versions:
-        prefix = f"blendv{v}/conus/{day:%Y/%m/%d}/{init_hour:02d}00/{element}/"
+        prefix = f"blendv{v}/conus/{day:%Y/%m/%d}/{init_hour:02d}00/{element_in(element, v)}/"
         url = f"{BASE}?list-type=2&prefix={prefix}&max-keys=400"
         text = with_retries(lambda u=url: _get(u), f"list {prefix}", log=lambda m: None).decode()
         keys = re.findall(r"<Key>([^<]+)</Key>", text)
