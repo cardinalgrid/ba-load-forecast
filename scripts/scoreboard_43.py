@@ -77,7 +77,7 @@ def aggregates(t: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def figure(t: pd.DataFrame, out: Path) -> None:
+def figure(t: pd.DataFrame, out: Path, period: str = "2023 to 2025") -> None:
     import matplotlib
     import matplotlib.ticker
 
@@ -101,7 +101,7 @@ def figure(t: pd.DataFrame, out: Path) -> None:
     ax.set_xticks(ticks)
     ax.set_xticklabels([str(v) for v in ticks])
     ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-    ax.set_xlabel("mean daily MAPE, 2023 to 2025 (%)", fontsize=8)
+    ax.set_xlabel(f"mean daily MAPE, {period} (%)", fontsize=8)
     ax.tick_params(axis="x", labelsize=7)
     ax.grid(axis="x", lw=0.3, alpha=0.5)
     ax.legend(frameon=False, fontsize=6, loc="lower right")
@@ -125,7 +125,11 @@ def md_table(t: pd.DataFrame, cols: list[tuple[str, str, str]]) -> str:
     return "\n".join(lines)
 
 
-def write_doc(t: pd.DataFrame, agg: pd.DataFrame, doc: Path, model: str, fig_rel: str) -> None:
+SOURCE_B4 = "the 43-BA evaluation (`run_phase_e.py --groups b4`, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, protocol v2)"
+
+
+def write_doc(t: pd.DataFrame, agg: pd.DataFrame, doc: Path, model: str, fig_rel: str, period: str = "2023 to 2025",
+              source: str = SOURCE_B4) -> None:
     t = t.copy()
     t["ba_label"] = t["ba"] + np.where(t["comparable"], "", " (a)")
     t["dm"] = t.apply(lambda r: f"{r['dm_stat']:.1f}" + ("*" if r["dm_p"] < 0.05 else ""), axis=1)
@@ -139,9 +143,9 @@ def write_doc(t: pd.DataFrame, agg: pd.DataFrame, doc: Path, model: str, fig_rel
         ("mape_df_weighted", "MAPE DF, weighted", "{:.2f}"), ("mape_median", "MAPE recipe, median", "{:.2f}"),
         ("mape_df_median", "MAPE DF, median", "{:.2f}"), ("better", "BAs better", "{}"), ("worse", "BAs worse", "{}"),
         ("better_p05", "better, p < 0.05", "{}"), ("worse_p05", "worse, p < 0.05", "{}"), ("coverage_90", "coverage 90", "{:.3f}")])
-    text = f"""# The recipe against each BA's own forecast on the 43 BAs, 2023 to 2025
+    text = f"""# The recipe against each BA's own forecast on the 43 BAs, {period}
 
-Daily rows of the 43-BA evaluation (`run_phase_e.py --groups b4`, 2023-01-01 to 2025-12-31, 9 a.m. cut-off, protocol v2),
+Daily rows of {source},
 on the days both `{model}` and `DF` scored. MAPE is the mean of the daily MAPE in percent of the actual; peak under-forecast
 in percent of the actual peak (negative is under); coverage and Winkler score of the 90 % band of `{model}`. DM is the
 Diebold-Mariano statistic of the daily MAPE of `{model}` against `DF` (negative: the recipe's errors are smaller; `*` for
@@ -173,18 +177,20 @@ def main(argv=None) -> int:
     ap.add_argument("--model", default="final10s")
     ap.add_argument("--doc", type=Path, default=ROOT / "docs" / "scoreboard_43_bas.md")
     ap.add_argument("--fig", type=Path, default=ROOT / "docs" / "figures" / "scoreboard_43_bas")
+    ap.add_argument("--period", default="2023 to 2025", help="the period named in the title and the figure")
+    ap.add_argument("--source", default=SOURCE_B4, help="the run the daily rows come from, as written in the report")
     a = ap.parse_args(argv)
     rows = pd.read_parquet(a.results / "rows.parquet")
     t = per_ba(rows, a.model)
     agg = aggregates(t)
     t.to_csv(a.results / "scoreboard.csv", index=False, float_format="%.4f")
     agg.to_csv(a.results / "scoreboard_aggregates.csv", index=False, float_format="%.4f")
-    figure(t, a.fig)
+    figure(t, a.fig, a.period)
     try:
         fig_rel = a.fig.with_suffix(".png").relative_to(a.doc.parent).as_posix()
     except ValueError:
         fig_rel = a.fig.with_suffix(".png").as_posix()
-    write_doc(t, agg, a.doc, a.model, fig_rel)
+    write_doc(t, agg, a.doc, a.model, fig_rel, a.period, a.source)
     print(agg.to_string(index=False))
     print("wrote", a.doc)
     return 0

@@ -63,7 +63,9 @@ def main(argv=None) -> int:
     rows = scored_rows(a.runs, a.results, a.start, a.end)
     print(f"{rows['ba'].nunique()} BAs, {rows['day'].min()} to {rows['day'].max()}")
     scoreboard_43.main(["--results", str(a.results), "--model", MODEL, "--doc", str(a.docs / "test_2026_scoreboard.md"),
-                        "--fig", str(a.docs / "figures" / "test_2026_scoreboard")])
+                        "--fig", str(a.docs / "figures" / "test_2026_scoreboard"), "--period", "January to September 2026",
+                        "--source", "the test on 2026 (`run_phase_e.py --groups t2026`, run from 2025-01-01 to 2026-09-30, "
+                                    "scored from 2026-01-01; 9 a.m. cut-off, protocol v2; `docs/test_2026_protocol.md`)"])
     comparable = [b for b in BAS_43 if b not in scoreboard_43.NOT_COMPARABLE]
     spec, ref = f"{GROUP}@{a.results / 'scored'}:{MODEL}", f"{GROUP}@{a.results / 'scored'}:DF"
     compare_events.main(["--candidate", spec, "--reference", ref, "--bas", *comparable,
