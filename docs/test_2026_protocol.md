@@ -90,3 +90,14 @@ which until May 2027 are mostly days of version 4.3; from May to September 2026 
 10 % lower than the same weather would have given under 4.3, and the band be narrower. This is reported with the result
 (coverage and Winkler score by month, May to September against January to April), and is a limitation of the test, not
 a reason to change it. `nbm.py` reads the 5.0 tree from commit `c60286b` on.
+
+## After the run, 16 October 2026
+
+The test was run once, on commit `9b43546`, for all 43 BAs. The reports are `docs/test_2026_scoreboard.md`,
+`docs/test_2026_strata.md` and `docs/test_2026_strata_dev.md`, with the daily rows in `results/test_2026/`; the
+result is summarised in section 8x of `docs/methods.md`.
+
+- A defect of the reports: the scoreboard carried the title and figure axis of 2023 to 2025. The labels were fixed
+  (`scoreboard_43.py --period --source`) and the scoring alone was run again; every number is the same.
+- The published `DF` changed at several BAs in 2026. That is described, after the run and apart from the test, in
+  `docs/test_2026_checks.md`; the headline above is not changed by it.

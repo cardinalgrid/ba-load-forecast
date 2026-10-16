@@ -517,6 +517,12 @@ Re-triggering the stored phase O and S candidates offline gave the same picture 
 
 **The NBM version 5.0** (found on 15 October 2026, before the run). The archive moved to version 5.0 in May 2026 (the 4.3 tree ends on 5 May); grid and encoding are unchanged and the temperature spread is published as `temppstddev`, about 0.9 times the 4.3 `tempstddev` on the one day both trees hold. It is read as published, with no rescaling; the consequence for the band from May 2026 on is reported with the result (addendum of `docs/test_2026_protocol.md`).
 
+**Result** (run on 16 October 2026, on commit `9b43546`, all 43 BAs; `docs/test_2026_scoreboard.md`, `docs/test_2026_strata.md`, `docs/test_2026_strata_dev.md`). The headline fixed by the protocol: on the 38 comparable BAs, a demand-weighted MAPE of 2.60 % for the recipe against 4.22 % for `DF` (medians 3.25 and 3.68), the recipe ahead at 24 BAs and behind at 14 (22 and 11 with p < 0.05), coverage of the band 0.899. The peak under-forecast is −1.36 % against −2.73 % on the 30 coldest mornings and −1.35 % against −1.93 % on the 30 largest peaks. On 2023 to 2025 the same comparison gave 2.41 % against 3.16 %, 26 ahead and 12 behind.
+
+**What the headline compares against** (descriptive, after the run; `docs/test_2026_checks.md`, `scripts/test_2026_checks.py`). The published `DF` moved away from the published demand at several BAs in 2026: by more than 5 % from the same month of 2024 in six or more of the nine months at FMPP, LDWP, PSCO, SRP and SWPP, and with a change of hour labels at CISO from December 2025. Without those six BAs, the recipe gives 2.46 % against 2.84 % on the 32 left (medians 3.14 and 3.19), ahead at 18 and behind at the same 14. The headline stands as the protocol fixed it; the smaller number is the fairer reading of the recipe against the operators' forecasts in 2026. The band covers 0.899 from January to April and 0.894 from May to September (NBM 5.0), 0.877 in September.
+
+**A defect of the reports**, found on reading them: the scoreboard of 2026 carried the title and the figure axis of 2023 to 2025, fixed in `scripts/scoreboard_43.py` (`--period`, `--source`); only the scoring was run again, with the same numbers.
+
 ## 9. Limitations
 
 One to six stations per BA; 22 of the 43 BAs of section 8n still on one. The 9 a.m. cut-off and the 2 h availability lag are conventions, not a
