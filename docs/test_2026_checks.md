@@ -1,7 +1,7 @@
 # The test on January to September 2026: descriptive checks after the run
 
 Written on 16 October 2026, after the run and the reports of `docs/test_2026_protocol.md`, by
-`scripts/test_2026_checks.py`. None of this is the test: the headline of the protocol stands as reported in
+`scripts/test_2026_checks.py`; the CISO paragraph of section 1 extended on 17 October 2026. None of this is the test: the headline of the protocol stands as reported in
 `docs/test_2026_scoreboard.md`, and no BA-day was removed from it. These checks describe what the headline compares
 against, the BA's own day-ahead forecast (`DF`) as published on Form EIA-930, and the band after the NBM moved to
 version 5.0.
@@ -117,8 +117,8 @@ of the scoreboard):
 SWPP and LDWP had already moved in 2025 (SWPP from May 2025), so part of their change is also in the 2023 to 2025
 evaluation. CISO is not marked by the level rule (its ratio stays between 0.95 and 0.98 in the three years), but its
 `DF` error rose from 5.38 % over 2023 to 2025 to 10.92 % in
-2026. The `DF` as the run saw it (protocol v2 applied), shifted by whole hours, points to a change of hour labels in the
-published series: from December 2025 on, a shift of one hour (+1 h) lowers its error in every month:
+2026. The `DF` as the run saw it (protocol v2 applied), shifted by whole hours: from December 2025 on, a shift of one
+hour (+1 h) lowers its error in every month:
 
 | month | days | MAPE recipe | MAPE DF | DF shifted -2 h | DF shifted -1 h | DF shifted +1 h | DF shifted +2 h |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -143,6 +143,43 @@ published series: from December 2025 on, a shift of one hour (+1 h) lowers its e
 | 2026-07 | 31 | 2.78 | 10.49 | 16.45 | 13.50 | 8.17 | 8.48 |
 | 2026-08 | 31 | 2.63 | 10.28 | 16.48 | 13.35 | 8.21 | 8.37 |
 | 2026-09 | 30 | 3.01 | 10.16 | 15.48 | 12.85 | 8.14 | 8.30 |
+
+The cause is in the outcome, not in `DF`. Protocol v2 moves the published CISO demand back one hour from 14 June 2022
+on, with no end date (`docs/hour_label_offsets.csv`). The daily test that found that offset, run on the raw series,
+shows that it ended: from 3 December 2025 on, `DF` fits the published demand better as published than as protocol v2
+reads it on nearly every day.
+
+| month | days | share of days DF fits D as published better |
+| --- | --- | --- |
+| 2025-06 | 30 | 0.03 |
+| 2025-07 | 31 | 0.03 |
+| 2025-08 | 31 | 0.06 |
+| 2025-09 | 30 | 0.03 |
+| 2025-10 | 31 | 0.00 |
+| 2025-11 | 28 | 0.07 |
+| 2025-12 | 31 | 0.87 |
+| 2026-01 | 31 | 0.97 |
+| 2026-02 | 28 | 1.00 |
+| 2026-03 | 29 | 1.00 |
+| 2026-04 | 30 | 1.00 |
+| 2026-05 | 31 | 1.00 |
+| 2026-06 | 30 | 1.00 |
+| 2026-07 | 31 | 1.00 |
+| 2026-08 | 31 | 1.00 |
+| 2026-09 | 30 | 1.00 |
+
+So from that day protocol v2 moves a correctly labelled demand one hour off, for the recipe and for `DF` alike, and the
+recipe also learned from the moved demand after that day. The test was run as the protocol fixed it and is not
+changed. Scored against the demand as published, CISO in 2026 reads:
+
+| outcome | days | MAPE recipe | MAPE DF |
+| --- | --- | --- | --- |
+| D as protocol v2 reads it (the test) | 272 | 2.93 | 10.92 |
+| D as published | 272 | 3.87 | 9.23 |
+
+Against the demand as published the recipe, trained on the moved demand, does worse and `DF` does better; the recipe
+stays well ahead of `DF` on both, and `DF` of CISO is weak against either. CISO is left out of the last row below
+because its 2026 scoring, for both forecasts, rests on an outcome one hour off.
 
 ## 2. The headline without those BAs
 
