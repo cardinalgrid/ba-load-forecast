@@ -135,8 +135,8 @@ the refit cadence (7 days), the complete-case rule of the report, and the load-s
 Not versioned here: the data files themselves. The HRRR archive is immutable, so steps 1 and 6 give the
 same parquet files on any day; the EIA-930 and ISD-Lite files may be revised by their publishers, so a
 rerun months later can differ in a few hours of a few BA-years. To reproduce the numbers exactly, use the
-same tidy and ISD-Lite snapshots (the scorecard repository and the `isd` cache) or the archived copies
-that each tagged release deposits.
+same tidy and ISD-Lite snapshots (the tidy files of the scorecard repository at the commit used, and the
+`isd` cache). The tagged releases and their archived copies hold the code, not the data files.
 
 ## Reading the results
 
