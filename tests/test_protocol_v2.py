@@ -2,7 +2,8 @@
 import numpy as np
 import pandas as pd
 
-from ba_load_forecast.information_set import apply_label_offsets, forecast_plausible, jumps, plausible
+from ba_load_forecast.information_set import (LABEL_OFFSETS, apply_label_offsets, forecast_plausible, jumps,
+                                              label_offsets, plausible)
 
 
 def test_a_spike_against_its_neighbours_is_a_fault_and_a_ramp_is_not():
@@ -54,3 +55,15 @@ def test_label_offsets_move_only_the_documented_period_and_column():
     b = apply_label_offsets(s, "CISO", "demand", back)
     assert b.loc["2019-01-31 23:00"] == s.loc["2019-02-01 00:00"]      # a moved value wins over the one it lands on
     assert b.loc["2019-02-02 00:00"] == s.loc["2019-02-02 00:00"]      # the period end is respected
+
+
+def test_the_documented_ciso_offset_ends_on_2_december_2025():
+    t = label_offsets(LABEL_OFFSETS)
+    ciso = t[(t["ba"] == "CISO") & (t["column"] == "demand")].iloc[0]
+    assert ciso["end"] == pd.Timestamp("2025-12-02 14:00")
+    hours = pd.date_range("2025-12-02 12:00", periods=5, freq="h")
+    s = pd.Series(np.arange(5, dtype=float), index=hours)
+    moved = apply_label_offsets(s, "CISO", "demand", t)
+    assert moved.loc["2025-12-02 13:00"] == s.loc["2025-12-02 14:00"]  # the last moved hour
+    assert "2025-12-02 14:00" not in moved.index.astype(str)          # the hour at the switch stays missing
+    assert moved.loc["2025-12-02 15:00"] == s.loc["2025-12-02 15:00"]  # read as published from then on
